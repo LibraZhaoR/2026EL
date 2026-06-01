@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>南京周末漫游</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main class="stage">
+    <section class="phone" aria-label="南京周末漫游 APP 演示">
+        <div class="status-bar">
+            <span>19:02</span>
+            <span>南京 · 周末</span>
+        </div>
+
+        <section class="screen active" id="splash-screen">
+            <div class="splash-art">
+                <div class="sun"></div>
+                <div class="river"></div>
+                <div class="gate gate-left"></div>
+                <div class="gate gate-right"></div>
+                <div class="tower"></div>
+            </div>
+            <div class="splash-copy">
+                <p class="eyebrow">Citywalk · NJU Story</p>
+                <h1>今天，去南京走一段故事</h1>
+                <p>路线推荐、剧情任务、南大校史、展览提醒和轻量 AI 向导，一起装进口袋。</p>
+            </div>
+            <button class="primary-btn" data-go="onboarding-screen">开始漫游</button>
+        </section>
+
+        <section class="screen" id="onboarding-screen">
+            <header class="page-head">
+                <p class="eyebrow">偏好选择</p>
+                <h2>今天想怎么逛？</h2>
+            </header>
+            <div class="selector-block">
+                <h3>身份</h3>
+                <div class="choice-grid" id="role-options">
+                    <button class="choice-card selected" data-value="南大新生"><span class="line-icon campus"></span>南大新生</button>
+                    <button class="choice-card" data-value="一个人闲逛"><span class="line-icon leaf"></span>一个人闲逛</button>
+                    <button class="choice-card" data-value="和朋友出门"><span class="line-icon people"></span>和朋友出门</button>
+                    <button class="choice-card" data-value="约会出行"><span class="line-icon heart"></span>约会出行</button>
+                </div>
+            </div>
+            <div class="selector-block">
+                <h3>心情</h3>
+                <div class="mood-list" id="mood-options">
+                    <button class="pill selected" data-value="想学点历史">想学点历史</button>
+                    <button class="pill" data-value="想放空">想放空</button>
+                    <button class="pill" data-value="想热闹">想热闹</button>
+                    <button class="pill" data-value="只有两小时">只有两小时</button>
+                    <button class="pill" data-value="想看展">想看展</button>
+                </div>
+            </div>
+            <button class="primary-btn sticky-action" data-go="home-screen">进入首页</button>
+        </section>
+
+        <section class="screen with-nav" id="home-screen">
+            <div class="map-shell">
+                <div id="nanjing-map" class="map-canvas" aria-label="南京漫游地图"></div>
+                <div class="map-top-panel">
+                    <div>
+                        <p class="eyebrow">南京漫游地图</p>
+                        <h2>拖动地图，找今天想走的故事</h2>
+                    </div>
+                    <button class="guide-avatar" data-open-guide aria-label="打开向导">呢</button>
+                </div>
+                <div class="map-tools">
+                    <button data-map-focus="night">夜游</button>
+                    <button data-map-focus="exhibition">展览</button>
+                    <button data-map-focus="all">全览</button>
+                </div>
+                <button class="nju-map-entry" data-tab="nju" aria-label="进入南大专属剧本">
+                    <span>南大</span>
+                    <strong>1902</strong>
+                </button>
+                <section class="home-action-dock" aria-label="首页快捷入口">
+                    <button data-tab="routes"><span class="line-icon route"></span><strong>按时间选路线</strong></button>
+                    <button data-tab="story"><span class="line-icon book"></span><strong>剧情导览</strong></button>
+                    <button data-tab="exhibitions"><span class="line-icon bell"></span><strong>预约提醒</strong></button>
+                </section>
+            </div>
+        </section>
+
+        <section class="screen with-nav" id="routes-screen">
+            <header class="page-head compact">
+                <p class="eyebrow">路线列表</p>
+                <h2>选一段适合今天的路</h2>
+            </header>
+            <div class="filter-row">
+                <button class="filter-chip selected" data-filter="all">全部</button>
+                <button class="filter-chip" data-filter="生活">生活</button>
+                <button class="filter-chip" data-filter="文化">文化</button>
+                <button class="filter-chip" data-filter="预约">需预约</button>
+            </div>
+            <div class="route-stack" id="route-list"></div>
+        </section>
+
+        <section class="screen with-nav story-mode" id="story-screen">
+            <header class="story-head">
+                <p class="eyebrow">剧情导览</p>
+                <h2>金陵旧梦夜游</h2>
+                <div class="progress-line"><span style="width: 42%"></span></div>
+            </header>
+            <article class="story-card">
+                <p class="chapter-label">第二章 · 灯影任务</p>
+                <h3>你在夫子庙前停下脚步</h3>
+                <p>河面有灯色，旧街有烟火气。向导提醒你：找到今晚最像“金陵旧梦”的一处光影，然后完成一次打卡。</p>
+                <div class="task-panel">
+                    <span class="line-icon camera"></span>
+                    <div>
+                        <strong>点位任务</strong>
+                        <p>拍一张灯影照片，或回答一道秦淮文化小问题。</p>
+                    </div>
+                </div>
+                <button class="gold-btn" id="submit-task-btn">完成任务</button>
+            </article>
+            <div class="guide-bubble night">
+                <strong>金陵引路人</strong>
+                <p id="task-feedback">今晚的隐藏结局，会由你的选择决定。</p>
+            </div>
+        </section>
+
+        <section class="screen with-nav paper-mode" id="nju-screen">
+            <header class="page-head compact">
+                <p class="eyebrow">南大专属剧本</p>
+                <h2>从 1902 到 2026</h2>
+            </header>
+            <div class="guide-bubble nju">
+                <strong>呢喃向导</strong>
+                <p>我会陪你从三江师范的来信走到今天的南大。</p>
+            </div>
+            <div class="timeline" id="nju-timeline"></div>
+        </section>
+
+        <section class="screen with-nav" id="exhibitions-screen">
+            <header class="page-head compact">
+                <p class="eyebrow">展览预约</p>
+                <h2>把放票时间提前记住</h2>
+            </header>
+            <div class="exhibition-list" id="exhibition-list"></div>
+        </section>
+
+        <section class="screen with-nav" id="achievements-screen">
+            <header class="page-head compact">
+                <p class="eyebrow">城市文化图鉴</p>
+                <h2>你的南京探索收藏</h2>
+            </header>
+            <div class="achievement-grid" id="achievement-list"></div>
+        </section>
+
+        <section class="screen with-nav" id="ai-screen">
+            <header class="page-head compact">
+                <p class="eyebrow">AI 城市向导</p>
+                <h2>让向导帮你安排</h2>
+            </header>
+            <div class="chat-window" id="chat-window">
+                <div class="chat assistant">想要半日路线、展览路线，还是南大校史线？</div>
+            </div>
+            <form class="chat-form" id="chat-form">
+                <input id="chat-input" type="text" placeholder="例如：我只有 2 小时，想轻松一点">
+                <button type="submit">发送</button>
+            </form>
+        </section>
+
+        <nav class="bottom-nav">
+            <button class="active" data-tab="home"><span class="line-icon home"></span>首页</button>
+            <button data-tab="routes"><span class="line-icon route"></span>路线</button>
+            <button data-tab="story"><span class="line-icon book"></span>剧情</button>
+            <button data-tab="achievements"><span class="line-icon medal"></span>成就</button>
+            <button data-tab="ai"><span class="line-icon chat"></span>AI</button>
+        </nav>
+
+        <div class="guide-sheet" id="guide-sheet" aria-hidden="true">
+            <button class="sheet-mask" data-close-guide aria-label="关闭"></button>
+            <section class="sheet-panel">
+                <div class="guide-portrait">呢</div>
+                <div>
+                    <p class="eyebrow">二次元向导</p>
+                    <h3>呢喃</h3>
+                    <p>我会在路线开始、到达点位、完成任务和解锁成就时给你轻提示。</p>
+                </div>
+                <button class="primary-btn" data-close-guide>知道了</button>
+            </section>
+        </div>
+    </section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: campus-nanjing-travel
+
+travel:
+  ai:
+    provider: mock
+    base-url: ""
+    api-key: ""
+  share:
+    base-url: "https://example.com/invite/"
