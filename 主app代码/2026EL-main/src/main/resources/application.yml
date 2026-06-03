@@ -6,6 +6,10 @@ server:
 spring:
   application:
     name: campus-nanjing-travel
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
 
 travel:
   ai:
