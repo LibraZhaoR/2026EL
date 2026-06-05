@@ -6,15 +6,17 @@ server:
 spring:
   application:
     name: campus-nanjing-travel
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
 
 travel:
   ai:
     provider: mock
-    base-url: ""
-    api-key: ""
+    base-url: https://ark.cn-beijing.volces.com/api/v3/responses
+    api-key: ${AI_API_KEY:your-api-key-here}
+    model: doubao-seed-1-6
+  meituan:
+    enabled: false
+    developer-id: ""
+    sign-key: ${MEITUAN_SIGN_KEY:your-sign-key-here}
+    base-url: https://api-open-cater.meituan.com
   share:
-    base-url: "https://example.com/invite/"
+    base-url: https://example.com/invite/

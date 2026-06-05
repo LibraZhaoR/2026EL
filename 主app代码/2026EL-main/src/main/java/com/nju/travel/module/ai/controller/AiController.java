@@ -1,5 +1,6 @@
 package com.nju.travel.module.ai.controller;
 
+import com.nju.travel.common.annotation.RateLimit;
 import com.nju.travel.common.result.ApiResult;
 import com.nju.travel.module.ai.dto.AiChatRequest;
 import com.nju.travel.module.ai.dto.AiRoutePlanRequest;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/ai")
+@RateLimit(key = "ai", maxRequests = 20, duration = 1, message = "AI 接口请求过于频繁，请稍后再试")
 public class AiController {
 
     private final AiService aiService;
@@ -22,12 +24,12 @@ public class AiController {
     }
 
     @PostMapping("/chat")
-    public ApiResult<AiChatVO> chat(@Valid @RequestBody AiChatRequest request) {
+    public ApiResult<AiChatVO> chat(@RequestBody AiChatRequest request) {
         return ApiResult.success(aiService.chat(request));
     }
 
     @PostMapping("/route-plan")
-    public ApiResult<AiChatVO> routePlan(@Valid @RequestBody AiRoutePlanRequest request) {
+    public ApiResult<AiChatVO> routePlan(@RequestBody AiRoutePlanRequest request) {
         return ApiResult.success(aiService.routePlan(request));
     }
 }

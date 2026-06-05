@@ -7,9 +7,10 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "travel.ai")
 public class AiConfig {
 
-    private String provider;
-    private String baseUrl;
-    private String apiKey;
+    private String provider = "mock";
+    private String baseUrl = "";
+    private String apiKey = "";
+    private String model = "doubao-seed-1-6-thinking-250715";
 
     public String getProvider() {
         return provider;
@@ -33,5 +34,13 @@ public class AiConfig {
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
     }
 }

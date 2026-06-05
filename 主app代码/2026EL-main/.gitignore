@@ -4,3 +4,8 @@ target/
 *.iml
 *.log
 .DS_Store
+*.bak2
+交互代码/
+资源/
+Citywalk.docx
+设想.md

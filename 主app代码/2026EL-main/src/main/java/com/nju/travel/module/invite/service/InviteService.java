@@ -20,7 +20,7 @@ public class InviteService {
     private final RouteService routeService;
     private final String shareBaseUrl;
 
-    public InviteService(RouteService routeService, @Value("${travel.share.base-url}") String shareBaseUrl) {
+    public InviteService(RouteService routeService, @Value("${travel.share.base-url:https://example.com/invite/}") String shareBaseUrl) {
         this.routeService = routeService;
         this.shareBaseUrl = shareBaseUrl;
     }
