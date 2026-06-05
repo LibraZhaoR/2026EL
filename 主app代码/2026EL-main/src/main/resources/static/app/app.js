@@ -910,15 +910,26 @@ function openRoute(key) {
                 <span class="icon">🎴</span>
                 <span class="label">路线邀请卡</span>
             </button>
+            <button class="route-action-btn" onclick="handleSaveRoute('${key}')">
+                <span class="icon">💾</span>
+                <span class="label">存入我的路线</span>
+            </button>
         </div>` +
         `<button class="sheet-close">收起画卷</button>`;
     sheet.classList.add("open");
+    // Add no-scroll class for compact routes (< 5 stops)
+    if (r.stops.length <= 4) {
+        sheetBody.classList.add("no-scroll");
+    } else {
+        sheetBody.classList.remove("no-scroll");
+    }
     // Inject supply entry into route sheet
     setTimeout(() => addSupplyEntryToRouteSheet(sheetBody, key), 50);
 }
 
 function closeSheet() {
     sheet.classList.remove("open");
+    sheetBody.classList.remove("no-scroll");
     currentRouteKey = null;
 }
 
@@ -1497,6 +1508,12 @@ function showMainPage() {
     enteredApp = true;
 
     mainPage.classList.add("visible");
+    // Ensure scroll drawer starts collapsed
+    const mainScrollInit = document.getElementById("main-scroll");
+    if (mainScrollInit) {
+        mainScrollInit.classList.remove("expanded");
+    }
+    mainPage.classList.remove("drawer-open");
     // Initialize AMap instead of canvas map
     initAMap();
     window.addEventListener("resize", onMainResize);
@@ -1615,7 +1632,24 @@ function showMainPage() {
         });
     }
 
-    // Bottom nav — full tab switching system
+    // ── Scroll pull handle → toggle drawer ──
+    const pullHandle = document.getElementById("scroll-pull-handle");
+    const mainScrollEl = document.getElementById("main-scroll");
+    if (pullHandle && mainScrollEl) {
+        pullHandle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleScrollDrawer();
+        });
+        // Auto-expand on first scroll
+        mainScrollEl.addEventListener("scroll", () => {
+            if (mainScrollEl.scrollTop > 20 && !mainScrollEl.classList.contains("expanded")) {
+                mainScrollEl.classList.add("expanded");
+                document.getElementById("main-page").classList.add("drawer-open");
+            }
+        }, { passive: true });
+    }
+
+    // ── Bottom nav — full tab switching system
     document.querySelectorAll(".nav-item").forEach(item => {
         item.addEventListener("click", () => {
             switchTab(item.dataset.tab);
@@ -1641,6 +1675,24 @@ function onMainResize() {
     if (amapInstance) {
         amapInstance.resize();
     }
+}
+
+// ── Toggle scroll bottom drawer ──
+function toggleScrollDrawer() {
+    const scrollEl = document.getElementById("main-scroll");
+    const mainPage = document.getElementById("main-page");
+    if (!scrollEl || !mainPage) return;
+
+    scrollEl.classList.toggle("expanded");
+    mainPage.classList.toggle("drawer-open", scrollEl.classList.contains("expanded"));
+
+    // Hide the pull-text when expanded
+    const pullText = scrollEl.querySelector(".pull-text");
+    if (pullText) {
+        pullText.style.display = scrollEl.classList.contains("expanded") ? "none" : "";
+    }
+
+    if (amapInstance) setTimeout(() => amapInstance.resize(), 100);
 }
 
 // ── Route marker map data for AMap ──
@@ -1704,6 +1756,22 @@ function initAMap() {
                 position: "RT",
                 offset: new AMap.Pixel(10, 60),
             }));
+
+            // ── Map interaction → hide title/header, restore on idle ──
+            let mapInteractTimer = null;
+            const titleArea = document.querySelector(".map-title-area");
+            const mainHeader = document.querySelector(".main-header");
+            const fadeMapUI = () => {
+                if (titleArea) titleArea.classList.add("fade-out");
+                if (mainHeader) mainHeader.style.opacity = "0";
+                clearTimeout(mapInteractTimer);
+                mapInteractTimer = setTimeout(() => {
+                    if (titleArea) titleArea.classList.remove("fade-out");
+                    if (mainHeader) mainHeader.style.opacity = "1";
+                }, 2000);
+            };
+            amapInstance.on("mapmove", fadeMapUI);
+            amapInstance.on("zoomchange", fadeMapUI);
 
             // Add all route markers and lines
             addAllRouteOverlays(AMap);
@@ -1804,7 +1872,7 @@ function startCanvasMapFallback() {
         mainMapCanvas.style.display = "block";
         const ctx = mainMapCanvas.getContext("2d");
         const vw = window.innerWidth;
-        const vh = Math.round(window.innerHeight * 0.55);
+        const vh = window.innerHeight;
         mainMapCanvas.width = vw * (window.devicePixelRatio || 1);
         mainMapCanvas.height = vh * (window.devicePixelRatio || 1);
         mainMapCanvas.style.width = vw + "px";
@@ -2410,6 +2478,13 @@ const ACHIEVEMENT_DEFS = [
     { id: "coffee",  icon: "☕", name: "午后慢享", desc: "完成午后餐茶路线" },
     { id: "copy",    icon: "💜", name: "首条复刻", desc: "复刻一条喜欢的路线" },
     { id: "invite",  icon: "🤝", name: "邀约达人", desc: "成功邀请朋友一起出发" },
+    { id: "all_routes", icon: "🌟", name: "金陵通", desc: "完成全部4条路线" },
+    { id: "five_stops", icon: "📌", name: "打卡达人", desc: "累计打卡10个站点" },
+    { id: "early", icon: "🌅", name: "早鸟", desc: "在上午9点前出发探索" },
+    { id: "night_owl", icon: "🦉", name: "夜猫子", desc: "晚上8点后还在探索" },
+    { id: "guide", icon: "💬", name: "向导挚友", desc: "与南小鲸对话10次以上" },
+    { id: "collector", icon: "🎴", name: "收藏家", desc: "创建3条以上自定义路线" },
+    { id: "social", icon: "👥", name: "社交达人", desc: "分享路线给5位好友" },
 ];
 
 function getAchievements() {
@@ -2493,10 +2568,12 @@ function switchTab(tab) {
     if (!mapStage || !mapContainer) return;
 
     if (tab === "map") {
-        // Fullscreen map — show stage, hide scroll and all overlays
+        // Map is already full screen; just hide drawer and overlays
         mapStage.style.display = "";
         mapContainer.style.display = "block";
         hideAllTabContent();
+        const scroll = document.querySelector(".main-scroll");
+        if (scroll) scroll.style.display = "none";
         // Hide header and title area so only the map fills the page
         const header = document.querySelector(".main-header");
         const titleArea = document.querySelector(".map-title-area");
@@ -2512,14 +2589,14 @@ function switchTab(tab) {
         if (mapOverlay) mapOverlay.style.display = "none";
         if (routeCanvas) routeCanvas.style.display = "none";
         if (graffitiLayer) graffitiLayer.style.display = "none";
+        // Mark as fullscreen for resize purposes only
         if (!amapFullscreen) {
             amapFullscreen = true;
-            mapContainer.classList.add("amap-fullscreen");
             document.querySelector(".bottom-nav").style.zIndex = "60";
             if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
         }
     } else if (tab === "home") {
-        // Home — show stage at normal height, show scroll
+        // Home — map fills screen, bottom drawer collapsed
         mapStage.style.display = "";
         mapContainer.style.display = "block";
         // Restore header and overlays
@@ -2544,8 +2621,15 @@ function switchTab(tab) {
             if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
         }
         hideAllTabContent();
+        // Reset drawer to collapsed state (after hideAllTabContent unhides it)
         const scroll = document.querySelector(".main-scroll");
-        if (scroll) scroll.style.display = "";
+        if (scroll) {
+            scroll.style.display = "";
+            scroll.classList.remove("expanded");
+        }
+        document.getElementById("main-page")?.classList.remove("drawer-open");
+        const pullText = scroll?.querySelector(".pull-text");
+        if (pullText) pullText.style.display = "";
     } else {
         // routes / nearby / profile — hide entire map stage and all other tabs
         mapStage.style.display = "none";
@@ -3239,16 +3323,7 @@ function renderProfileTab(container) {
     const personaName = persona ? persona.title : "未选择";
     const personaIcon = persona ? persona.elements[0].emoji : "👤";
     const unlockedData = getAchievements();
-    const achievements = [
-        { id: "night",  icon: "🏮", name: "夜泊秦淮", desc: "完成秦淮夜游路线" },
-        { id: "nju",    icon: "🎓", name: "南大记忆", desc: "完成南大校史路线" },
-        { id: "food",   icon: "🍜", name: "美食猎人", desc: "探索 3 家以上美食点位" },
-        { id: "expo",   icon: "🏛", name: "文化漫游者", desc: "完成博物馆展览路线" },
-        { id: "photo",  icon: "📸", name: "城市记录者", desc: "拍摄 5 个以上打卡点位" },
-        { id: "coffee", icon: "☕", name: "午后慢享", desc: "完成午后餐茶路线" },
-        { id: "copy",   icon: "💜", name: "首条复刻", desc: "复刻一条喜欢的路线" },
-        { id: "invite", icon: "🤝", name: "邀约达人", desc: "成功邀请朋友一起出发" },
-    ];
+    const achievements = ACHIEVEMENT_DEFS;
     const unlockedCount = achievements.filter(a => unlockedData[a.id]).length;
 
     container.innerHTML =
@@ -3267,7 +3342,7 @@ function renderProfileTab(container) {
         </div>
 
         <div class="profile-section">
-            <button class="profile-menu-item" onclick="switchTab('home')" style="border-radius:16px;border:1px solid var(--rule);padding:16px;background:var(--surface);margin-bottom:10px;display:flex;align-items:center;gap:12px;width:100%;font-family:inherit;font-size:14px;color:var(--ink);cursor:pointer;">
+            <button class="profile-menu-item" onclick="showMyRoutes()" style="border-radius:16px;border:1px solid var(--rule);padding:16px;background:var(--surface);margin-bottom:10px;display:flex;align-items:center;gap:12px;width:100%;font-family:inherit;font-size:14px;color:var(--ink);cursor:pointer;">
                 <span class="menu-icon" style="font-size:22px;">📋</span>
                 <span class="menu-text" style="flex:1;font-weight:500;">我的路线</span>
                 <span class="menu-arrow" style="color:var(--faint);">›</span>
@@ -3307,6 +3382,257 @@ function renderProfileTab(container) {
                 </div>
             </div>
         </div>`;
+}
+
+// ═══════════════════════════════════════
+//  Re-select Persona
+// ═══════════════════════════════════════
+
+function reSelectPersona() {
+    // Reset state so showPersonaPage() can be called again
+    personaSwiperShown = false;
+    mainPageShown = false;
+    enteredApp = false;
+
+    // Hide main page
+    mainPage.classList.remove("visible");
+    mainPage.style.display = "none";
+
+    // Reset swiper container
+    swiperContainer.innerHTML = "";
+    swiperContainer.removeEventListener("scroll", onSwiperScroll);
+
+    // Swiper UI reset
+    const tut = document.getElementById("swiper-tutorial");
+    if (tut) { tut.style.display = ""; tut.classList.remove("show"); }
+
+    // Close any open sheets/overlays
+    closeSheet();
+    document.querySelectorAll(".open").forEach(el => el.classList.remove("open"));
+
+    // Reset AMap for re-init with new persona
+    if (amapInstance) {
+        amapInstance.destroy();
+        amapInstance = null;
+    }
+    document.getElementById("main-map-container")?.classList.remove("amap-fullscreen");
+    amapReady = false;
+    amapInitializing = false;
+    amapRouteLines = [];
+    amapMarkers = [];
+    amapFullscreen = false;
+
+    // Hide AI chat
+    if (aiChatOpen) toggleAiChat();
+
+    // Show persona page after brief delay
+    setTimeout(() => showPersonaPage(), 300);
+}
+
+// ═══════════════════════════════════════
+//  My Routes — popup showing saved routes
+// ═══════════════════════════════════════
+
+function showMyRoutes() {
+    // Remove existing overlay
+    const existing = document.querySelector(".my-routes-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "my-routes-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:300;background:rgba(26,28,27,0.35);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;";
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+    const sheet = document.createElement("div");
+    sheet.style.cssText = "width:100%;max-height:85%;background:var(--stone);border-radius:20px 20px 0 0;padding:24px 20px 36px;animation:rise 0.3s ease;overflow-y:auto;";
+
+    // Try to load from API first, fallback to local
+    Promise.all([
+        fetch("/api/user-routes?userId=1").then(r => r.json()).then(d => d.data || []).catch(() => []),
+        Promise.resolve().then(() => { try { return JSON.parse(localStorage.getItem("nj_saved_routes") || "[]"); } catch(e) { return []; } })
+    ]).then(([apiRoutes, localRoutes]) => {
+        let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+                <div style="font-family:'Noto Serif SC',serif;font-size:20px;font-weight:500;color:var(--ink);">📋 我的路线</div>
+                <div style="font-size:12px;color:var(--soft);margin-top:4px;">${apiRoutes.length + localRoutes.length} 条已保存路线</div>
+            </div>
+            <button onclick="showCreateRouteForm()" style="padding:8px 16px;border-radius:999px;background:var(--nju-purple);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;">+ 新建路线</button>
+        </div>`;
+
+        if (apiRoutes.length === 0 && localRoutes.length === 0) {
+            html += `<div style="text-align:center;padding:40px 20px;color:var(--faint);font-size:14px;">
+                <div style="font-size:48px;margin-bottom:12px;">🗺</div>
+                <p>还没有保存的路线</p>
+                <p style="font-size:12px;margin-top:4px;">探索路线后点击「存入我的路线」即可保存</p>
+            </div>`;
+        } else {
+            // API routes
+            apiRoutes.forEach(ur => {
+                html += renderMyRouteItem(ur.title || "我的路线", ur.description || "", ur.createdAt || "");
+            });
+            // Local routes
+            localRoutes.forEach(lr => {
+                html += renderMyRouteItem(lr.title || "离线路线", "离线保存", lr.savedAt || "");
+            });
+        }
+
+        html += `<button onclick="this.closest('.my-routes-overlay').remove()" style="display:block;width:100%;padding:10px;margin-top:12px;border-radius:999px;border:1px solid var(--rule);background:transparent;font-size:13px;color:var(--soft);cursor:pointer;font-family:inherit;">关闭</button>`;
+
+        sheet.innerHTML = html;
+        overlay.appendChild(sheet);
+        document.body.appendChild(overlay);
+    });
+}
+
+function renderMyRouteItem(title, desc, date) {
+    const dateStr = date ? new Date(date).toLocaleDateString("zh-CN") : "";
+    return `<div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--rule);margin-bottom:8px;cursor:pointer;" onclick="showToast('🗺 路线详情')">
+        <span style="font-size:24px;">📍</span>
+        <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(title)}</div>
+            <div style="font-size:11px;color:var(--faint);margin-top:2px;">${escapeHtml(desc)}${dateStr ? ' · ' + dateStr : ''}</div>
+        </div>
+        <span style="color:var(--faint);font-size:16px;">›</span>
+    </div>`;
+}
+
+// ═══════════════════════════════════════
+//  Create Route Form
+// ═══════════════════════════════════════
+
+function showCreateRouteForm() {
+    // Close my-routes overlay if open
+    const existing = document.querySelector(".my-routes-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "create-route-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:310;background:rgba(26,28,27,0.35);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;";
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeCreateRoute(overlay); });
+
+    overlay.innerHTML = `
+    <div class="invite-sheet" style="background:var(--stone);" onclick="event.stopPropagation()">
+        <p class="title">✏️ 创建自定义路线</p>
+        <p class="subtitle">设计你自己的南京探索路线</p>
+        <div class="invite-form">
+            <label>路线名称</label>
+            <input type="text" id="create-route-title" placeholder="如：我的午后漫步" />
+
+            <label>路线描述</label>
+            <input type="text" id="create-route-desc" placeholder="一句话描述..." />
+
+            <label>路线时长（分钟）</label>
+            <input type="number" id="create-route-duration" placeholder="如：120" />
+
+            <label>基于已有路线（可选）</label>
+            <select id="create-route-source" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--rule);background:var(--surface);font-size:14px;font-family:inherit;outline:none;">
+                <option value="">全新路线</option>
+                <option value="nju">南大校史线</option>
+                <option value="night">秦淮夜游</option>
+                <option value="food">午后餐茶</option>
+                <option value="expo">博物馆展览</option>
+            </select>
+
+            <div class="form-actions">
+                <button class="btn-primary" onclick="submitCreateRoute()">✨ 创建路线</button>
+                <button class="btn-cancel" onclick="closeCreateRoute(this.closest('.create-route-overlay'))">取消</button>
+            </div>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+}
+
+function closeCreateRoute(overlay) {
+    if (overlay) overlay.remove();
+}
+
+function submitCreateRoute() {
+    const title = document.getElementById("create-route-title").value.trim();
+    const desc = document.getElementById("create-route-desc").value.trim();
+    const duration = parseInt(document.getElementById("create-route-duration").value) || 120;
+    const sourceKey = document.getElementById("create-route-source").value;
+    const sourceRouteId = sourceKey ? (ROUTE_KEY_TO_ID[sourceKey] || 1) : null;
+
+    if (!title) { showToast("请填写路线名称"); return; }
+
+    const body = {
+        userId: 1,
+        sourceRouteId: sourceRouteId,
+        title: title,
+        description: desc || "我的自定义路线",
+        isPublic: false,
+        pointIds: []
+    };
+
+    fetch("/api/user-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.code === 200) {
+            showToast("✅ 路线已创建！前往「我的路线」查看");
+            unlockAchievement("collector");
+            document.querySelectorAll(".create-route-overlay, .my-routes-overlay").forEach(el => el.remove());
+        } else {
+            showToast("❌ 创建失败");
+        }
+    })
+    .catch(() => {
+        // Offline fallback
+        let saved = [];
+        try { saved = JSON.parse(localStorage.getItem("nj_saved_routes") || "[]"); } catch(e) {}
+        saved.push({ key: "custom_" + Date.now(), title: title + "（自定义）", savedAt: new Date().toISOString() });
+        localStorage.setItem("nj_saved_routes", JSON.stringify(saved));
+        showToast("✅ 路线已离线创建");
+        unlockAchievement("collector");
+        document.querySelectorAll(".create-route-overlay, .my-routes-overlay").forEach(el => el.remove());
+    });
+}
+
+// ═══════════════════════════════════════
+//  Save Route / My Routes
+// ═══════════════════════════════════════
+
+function handleSaveRoute(routeKey) {
+    const r = routes[routeKey];
+    if (!r) return;
+    const routeId = ROUTE_KEY_TO_ID[routeKey] || 1;
+
+    fetch("/api/user-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            userId: 1,
+            sourceRouteId: routeId,
+            title: r.title + "（已探索）",
+            description: "我体验过的路线",
+            isPublic: false,
+            pointIds: []
+        })
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.code === 200) {
+            showToast("✅ 路线已存入「我的路线」");
+            unlockAchievement("all_routes"); // will be checked
+            closeSheet();
+        } else {
+            showToast("❌ 保存失败");
+        }
+    })
+    .catch(() => {
+        // Offline: save locally
+        let saved = [];
+        try { saved = JSON.parse(localStorage.getItem("nj_saved_routes") || "[]"); } catch(e) {}
+        if (!saved.find(s => s.key === routeKey)) {
+            saved.push({ key: routeKey, title: r.title, savedAt: new Date().toISOString() });
+            localStorage.setItem("nj_saved_routes", JSON.stringify(saved));
+        }
+        showToast("✅ 路线已离线保存");
+        closeSheet();
+    });
 }
 
 // ── Init ──

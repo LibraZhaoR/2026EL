@@ -9,8 +9,11 @@ spring:
 
 travel:
   ai:
+    # 可选: mock(离线关键词回复) | doubao(火山引擎豆包,需配API_KEY)
     provider: mock
     base-url: https://ark.cn-beijing.volces.com/api/v3/responses
+    # 环境变量 AI_API_KEY 设置火山引擎 API Key
+    # 或直接替换下方 your-api-key-here
     api-key: ${AI_API_KEY:your-api-key-here}
     model: doubao-seed-1-6
   meituan:

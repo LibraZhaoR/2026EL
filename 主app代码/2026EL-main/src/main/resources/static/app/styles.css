@@ -559,29 +559,29 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     box-shadow: 0 4px 12px rgba(26,28,27,0.06);
 }
 
-/* ═══ Scene Dots — route-mark style ═══ */
+/* ═══ Scene Dots — horizontal slider progress ═══ */
 .dots {
     position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 18px;
+    justify-content: center;
+    gap: 10px;
     pointer-events: none;
     z-index: 5;
 }
-/* Vertical line connecting dots — 慕夏藤蔓式 · Mucha vine */
+/* Horizontal connecting line */
 .dots::before {
     content: "";
     position: absolute;
-    left: 50%;
-    top: -14px;
-    bottom: -14px;
-    width: 1px;
+    left: 12px;
+    right: 12px;
+    top: 50%;
+    height: 1px;
     background: linear-gradient(
-        to bottom,
+        to right,
         transparent,
         rgba(139,115,85,0.16) 20%,
         rgba(139,115,85,0.16) 80%,
@@ -590,7 +590,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 .dots i {
     display: block;
-    width: 6px; height: 6px;
+    width: 8px; height: 8px;
     border-radius: 50%;
     background: rgba(28,25,23,0.14);
     border: 1px solid rgba(139,115,85,0.12);
@@ -602,7 +602,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     background: var(--gold-gradient);
     box-shadow: 0 0 0 5px rgba(201,168,76,0.10),
                 0 0 12px rgba(201,168,76,0.2);
-    transform: scale(1.3);
+    transform: scale(1.6);
     border-color: transparent;
 }
 
@@ -625,9 +625,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .sheet-body {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    max-height: 80%;
+    max-height: 88%;
     overflow-y: auto;
-    padding: 28px 24px 36px;
+    padding: 16px 18px 24px;
     border-radius: 20px 20px 0 0;
     background:
         linear-gradient(180deg, rgba(251,250,246,0.98), rgba(242,240,235,0.99)),
@@ -636,6 +636,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     border-bottom: none;
     box-shadow: 0 -10px 56px rgba(28,25,23,0.08);
     animation: rise 0.3s ease;
+}
+.sheet-body.no-scroll {
+    overflow-y: hidden;
 }
 /* 慕夏金线拉手 · Mucha gold pull handle */
 .sheet-body::before {
@@ -654,33 +657,33 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 
 .sheet-body .tag {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     color: var(--vermillion);
     letter-spacing: 0.06em;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .sheet-body h3 {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 500;
     color: var(--ink);
-    line-height: 1.35;
-    margin-bottom: 8px;
+    line-height: 1.3;
+    margin-bottom: 4px;
 }
 
 .sheet-body .desc {
-    font-size: 14px;
+    font-size: 12px;
     color: var(--soft);
-    line-height: 1.6;
-    margin-bottom: 18px;
+    line-height: 1.4;
+    margin-bottom: 10px;
 }
 
 .sheet-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 20px;
+    gap: 4px;
+    margin-bottom: 10px;
 }
 .sheet-meta span {
     font-size: 10px;
@@ -693,49 +696,49 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .stops {
     display: grid;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 6px;
+    margin-bottom: 10px;
 }
 
 .stop {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     align-items: flex-start;
-    padding: 14px;
-    border-radius: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
     background: var(--surface);
     border: 1px solid var(--rule);
 }
 
 .stop-num {
     flex-shrink: 0;
-    width: 24px; height: 24px;
+    width: 20px; height: 20px;
     display: grid;
     place-items: center;
     border-radius: 50%;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #2A2A1A;
     background: var(--gold-gradient);
-    box-shadow: 0 2px 8px rgba(201,168,76,0.2);
+    box-shadow: 0 1px 4px rgba(201,168,76,0.2);
 }
 
 .stop-text h4 {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--ink);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 .stop-text p {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--soft);
-    line-height: 1.5;
+    line-height: 1.4;
 }
 .stop-story-icon {
     flex-shrink: 0;
-    font-size: 16px;
+    font-size: 14px;
     margin-left: auto;
-    padding: 4px;
+    padding: 2px;
     opacity: 0.5;
     transition: opacity 0.2s;
 }
@@ -746,9 +749,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .sheet-close {
     display: block;
     width: 100%;
-    padding: 11px;
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--soft);
     text-align: center;
@@ -1172,8 +1175,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 
 .main-page.visible {
-    display: flex;
-    flex-direction: column;
+    display: block;
     animation: mainFadeIn 0.5s ease;
 }
 
@@ -1182,12 +1184,17 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     to   { opacity: 1; }
 }
 
-/* ── Map Container (AMap) — flex child, 55% height ── */
+/* ── Impressionist Map Stage — fills entire screen ── */
+.impressionist-map-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+/* ── Map Container (AMap) — fills 100% ── */
 .main-map-container {
-    position: relative;
-    flex-shrink: 0;
     width: 100%;
-    height: 55%;
+    height: 100%;
     z-index: 1;
     overflow: hidden;
     pointer-events: auto;
@@ -1200,6 +1207,67 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     bottom: 0 !important;
     height: 100% !important;
     z-index: 50 !important;
+}
+
+/* ── Map Dim Overlay — fades map to 20% opacity when drawer open ── */
+.map-dim-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: rgba(0,0,0,0);
+    pointer-events: none;
+    transition: background 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.main-page.drawer-open .map-dim-overlay {
+    background: rgba(0,0,0,0.80);
+}
+
+/* ── Scroll Pull Handle ── */
+.scroll-pull-handle {
+    text-align: center;
+    padding: 10px 0 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.pull-arrow {
+    display: block;
+    font-size: 14px;
+    color: rgba(32,32,32,0.3);
+    letter-spacing: 4px;
+    animation: pullBounce 1.8s ease-in-out infinite;
+}
+.pull-text {
+    display: block;
+    font-size: 11px;
+    color: rgba(32,32,32,0.25);
+    margin-top: 2px;
+    letter-spacing: 0.06em;
+}
+@keyframes pullBounce {
+    0%, 100% { transform: translateY(0); opacity: 0.3; }
+    50% { transform: translateY(-6px); opacity: 0.6; }
+}
+
+/* ── Bottom Drawer — starts collapsed, expands on pull ── */
+.main-scroll {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    height: 78vh;
+    transform: translateY(calc(78vh - 200px));
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    background: rgba(251,250,246, 0.97);
+    border-radius: 24px 24px 0 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 80px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+    border-top: 1px solid rgba(210,176,92,0.15);
+}
+.main-scroll.expanded {
+    transform: translateY(0);
 }
 
 /* Header — floats inside map container */
@@ -1234,7 +1302,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     position: absolute;
     top: 0; left: 0;
     width: 100%;
-    height: 55%;
+    height: 100%;
     z-index: 0;
     pointer-events: none;
 }
@@ -1307,18 +1375,18 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 /* ═══ Route Action Buttons (in sheet) ═══ */
 .route-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 5px;
+    margin-bottom: 10px;
 }
 .route-action-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 14px 8px;
-    border-radius: 12px;
+    gap: 2px;
+    padding: 8px 6px;
+    border-radius: 8px;
     background: var(--surface);
     border: 1px solid var(--rule);
     cursor: pointer;
@@ -1330,11 +1398,11 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     background: rgba(224,225,221,0.5);
 }
 .route-action-btn .icon {
-    font-size: 22px;
+    font-size: 18px;
     line-height: 1;
 }
 .route-action-btn .label {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--soft);
     font-weight: 500;
     letter-spacing: 0.03em;
@@ -1670,10 +1738,19 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     font-family: "Noto Serif SC", "STSong", "SimSun", serif;
     font-size: 26px;
     font-weight: 400;
-    color: var(--ink);
     letter-spacing: 0.04em;
     line-height: 1.3;
     margin-bottom: 4px;
+    color: transparent;
+    background: linear-gradient(180deg, var(--ink) 20%, rgba(32,32,32,0.1) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    transition: opacity 0.35s ease;
+}
+.map-title-area.fade-out .map-main-title,
+.map-title-area.fade-out .map-sub-title {
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .map-sub-title {
@@ -2635,21 +2712,10 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 /* ═══════════════════════════════════════
    印象派地图画布 · Impressionist Map Stage
-   50% 视觉权重 — 地图+水彩纹理+涂鸦标记
+   全屏地图 + 底部上拉抽屉
    ═══════════════════════════════════════ */
 
-/* ── 印象派地图舞台容器 ── */
-.impressionist-map-stage {
-    position: relative;
-    width: 100%;
-    height: 58vh;
-    flex-shrink: 0;
-    z-index: 1;
-    overflow: hidden;
-    background: #f5efe0;
-}
-
-/* ── AMap 印象派弱化滤镜 — 强度拉到80% ── */
+/* ── 印象派地图舞台容器（全屏覆盖）── */
 .impressionist-map-stage .main-map-container {
     position: absolute !important;
     inset: 0;
@@ -2916,63 +2982,63 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .map-recommend-card {
     position: absolute;
-    bottom: 100px;
-    left: 16px;
+    bottom: 80px;
+    left: 10px;
     z-index: 6;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 14px 16px;
+    gap: 4px;
+    padding: 10px 12px;
     background: rgba(255,248,232,0.94);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-radius: 16px;
-    border: 2.5px solid var(--ink);
-    box-shadow: 4px 5px 0 rgba(32,32,32,0.7);
-    max-width: 185px;
+    border-radius: 12px;
+    border: 2px solid var(--ink);
+    box-shadow: 3px 4px 0 rgba(32,32,32,0.7);
+    max-width: 150px;
     transform: rotate(1deg);
     animation: floatCardIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .rec-badge {
-    font-size: 10px;
+    font-size: 8px;
     font-weight: 700;
     color: var(--ink);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     background: linear-gradient(135deg, var(--gold), var(--gold-light));
-    padding: 2px 8px;
-    border-radius: 3px;
+    padding: 1px 6px;
+    border-radius: 2px;
     border: 1.5px solid var(--ink);
     display: inline-block;
     align-self: flex-start;
-    box-shadow: 2px 2px 0 rgba(32,32,32,0.5);
+    box-shadow: 1.5px 1.5px 0 rgba(32,32,32,0.5);
     transform: rotate(-1deg);
 }
 
 .rec-name {
     font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--ink);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
 }
 
 .rec-stops {
-    font-size: 11px;
+    font-size: 9px;
     color: var(--soft);
-    letter-spacing: 0.03em;
-    line-height: 1.4;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
 }
 
 .rec-go {
     align-self: flex-end;
-    padding: 6px 16px;
+    padding: 4px 12px;
     border-radius: 999px;
     background: var(--nju-purple);
     color: #fff;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     cursor: pointer;
     border: none;
     font-family: inherit;

@@ -112,6 +112,19 @@ public class RouteService {
         return routes.stream().filter(RouteVO::official).toList();
     }
 
+    public List<UserRouteVO> listUserRoutes(Long userId) {
+        return userRoutes.values().stream()
+                .filter(ur -> ur.userId().equals(userId))
+                .toList();
+    }
+
+    public void deleteUserRoute(Long userRouteId, Long userId) {
+        UserRouteVO route = userRoutes.get(userRouteId);
+        if (route == null) throw new BusinessException(404, "路线不存在");
+        if (!route.userId().equals(userId)) throw new BusinessException(403, "无权删除");
+        userRoutes.remove(userRouteId);
+    }
+
     private RouteVO findRoute(Long routeId) {
         return routes.stream()
                 .filter(route -> route.routeId().equals(routeId))
