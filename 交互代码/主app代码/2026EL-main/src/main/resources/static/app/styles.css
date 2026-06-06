@@ -10,8 +10,8 @@
     --stone: #FBFAF6;
     --surface: #F5F4EE;
     --paper: #FDF8F0;
-    --accent: #5B8C8A;
-    --accent-dim: rgba(91,140,138,0.09);
+    --accent: #2E8B57;
+    --accent-dim: rgba(46,139,87,0.09);
     --soft: #6B6E69;
     --faint: #9A9B95;
     --rule: #E6E4DE;
@@ -1690,12 +1690,12 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .header-budget {
     font-size: 12px;
     font-weight: 600;
-    color: var(--ink);
+    color: #2E7D4F;
     padding: 5px 12px;
-    background: rgba(255,247,232,0.82);
+    background: rgba(255,255,255,0.85);
     backdrop-filter: blur(8px);
     border-radius: 999px;
-    border: 1px solid rgba(232,196,106,0.25);
+    border: 1px solid rgba(46,125,79,0.18);
     letter-spacing: 0.04em;
 }
 
@@ -1730,15 +1730,15 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .pet-avatar {
     display: grid;
     place-items: center;
-    width: 38px;
-    height: 38px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
-    font-size: 22px;
-    background: rgba(255, 255, 255, 0.88);
+    font-size: 24px;
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(8px);
-    border: 1.5px solid rgba(24, 33, 43, 0.08);
+    border: 2px solid rgba(46, 125, 79, 0.35);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 2px 12px rgba(24, 33, 43, 0.08);
+    box-shadow: 0 2px 14px rgba(46, 125, 79, 0.18);
     user-select: none;
 }
 .pet-avatar:active {
@@ -1925,14 +1925,15 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .carousel-track {
     display: flex;
     gap: 12px;
-    padding: 0 calc(50vw - 30vw);
+    padding: 0 calc(50vw - 19vw);
 }
 
 .carousel-card {
-    flex: 0 0 60vw;
+    flex: 0 0 38vw !important;
+    max-width: 240px !important;
     scroll-snap-align: center;
-    aspect-ratio: 3 / 4;
-    border-radius: 18px;
+    aspect-ratio: 3 / 5;
+    border-radius: 12px;
     background: var(--card-bg, #FFFFFF);
     border: 1px solid rgba(24,33,43,0.05);
     box-shadow: 0 8px 24px rgba(24,33,43,0.06);
@@ -1950,11 +1951,11 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 /* ── Card top banner — route-colored header with Nanjing photo ── */
 .carousel-card .card-banner {
-    background-color: var(--card-accent, #44C9B4);
+    background-color: var(--card-accent, #4A7DBF);
     background-image: var(--card-img);
     background-size: cover;
     background-position: center;
-    height: 38%;
+    height: 32%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1966,16 +1967,16 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     content: "";
     position: absolute;
     inset: 0;
-    background: var(--card-accent, #44C9B4);
-    opacity: 0.5;
+    background: var(--card-accent, #3A8C5C);
+    opacity: 0.45;
     z-index: 0;
 }
 .carousel-card .card-banner-icon {
-    font-size: 48px;
+    font-size: 28px;
     line-height: 1;
     position: relative;
     z-index: 1;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15));
 }
 /* Subtle pattern overlay on banner */
 .carousel-card .card-banner::after {
@@ -1993,9 +1994,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .carousel-card .card-index {
     position: absolute;
-    top: 14px;
-    right: 18px;
-    font-size: 11px;
+    top: 10px;
+    right: 14px;
+    font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.08em;
     color: rgba(255,255,255,0.7);
@@ -2005,7 +2006,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 /* ── Card body — white content area ── */
 .carousel-card .card-body {
     flex: 1;
-    padding: 16px 18px 14px;
+    padding: 9px 11px 8px;
     display: flex;
     flex-direction: column;
     background: #FFFFFF;
@@ -2013,7 +2014,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .carousel-card .card-name {
     font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
-    font-size: 18px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: #18212B;
@@ -2021,15 +2022,15 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 
 .carousel-card .card-desc {
-    font-size: 12px;
+    font-size: 10px;
     color: #6B7280;
-    margin-top: 4px;
-    line-height: 1.4;
+    margin-top: 2px;
+    line-height: 1.3;
 }
 
 /* ── Stop preview with vertical connecting line ── */
 .carousel-card .card-stops {
-    margin-top: 14px;
+    margin-top: 7px;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -2040,18 +2041,18 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .carousel-card .card-stop-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
+    gap: 6px;
+    font-size: 10px;
     color: #5A6270;
-    padding: 5px 0;
+    padding: 3px 0;
     position: relative;
 }
 .carousel-card .card-stop-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: var(--card-accent, #44C9B4);
+    background: var(--card-accent, #3A8C5C);
     position: relative;
     z-index: 1;
 }
@@ -2059,16 +2060,16 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .carousel-card .card-stop-row:not(:last-child)::before {
     content: "";
     position: absolute;
-    left: 3px;
-    top: 16px;
+    left: 2.5px;
+    top: 14px;
     width: 1px;
-    height: calc(100% - 5px);
-    background: var(--card-accent, #44C9B4);
+    height: calc(100% - 4px);
+    background: var(--card-accent, #3A8C5C);
     opacity: 0.2;
 }
-.carousel-card .card-stop-row:nth-child(2) .card-stop-dot { opacity: 0.7; }
-.carousel-card .card-stop-row:nth-child(3) .card-stop-dot { opacity: 0.55; }
-.carousel-card .card-stop-row:nth-child(4) .card-stop-dot { opacity: 0.4; }
+.carousel-card .card-stop-row:nth-child(2) .card-stop-dot { opacity: 0.65; }
+.carousel-card .card-stop-row:nth-child(3) .card-stop-dot { opacity: 0.5; }
+.carousel-card .card-stop-row:nth-child(4) .card-stop-dot { opacity: 0.35; }
 .carousel-card .card-stop-name {
     flex: 1;
     white-space: nowrap;
@@ -2079,15 +2080,15 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .carousel-card .card-meta {
     display: flex;
-    gap: 6px;
-    margin-top: 10px;
+    gap: 4px;
+    margin-top: 6px;
     flex-wrap: wrap;
 }
 
 .carousel-card .meta-chip {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 500;
-    padding: 5px 10px;
+    padding: 3px 8px;
     border: 1px solid rgba(24,33,43,0.08);
     border-radius: 999px;
     color: #6B7280;
@@ -2110,9 +2111,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .carousel-dot.active {
-    background: #18212B;
+    background: #2E7D4F;
     transform: scale(1.4);
-    box-shadow: 0 0 0 3px rgba(24,33,43,0.08);
+    box-shadow: 0 0 0 3px rgba(46,125,79,0.12);
 }
 
 /* ═══ Scroll Hint ═══ */
@@ -2155,7 +2156,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #7B61FF;
+    color: #2E8B57;
     margin-bottom: 4px;
 }
 
@@ -2217,7 +2218,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     flex: 1;
     height: 48px;
     border-radius: 999px;
-    background: #18212B;
+    background: #2E7D4F;
     color: #FFFFFF;
     font-size: 14px;
     font-weight: 600;
@@ -2269,12 +2270,12 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 
 .mini-route-card {
-    aspect-ratio: 3 / 4;
-    border-radius: 18px;
+    aspect-ratio: 4 / 5;
+    border-radius: 10px;
     background: #FFFFFF;
-    border: 1px solid rgba(24,33,43,0.05);
-    box-shadow: 0 4px 16px rgba(24,33,43,0.04);
-    padding: 16px 12px;
+    border: 1px solid rgba(24,33,43,0.04);
+    box-shadow: 0 4px 12px rgba(24,33,43,0.03);
+    padding: 10px 8px;
     display: flex;
     flex-direction: column;
     cursor: pointer;
@@ -2285,20 +2286,20 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .mini-route-card:active { transform: scale(0.96); }
 
 .mini-route-card .mini-accent {
-    width: 28px;
-    height: 4px;
+    width: 16px;
+    height: 3px;
     border-radius: 999px;
-    margin-bottom: 14px;
+    margin-bottom: 8px;
 }
 
 .mini-route-card .mini-icon {
-    font-size: 30px;
+    font-size: 20px;
     line-height: 1;
     margin-bottom: auto;
 }
 
 .mini-route-card .mini-name {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     color: #18212B;
     letter-spacing: -0.01em;
@@ -2306,9 +2307,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 
 .mini-route-card .mini-meta {
-    font-size: 10px;
-    color: #6B7280;
-    margin-top: 4px;
+    font-size: 8px;
+    color: #8B939E;
+    margin-top: 2px;
     letter-spacing: 0.03em;
 }
 
@@ -2335,12 +2336,12 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: #EEF0F5;
+    background: rgba(46,125,79,0.12);
     display: grid;
     place-items: center;
     font-size: 18px;
     font-weight: 700;
-    color: #44C9B4;
+    color: #2E7D4F;
     flex-shrink: 0;
 }
 
@@ -2367,7 +2368,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     flex-shrink: 0;
     padding: 10px 20px;
     border-radius: 999px;
-    background: #44C9B4;
+    background: #3A8C5C;
     color: #FFFFFF;
     font-size: 12px;
     font-weight: 600;
@@ -2443,8 +2444,8 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .nav-item.active .nav-indicator {
     width: 16px;
     border-radius: 999px;
-    background: #44C9B4;
-    box-shadow: 0 0 8px rgba(68,201,180,0.3);
+    background: #3A8C5C;
+    box-shadow: 0 0 8px rgba(46,125,79,0.25);
 }
 
 .nav-item:active {
@@ -3805,7 +3806,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .supply-card[data-type="ticket"]::after {
     width: 70px; height: 70px;
     top: -15px; right: -10px;
-    background: #4FC3C7;
+    background: #4CAF50;
 }
 .supply-card:hover::after { opacity: 0.35; transform: scale(1.15); }
 .supply-card:active { transform: scale(0.97); }

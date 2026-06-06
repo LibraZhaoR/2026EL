@@ -1859,10 +1859,10 @@ function showMainPage() {
 
 const CAROUSEL_ROUTES = ["night", "nju", "food", "expo"];
 const ROUTE_ACCENT = {
-    nju: "#6E62E0",
-    night: "#4A90D9",
-    food: "#FF8066",
-    expo: "#44C9B4",
+    nju: "#2E8B57",
+    night: "#1A6B5E",
+    food: "#F4A261",
+    expo: "#5B9BD5",
 };
 const ROUTE_ICON = {
     nju: "🏛️",
@@ -1893,7 +1893,7 @@ function renderCarouselCards() {
         const chips = (r.meta || []).slice(0, 3).map(m =>
             `<span class="meta-chip">${m}</span>`
         ).join("");
-        return `<div class="carousel-card" data-route="${key}" style="--card-accent:${accent};--card-img:url(${img})">
+        return `<div class="carousel-card" data-route="${key}" style="flex:0 0 38vw;aspect-ratio:3/5;border-radius:12px;--card-accent:${accent};--card-img:url(${img})">
             <div class="card-banner">
                 <span class="card-banner-icon">${icon}</span>
                 <span class="card-index">${String(i + 1).padStart(2, "0")}</span>
@@ -1929,7 +1929,7 @@ function updateCarouselDots() {
     const dots = document.querySelectorAll(".carousel-dot");
     if (!carousel || !dots.length) return;
 
-    const cardW = carousel.clientWidth * 0.60 + 12; // card width + gap
+    const cardW = carousel.clientWidth * 0.38 + 12; // card width + gap
     const idx = Math.round(carousel.scrollLeft / cardW);
     dots.forEach((d, i) => d.classList.toggle("active", i === idx));
 }
@@ -1937,7 +1937,7 @@ function updateCarouselDots() {
 function updateFeatureFromCarousel() {
     const carousel = document.getElementById("route-carousel");
     if (!carousel) return;
-    const cardW = carousel.clientWidth * 0.60 + 12;
+    const cardW = carousel.clientWidth * 0.38 + 12;
     const idx = Math.round(carousel.scrollLeft / cardW);
     const routeKey = CAROUSEL_ROUTES[idx];
     if (routeKey) renderFeatureSection(routeKey);
@@ -2004,7 +2004,7 @@ function renderRouteGrid() {
         const r = routes[key];
         const accent = ROUTE_ACCENT[key];
         const icon = ROUTE_ICON[key];
-        return `<div class="mini-route-card" data-route="${key}">
+        return `<div class="mini-route-card" data-route="${key}" style="aspect-ratio:4/5;border-radius:10px;padding:10px 6px">
             <span class="mini-accent" style="background:${accent}"></span>
             <span class="mini-icon">${icon}</span>
             <span class="mini-name">${r.title.split("：")[0].split(":")[0]}</span>
