@@ -1170,7 +1170,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     inset: 0;
     z-index: 90;
     display: none;
-    background: var(--stone);
+    background: #F4F6F9;
     overflow: hidden;
 }
 
@@ -1209,78 +1209,61 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     z-index: 50 !important;
 }
 
-/* ── Map Dim Overlay — fades map to 20% opacity when drawer open ── */
+/* ── Map Dim Overlay — cool light tint ── */
 .map-dim-overlay {
     position: absolute;
     inset: 0;
     z-index: 4;
-    background: rgba(0,0,0,0);
+    background: rgba(244,246,249,0);
     pointer-events: none;
     transition: background 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .main-page.drawer-open .map-dim-overlay {
-    background: rgba(0,0,0,0.80);
+    background: rgba(244,246,249,0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
 }
 
-/* ── Scroll Pull Handle ── */
-.scroll-pull-handle {
-    text-align: center;
-    padding: 10px 0 6px;
-    cursor: pointer;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-.pull-line {
-    display: block;
-    width: 32px;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(201,168,76,0.35);
-    animation: pullLineBounce 1.8s ease-in-out infinite;
-}
-.pull-text {
-    display: block;
-    font-size: 11px;
-    color: rgba(32,32,32,0.28);
-    letter-spacing: 0.06em;
-}
-@keyframes pullLineBounce {
-    0%, 100% { transform: translateY(0); opacity: 0.35; }
-    50% { transform: translateY(-4px); opacity: 0.7; }
-}
-
-/* ── Bottom Drawer — starts collapsed, expands on pull ── */
-.main-scroll {
+/* ═══ Snap Scroll — full-screen vertical snap ═══ */
+.snap-scroll {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 5;
-    height: 78vh;
-    transform: translateY(calc(78vh - 200px));
-    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-    background: rgba(251,250,246, 0.97);
-    border-radius: 24px 24px 0 0;
-    overflow-y: auto;
+    top: 0;
+    overflow-y: scroll;
     overflow-x: hidden;
-    padding-bottom: 80px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-    border-top: 1px solid rgba(210,176,92,0.15);
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 64px;
 }
-.main-scroll.expanded {
-    transform: translateY(0);
+.snap-scroll::-webkit-scrollbar { display: none; }
+
+/* ── Snap Section — each fills viewport minus bottom nav ── */
+.snap-section {
+    scroll-snap-align: start;
+    min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24px 20px;
+    position: relative;
+}
+
+.snap-bottom-spacer {
+    height: 20px;
+    scroll-snap-align: none;
 }
 
 /* Header — floats inside map container */
 .main-header {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 10;
+    z-index: 25;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1288,17 +1271,6 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     padding-top: max(12px, env(safe-area-inset-top));
     background: transparent;
     pointer-events: auto;
-}
-
-/* Map title — floats inside map container */
-.map-title-area {
-    position: absolute;
-    top: 60px;
-    left: 0;
-    right: 0;
-    z-index: 10;
-    padding: 4px 20px 0;
-    pointer-events: none;
 }
 
 /* ── Map Canvas (fallback, hidden when AMap works) ── */
@@ -1685,20 +1657,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     font-family: inherit;
 }
 
-/* ── Scrollable Content — sits below map, solid bg ── */
-.main-scroll {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-bottom: 80px;
-    -webkit-overflow-scrolling: touch;
-    background: var(--stone);
-}
 .scroll-start-marker {
     height: 4px;
 }
-
-.main-scroll::-webkit-scrollbar { display: none; }
 
 .header-left {
     display: flex;
@@ -1757,382 +1718,679 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     transform: scale(0.94);
 }
 
-.map-main-title {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-    font-size: 26px;
-    font-weight: 400;
-    letter-spacing: 0.04em;
-    line-height: 1.3;
-    margin-bottom: 4px;
-    color: transparent;
-    background: linear-gradient(180deg, var(--ink) 20%, rgba(32,32,32,0.1) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    transition: opacity 0.35s ease;
-}
-.map-title-area.fade-out .map-main-title,
-.map-title-area.fade-out .map-sub-title {
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.map-sub-title {
-    font-size: 12px;
-    color: var(--soft);
-    line-height: 1.4;
-}
-/* ── Route Cards Section ── */
-.route-cards-section {
-    padding: 0 18px;
+/* ═══ Pet Companion System ═══ */
+.pet-companion {
     position: relative;
-    z-index: 3;
-}
-
-.section-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-
-.section-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: 0.03em;
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-}
-/* 慕夏金线装饰 · Mucha gold underline */
-.section-title::after {
-    content: "";
-    display: block;
-    width: 24px;
-    height: 2px;
-    margin-top: 5px;
-    background: var(--gold-gradient-h);
-    border-radius: 2px;
-}
-
-.section-more {
-    font-size: 12px;
-    color: var(--accent);
-    cursor: pointer;
-}
-
-/* ── Primary Route Card ── */
-.route-card {
-    border-radius: 18px;
-    overflow: hidden;
-    margin-bottom: 12px;
-    cursor: pointer;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-.route-card:active { transform: scale(0.98); }
-
-.route-card-primary {
-    background: var(--night-card);
-    color: #fff;
-    position: relative;
-    box-shadow: 0 14px 38px rgba(44,59,79,0.3),
-                0 0 0 1px rgba(232,212,139,0.10);
-    border-radius: 14px;
-}
-
-/* 巴洛克金聚光 · Baroque gold spotlight */
-.route-card-primary::before {
-    content: "";
-    position: absolute;
-    top: -50px; right: -30px;
-    width: 160px; height: 160px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(201,168,76,0.28), transparent 70%);
-    pointer-events: none;
-}
-
-.route-card-primary::after {
-    content: "";
-    position: absolute;
-    bottom: -30px; left: -30px;
-    width: 100px; height: 100px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(212,132,142,0.12), transparent 70%);
-    pointer-events: none;
-}
-
-.route-card-badge {
-    position: absolute;
-    top: 14px; right: 14px;
-    font-size: 10px;
-    padding: 4px 10px;
-    border-radius: 3px;
-    background: var(--gold-gradient);
-    color: #2A2A1A;
-    letter-spacing: 0.06em;
-    font-weight: 600;
-}
-
-.route-card-body {
-    position: relative;
-    z-index: 1;
-    padding: 20px 18px;
-}
-/* 慕夏金线顶饰 · Mucha gold line above card content */
-.route-card-body::before {
-    content: "";
-    display: block;
-    width: 32px;
-    height: 2px;
-    margin-bottom: 10px;
-    background: linear-gradient(90deg, transparent, rgba(232,212,139,0.45), transparent);
-    border-radius: 2px;
-}
-
-.route-card-primary .route-card-title {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-    font-size: 20px;
-    font-weight: 500;
-    margin-bottom: 12px;
-    letter-spacing: 0.03em;
-}
-
-.route-card-path {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
+    cursor: pointer;
+    z-index: 1;
 }
 
-.path-dot {
-    width: 6px; height: 6px;
+.pet-avatar {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: var(--gold);
-    flex-shrink: 0;
+    font-size: 22px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(24, 33, 43, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 12px rgba(24, 33, 43, 0.08);
+    user-select: none;
+}
+.pet-avatar:active {
+    transform: scale(1.12);
 }
 
-.path-text {
-    font-size: 13px;
-    color: rgba(255,255,255,0.85);
+.pet-avatar.state-idle {
+    animation: petIdleBounce 3s ease-in-out infinite;
+}
+.pet-avatar.state-welcome {
+    animation: petWelcomePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pet-avatar.state-happy {
+    animation: petHappySpin 0.6s ease-out;
+}
+.pet-avatar.state-confused {
+    animation: petTilt 2s ease-in-out infinite;
+}
+.pet-avatar.state-urging {
+    animation: petIdleBounce 0.6s ease-in-out infinite;
+    border-color: rgba(255, 122, 69, 0.6);
+    box-shadow: 0 0 12px rgba(255, 122, 69, 0.2);
+}
+
+@keyframes petIdleBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+@keyframes petWelcomePop {
+    0% { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+    60% { transform: scale(1.15) rotate(5deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes petHappySpin {
+    0% { transform: scale(1) rotate(0deg); }
+    40% { transform: scale(1.2) rotate(15deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes petTilt {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-8deg); }
+    75% { transform: rotate(8deg); }
+}
+
+/* Pet dialogue bubble */
+.pet-bubble {
+    position: absolute;
+    top: -42px;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 6px 12px;
+    border-radius: 12px 12px 12px 4px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(24, 33, 43, 0.06);
+    box-shadow: 0 4px 16px rgba(24, 33, 43, 0.08);
+    white-space: nowrap;
+    font-size: 11px;
+    color: #18212B;
     letter-spacing: 0.03em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 11;
 }
-
-.path-arrow {
-    color: rgba(255,255,255,0.4);
-    font-size: 12px;
+.pet-bubble.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
 }
-
-.route-card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 16px;
-}
-
-.meta-tag {
-    font-size: 10.5px;
-    padding: 5px 10px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.12);
-    color: rgba(255,255,255,0.85);
-    letter-spacing: 0.04em;
-}
-
-.route-card-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.btn-primary-route {
-    flex: 1;
-    height: 40px;
-    border-radius: 6px;
-    background: var(--gold-gradient);
-    color: #2A2A1A;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    border: none;
-    transition: transform 0.15s ease, box-shadow 0.25s ease, filter 0.2s ease;
-    box-shadow: 0 4px 16px rgba(168,133,46,0.3),
-                inset 0 1px 0 rgba(255,255,255,0.3);
-}
-.btn-primary-route:active { transform: scale(0.96); filter: brightness(0.9); }
-
-.btn-secondary-route {
-    flex: 1;
-    height: 40px;
-    border-radius: 6px;
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.85);
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    border: 1.5px solid rgba(139,115,85,0.2);
-    transition: background 0.25s, border-color 0.25s;
-}
-.btn-secondary-route:active { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.3); }
-
-/* ── Secondary Route Cards · 印象派柔和背景 ── */
-.route-card-secondary {
-    background: linear-gradient(135deg, rgba(255,248,232,0.94), rgba(253,245,235,0.88));
-    border: 1.5px solid rgba(210,176,92,0.35);
-    box-shadow: 0 5px 18px rgba(28,25,23,0.04),
-                inset 0 1px 0 rgba(255,255,255,0.6);
-    border-radius: 32px 32px 18px 18px;
-    position: relative;
-    overflow: hidden;
-    padding: 16px 16px 14px;
-}
-/* 木星云团装饰 · Persona-style color blob */
-.route-card-secondary::before {
+.pet-bubble::after {
     content: "";
     position: absolute;
-    top: -30px; right: -20px;
-    width: 100px; height: 100px;
-    border-radius: 50%;
-    filter: blur(40px);
-    opacity: 0.35;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(255, 255, 255, 0.95);
+}
+
+/* Pet selector overlay */
+.pet-selector-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 28, 27, 0.35);
+    backdrop-filter: blur(6px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+.pet-selector-panel {
+    background: var(--stone);
+    border-radius: 18px;
+    padding: 24px 20px 20px;
+    max-width: 340px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+    animation: rise 0.25s ease;
+}
+.pet-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.pet-selector-item {
+    padding: 10px 4px;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.pet-selector-item:active {
+    transform: scale(0.95);
+}
+.pet-selector-item.locked {
+    cursor: default;
+    filter: grayscale(0.85);
+}
+.pet-selector-item .pet-sel-emoji {
+    font-size: 28px;
+    display: block;
+    line-height: 1.2;
+}
+.pet-selector-item .pet-sel-name {
+    font-size: 10px;
+    color: var(--ink);
+    margin-top: 2px;
+    display: block;
+    line-height: 1.3;
+}
+.pet-selector-item .pet-sel-lock {
+    font-size: 10px;
+    color: var(--faint);
+    display: block;
+}
+
+/* ═══ Hero Section — 元气极简 ═══ */
+.hero-section {
+    justify-content: flex-start;
+    padding-top: 110px;
+    gap: 20px;
+}
+
+.hero-content {
+    padding: 0 4px;
+}
+
+.hero-title {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: clamp(34px, 7.5vw, 52px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: #18212B;
+    margin: 0;
+}
+
+.hero-desc {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: #6B7280;
+    margin-top: 10px;
+    letter-spacing: 0.02em;
+}
+
+/* ═══ Horizontal Route Carousel — 极简能量卡 ═══ */
+.route-carousel {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 8px 0 4px;
+    margin: 0 -20px;
+}
+.route-carousel::-webkit-scrollbar { display: none; }
+
+.carousel-track {
+    display: flex;
+    gap: 12px;
+    padding: 0 calc(50vw - 30vw);
+}
+
+.carousel-card {
+    flex: 0 0 60vw;
+    scroll-snap-align: center;
+    aspect-ratio: 3 / 4;
+    border-radius: 18px;
+    background: var(--card-bg, #FFFFFF);
+    border: 1px solid rgba(24,33,43,0.05);
+    box-shadow: 0 8px 24px rgba(24,33,43,0.06);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.carousel-card:active {
+    transform: scale(0.97);
+}
+
+/* ── Card top banner — route-colored header with Nanjing photo ── */
+.carousel-card .card-banner {
+    background-color: var(--card-accent, #44C9B4);
+    background-image: var(--card-img);
+    background-size: cover;
+    background-position: center;
+    height: 38%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+}
+/* Color overlay for image readability */
+.carousel-card .card-banner::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--card-accent, #44C9B4);
+    opacity: 0.5;
+    z-index: 0;
+}
+.carousel-card .card-banner-icon {
+    font-size: 48px;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+}
+/* Subtle pattern overlay on banner */
+.carousel-card .card-banner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.12;
+    background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.6) 0px, transparent 1px),
+                      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.5) 0px, transparent 1px),
+                      radial-gradient(circle at 40% 80%, rgba(255,255,255,0.4) 0px, transparent 1px);
+    background-size: 50px 50px, 65px 65px, 40px 40px;
     pointer-events: none;
     z-index: 0;
 }
-.route-card-secondary[data-route="nju"]::before { background: var(--nju-purple); }
-.route-card-secondary[data-route="food"]::before { background: #FF7A45; }
-.route-card-secondary .route-card-body { position: relative; z-index: 1; }
 
-.route-card-secondary .route-card-title {
-    font-size: 15px;
+.carousel-card .card-index {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--ink);
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.7);
+    z-index: 2;
+}
+
+/* ── Card body — white content area ── */
+.carousel-card .card-body {
+    flex: 1;
+    padding: 16px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+}
+
+.carousel-card .card-name {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #18212B;
+    line-height: 1.15;
+}
+
+.carousel-card .card-desc {
+    font-size: 12px;
+    color: #6B7280;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* ── Stop preview with vertical connecting line ── */
+.carousel-card .card-stops {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+    position: relative;
+    padding-left: 0;
+}
+.carousel-card .card-stop-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #5A6270;
+    padding: 5px 0;
+    position: relative;
+}
+.carousel-card .card-stop-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--card-accent, #44C9B4);
+    position: relative;
+    z-index: 1;
+}
+/* Connecting line between dots */
+.carousel-card .card-stop-row:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 16px;
+    width: 1px;
+    height: calc(100% - 5px);
+    background: var(--card-accent, #44C9B4);
+    opacity: 0.2;
+}
+.carousel-card .card-stop-row:nth-child(2) .card-stop-dot { opacity: 0.7; }
+.carousel-card .card-stop-row:nth-child(3) .card-stop-dot { opacity: 0.55; }
+.carousel-card .card-stop-row:nth-child(4) .card-stop-dot { opacity: 0.4; }
+.carousel-card .card-stop-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.carousel-card .card-meta {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.carousel-card .meta-chip {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border: 1px solid rgba(24,33,43,0.08);
+    border-radius: 999px;
+    color: #6B7280;
+    letter-spacing: 0.04em;
+    background: rgba(24,33,43,0.02);
+}
+
+/* ═══ Carousel Dots ═══ */
+.carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 0 4px;
+}
+.carousel-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #D0D5DD;
+    transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.carousel-dot.active {
+    background: #18212B;
+    transform: scale(1.4);
+    box-shadow: 0 0 0 3px rgba(24,33,43,0.08);
+}
+
+/* ═══ Scroll Hint ═══ */
+.scroll-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0 0;
+    opacity: 1;
+    animation: scrollHintPulse 2.2s ease-in-out infinite;
+}
+.scroll-hint-arrow {
+    font-size: 18px;
+    color: #A8B0BB;
+    line-height: 1;
+}
+.scroll-hint-text {
+    font-size: 11px;
+    color: #A8B0BB;
+    letter-spacing: 0.06em;
+}
+@keyframes scrollHintPulse {
+    0%, 100% { opacity: 0.4; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(5px); }
+}
+
+/* ═══ Feature Section — 极简能量卡 ═══ */
+.feature-section {
+    gap: 18px;
+    justify-content: center;
+}
+
+.feature-header {
+    padding: 0 4px;
+}
+
+.feature-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7B61FF;
     margin-bottom: 4px;
 }
 
-.route-card-secondary .route-card-desc {
-    font-size: 12px;
-    color: var(--soft);
-    margin-bottom: 10px;
+.feature-title {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: clamp(26px, 5.5vw, 36px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #18212B;
+    line-height: 1.08;
+    margin: 0;
 }
 
-.route-card-secondary .meta-tag {
-    background: rgba(91,140,138,0.07);
-    color: var(--soft);
-    border: 1px solid rgba(107,142,107,0.08);
+.feature-desc {
+    font-size: 14px;
+    color: #6B7280;
+    margin-top: 8px;
+    line-height: 1.5;
+    max-width: 340px;
 }
 
-/* ── Filter Section ── */
-.filter-section {
-    padding: 8px 18px 4px;
-    position: relative;
-    z-index: 3;
-}
-
-.filter-label {
-    font-size: 11px;
-    color: var(--faint);
-    letter-spacing: 0.08em;
-    margin-bottom: 8px;
-}
-
-.filter-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.chip {
-    font-size: 12px;
-    padding: 8px 16px;
-    border-radius: 5px;
-    border: 1px solid rgba(139,115,85,0.08);
-    background: rgba(255,255,255,0.55);
-    color: var(--soft);
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(4px);
-    letter-spacing: 0.03em;
-}
-.chip:active { transform: scale(0.95); }
-
-/* 巴洛克金激活态 · Baroque gold active */
-.chip.active {
-    background: var(--gold-gradient);
-    color: #2A2A1A;
-    border-color: transparent;
-    box-shadow: 0 4px 16px rgba(201,168,76,0.25);
-    font-weight: 600;
-}
-
-/* 印象派暖粉→橙色 · Impressionist warm pastel */
-.chip.mood.active {
-    background: linear-gradient(135deg, #e8a0b4, #e8c490);
-    color: #2A1A1A;
-    border-color: transparent;
-}
-
-/* ── Category Section ── */
-.category-section {
-    padding: 10px 18px 4px;
-    position: relative;
-    z-index: 3;
-}
-
-.category-grid {
+.feature-detail-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.feature-detail-item {
+    padding: 18px 16px;
+    border-radius: 16px;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.05);
+    box-shadow: 0 2px 12px rgba(24,33,43,0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.feature-detail-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #18212B;
+}
+
+.feature-detail-label {
+    font-size: 11px;
+    color: #6B7280;
+    letter-spacing: 0.04em;
+}
+
+.feature-actions {
+    display: flex;
     gap: 10px;
     margin-top: 6px;
 }
 
-.category-item {
+.feature-btn-primary {
+    flex: 1;
+    height: 48px;
+    border-radius: 999px;
+    background: #18212B;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: transform 0.15s ease, opacity 0.2s ease;
+}
+.feature-btn-primary:active { transform: scale(0.97); opacity: 0.85; }
+
+.feature-btn-secondary {
+    height: 48px;
+    padding: 0 24px;
+    border-radius: 999px;
+    background: #EEF0F5;
+    color: #18212B;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: background 0.2s;
+}
+.feature-btn-secondary:active { background: #E2E5ED; }
+
+/* ═══ More Section — 元气极简 ═══ */
+.more-section {
+    justify-content: center;
+    gap: 14px;
+}
+
+.section-heading {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #18212B;
+    margin: 0;
+    padding: 0 4px;
+}
+
+/* Route Grid — 3 energy cards */
+.route-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.mini-route-card {
+    aspect-ratio: 3 / 4;
+    border-radius: 18px;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.05);
+    box-shadow: 0 4px 16px rgba(24,33,43,0.04);
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 12px 6px;
-    border-radius: 10px;
-    background: rgba(251,250,246,0.5);
-    border: 1px solid rgba(139,115,85,0.05);
     cursor: pointer;
-    transition: all 0.2s ease;
     position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-/* 慕夏金点装饰 · Mucha gold dot on hover */
-.category-item::before {
-    content: "";
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: rgba(201,168,76,0.22);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-.category-item:active::before,
-.category-item:hover::before {
-    opacity: 1;
-}
-.category-item:active { transform: scale(0.95); background: rgba(255,255,255,0.9); }
+.mini-route-card:active { transform: scale(0.96); }
 
-.cat-icon {
-    font-size: 24px;
+.mini-route-card .mini-accent {
+    width: 28px;
+    height: 4px;
+    border-radius: 999px;
+    margin-bottom: 14px;
+}
+
+.mini-route-card .mini-icon {
+    font-size: 30px;
     line-height: 1;
+    margin-bottom: auto;
 }
 
-.cat-name {
-    font-size: 11px;
-    color: var(--soft);
+.mini-route-card .mini-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #18212B;
+    letter-spacing: -0.01em;
+    margin-top: auto;
+}
+
+.mini-route-card .mini-meta {
+    font-size: 10px;
+    color: #6B7280;
+    margin-top: 4px;
     letter-spacing: 0.03em;
 }
 
-.bottom-spacer {
-    height: 20px;
+/* ═══ Guide Block — 能量卡 ═══ */
+.guide-block {
+    margin-top: 2px;
 }
 
-/* ── Bottom Navigation ── */
+.guide-block-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-radius: 20px;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.05);
+    box-shadow: 0 4px 16px rgba(24,33,43,0.04);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.guide-block-card:active { transform: scale(0.98); }
+
+.guide-block-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #EEF0F5;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #44C9B4;
+    flex-shrink: 0;
+}
+
+.guide-block-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.guide-block-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #18212B;
+    margin: 0 0 2px;
+    letter-spacing: 0.01em;
+}
+
+.guide-block-hint {
+    font-size: 12px;
+    color: #6B7280;
+    margin: 0;
+}
+
+.guide-block-btn {
+    flex-shrink: 0;
+    padding: 10px 20px;
+    border-radius: 999px;
+    background: #44C9B4;
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: transform 0.15s ease, opacity 0.2s ease;
+}
+.guide-block-btn:active { transform: scale(0.95); opacity: 0.8; }
+
+/* ═══ Animations — scroll-triggered fades ═══ */
+.animate-in {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Bottom Navigation — 元气极简 ── */
 .bottom-nav {
     position: absolute;
     bottom: 0;
@@ -2142,27 +2400,11 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     justify-content: space-around;
     align-items: center;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    background: rgba(251,250,246,0.96);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border-top: 1px solid rgba(139,115,85,0.06);
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(24,33,43,0.05);
     gap: 0;
-}
-
-.bottom-nav::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 20%; right: 20%;
-    height: 1px;
-    background: linear-gradient(90deg,
-        transparent,
-        rgba(201,168,76,0.15),
-        rgba(201,168,76,0.3) 50%,
-        rgba(201,168,76,0.15),
-        transparent
-    );
-    border-radius: 1px;
 }
 
 .nav-item {
@@ -2174,13 +2416,14 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     cursor: pointer;
     position: relative;
     min-width: 48px;
+    transition: transform 0.2s ease;
 }
 
 .nav-label {
     font-size: 12px;
     font-weight: 500;
-    color: var(--faint);
-    letter-spacing: 0.05em;
+    color: #A0A8A0;
+    letter-spacing: 0.04em;
     transition: color 0.25s ease, font-weight 0.25s ease;
 }
 
@@ -2189,17 +2432,23 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     height: 4px;
     border-radius: 50%;
     background: transparent;
-    transition: background 0.25s ease, box-shadow 0.25s ease;
+    transition: background 0.25s ease, box-shadow 0.25s ease, width 0.25s ease;
 }
 
 .nav-item.active .nav-label {
-    color: var(--ink);
+    color: #18212B;
     font-weight: 600;
 }
 
 .nav-item.active .nav-indicator {
-    background: var(--gold-deep);
-    box-shadow: 0 0 6px rgba(201,168,76,0.4);
+    width: 16px;
+    border-radius: 999px;
+    background: #44C9B4;
+    box-shadow: 0 0 8px rgba(68,201,180,0.3);
+}
+
+.nav-item:active {
+    transform: scale(0.95);
 }
 
 /* ═══ 人格滑动教程覆盖层 ═══ */
@@ -2971,491 +3220,6 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); }
 }
-
-/* ═══════════════════════════════════════
-   向导气泡 · Guide Bubble
-   ═══════════════════════════════════════ */
-
-.guide-bubble {
-    position: absolute;
-    bottom: 110px;
-    right: 16px;
-    z-index: 6;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    max-width: 220px;
-    background: rgba(255,248,238,0.95);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 14px 14px 14px 4px;
-    padding: 12px 14px;
-    border: 1px solid rgba(201,168,76,0.2);
-    box-shadow: 0 4px 24px rgba(28,25,23,0.08),
-                0 0 0 1px rgba(255,255,255,0.5) inset;
-    animation: bubbleFloat 3.5s ease-in-out infinite;
-}
-
-.guide-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--gold-deep);
-    flex-shrink: 0;
-    margin-top: 5px;
-    box-shadow: 0 0 8px rgba(201,168,76,0.4);
-    animation: softPulse 2.5s ease-in-out infinite;
-}
-
-.guide-text {
-    font-size: 13px;
-    color: var(--ink);
-    line-height: 1.55;
-    letter-spacing: 0.03em;
-}
-
-@keyframes bubbleFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
-}
-
-/* ═══════════════════════════════════════
-   今日推荐浮卡 · Map Recommend Card
-   ═══════════════════════════════════════ */
-
-.map-recommend-card {
-    position: absolute;
-    bottom: 80px;
-    left: 10px;
-    z-index: 6;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px 14px;
-    background: rgba(255,248,238,0.95);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 12px;
-    border: 1px solid rgba(210,176,92,0.25);
-    box-shadow: 0 4px 24px rgba(28,25,23,0.08);
-    max-width: 160px;
-    animation: floatCardIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.rec-badge {
-    font-size: 9px;
-    font-weight: 600;
-    color: #2A2A1A;
-    letter-spacing: 0.06em;
-    background: linear-gradient(135deg, var(--gold-light), var(--gold));
-    padding: 2px 8px;
-    border-radius: 3px;
-    display: inline-block;
-    align-self: flex-start;
-}
-
-.rec-name {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: 0.04em;
-}
-
-.rec-stops {
-    font-size: 10px;
-    color: var(--soft);
-    letter-spacing: 0.03em;
-    line-height: 1.4;
-}
-
-.rec-go {
-    align-self: flex-end;
-    padding: 5px 14px;
-    border-radius: 999px;
-    background: var(--ink);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-    transition: transform 0.15s ease, opacity 0.2s ease;
-}
-.rec-go:active { transform: scale(0.95); opacity: 0.8; }
-
-@keyframes floatCardIn {
-    from { transform: translateY(20px); opacity: 0; }
-    to   { transform: translateY(0); opacity: 1; }
-}
-
-/* ═══════════════════════════════════════
-   今日漫游配方卡 · Recipe Card
-   ═══════════════════════════════════════ */
-
-.recipe-card {
-    position: relative;
-    z-index: 10;
-    margin: -24px 16px 12px;
-    padding: 18px 16px 16px;
-    background: linear-gradient(180deg, rgba(255,248,238,0.96), rgba(253,245,235,0.92));
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(210,176,92,0.25);
-    border-radius: 16px;
-    box-shadow: 0 2px 24px rgba(28,25,23,0.04),
-                0 8px 32px rgba(28,25,23,0.04);
-    overflow: hidden;
-}
-.recipe-card::before {
-    content: "";
-    position: absolute;
-    top: -30px; right: -20px;
-    width: 100px; height: 100px;
-    border-radius: 50%;
-    filter: blur(45px);
-    opacity: 0.15;
-    background: var(--gold-light);
-    pointer-events: none;
-}
-.recipe-title, .recipe-ingredients, .recipe-generate-btn { position: relative; z-index: 1; }
-
-.recipe-title {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: 0.05em;
-    margin-bottom: 12px;
-}
-
-.recipe-ingredients {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 14px;
-}
-
-.ingredient {
-    display: inline-flex;
-    align-items: center;
-    padding: 7px 16px;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.7);
-    border: 1px solid rgba(139,115,85,0.12);
-    font-size: 13px;
-    color: var(--soft);
-    cursor: pointer;
-    font-family: inherit;
-    letter-spacing: 0.04em;
-    font-weight: 500;
-    transition: all 0.25s ease;
-}
-.ingredient:active { transform: scale(0.96); }
-
-.ingredient.active {
-    border-color: rgba(201,168,76,0.5);
-    background: rgba(232,196,106,0.08);
-    color: var(--ink);
-    font-weight: 600;
-    box-shadow: 0 2px 12px rgba(201,168,76,0.1);
-}
-
-.ingredient-sep {
-    font-size: 14px;
-    color: rgba(139,115,85,0.25);
-    margin: 0 2px;
-    user-select: none;
-}
-
-.recipe-generate-btn {
-    width: 100%;
-    height: 44px;
-    border-radius: 12px;
-    background: var(--ink);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.15s ease, opacity 0.2s ease;
-}
-.recipe-generate-btn:active {
-    transform: scale(0.97);
-    opacity: 0.85;
-}
-
-/* ═══════════════════════════════════════
-   慕夏卡片系统 · Mucha Card System
-   70% 视觉强度 — 拱形顶部、金色双层边框、藤蔓线稿、花草角标、奶油纸底
-   ═══════════════════════════════════════ */
-
-/* ── 慕夏卡片基底 — 拱形顶边 + 奶油白半透明 ── */
-.mucha-card {
-    background: linear-gradient(180deg, rgba(255,248,232,0.92) 0%, rgba(253,245,235,0.86) 100%);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1.5px solid rgba(210,176,92,0.7);
-    border-radius: 32px 32px 18px 18px;
-    position: relative;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    box-shadow:
-        0 18px 40px rgba(104,78,35,0.1),
-        inset 0 0 0 1px rgba(255,255,255,0.6);
-    overflow: hidden;
-}
-.mucha-card:active { transform: scale(0.97); }
-
-/* ── 内层金色细线边框 — 慕夏双层框 ── */
-.mucha-card::before {
-    content: "";
-    position: absolute;
-    inset: 7px;
-    border: 1px solid rgba(193,155,72,0.45);
-    border-radius: 28px 28px 14px 14px;
-    pointer-events: none;
-    z-index: 1;
-}
-
-/* ── 左上角藤蔓线稿装饰 — 慕夏植物纹样 ── */
-.mucha-card::after {
-    content: "";
-    position: absolute;
-    top: -4px;
-    left: 8px;
-    width: 80px;
-    height: 60px;
-    opacity: 0.14;
-    pointer-events: none;
-    z-index: 0;
-    background:
-        /* 主藤蔓曲线 */
-        radial-gradient(ellipse at 25% 50%, transparent 30%, var(--wutong) 30.5%, transparent 31%) no-repeat,
-        /* 叶片点 */
-        radial-gradient(circle at 50% 30%, var(--wutong) 2px, transparent 3px),
-        radial-gradient(circle at 60% 55%, var(--wutong) 2.5px, transparent 3.5px),
-        radial-gradient(circle at 35% 65%, var(--wutong) 2px, transparent 3px),
-        radial-gradient(circle at 70% 40%, var(--wutong) 1.5px, transparent 2.5px),
-        /* 小花 */
-        radial-gradient(circle at 55% 42%, var(--plum) 3px, transparent 4px);
-    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
-}
-
-/* ── 金色分隔线 — 卡片内元素之间 ── */
-.mucha-card .mucha-divider {
-    width: 60%;
-    height: 1px;
-    margin: 10px auto;
-    background: linear-gradient(90deg,
-        transparent,
-        rgba(210,176,92,0.5) 20%,
-        rgba(210,176,92,0.7) 50%,
-        rgba(210,176,92,0.5) 80%,
-        transparent
-    );
-}
-
-/* ── Today Section ── */
-.today-section {
-    padding: 4px 16px 0;
-    position: relative;
-    z-index: 3;
-}
-
-/* ── Inspiration Section · Persona-style ── */
-.inspiration-section {
-    padding: 6px 16px 0;
-    position: relative;
-    z-index: 3;
-}
-
-.inspiration-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-    margin-top: 2px;
-}
-
-.inspiration-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 16px 8px 14px;
-    text-align: center;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255,248,238,0.94), rgba(253,245,235,0.88));
-    border: 1px solid rgba(210,176,92,0.15);
-    box-shadow: 0 2px 12px rgba(104,78,35,0.04);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-.inspiration-card:active { transform: scale(0.96); }
-.inspiration-card::before {
-    content: "";
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(35px);
-    opacity: 0.22;
-    pointer-events: none;
-    z-index: 0;
-    transition: opacity 0.3s ease;
-}
-.inspiration-card[data-cat="life"]::before {
-    width: 70px; height: 70px;
-    top: -15px; right: -10px;
-    background: #E07A5F;
-}
-.inspiration-card[data-cat="culture"]::before {
-    width: 65px; height: 65px;
-    top: -10px; right: -5px;
-    background: #81B29A;
-}
-.inspiration-card .insp-label,
-.inspiration-card .insp-name,
-.inspiration-card .insp-desc { position: relative; z-index: 1; }
-
-.insp-label {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--bronze);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 3px;
-    background: rgba(201,168,76,0.08);
-    border: 1px solid rgba(201,168,76,0.12);
-}
-
-.insp-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: 0.04em;
-    margin-top: 2px;
-}
-
-.insp-desc {
-    font-size: 10px;
-    color: var(--soft);
-    letter-spacing: 0.03em;
-}
-
-.inspiration-card .insp-name::before {
-    display: none;
-}
-
-/* ═══════════════════════════════════════
-   南大专属入口 · NJU Special Card
-   ═══════════════════════════════════════ */
-
-.nju-special-card {
-    background: linear-gradient(145deg, rgba(61,64,91,0.04), rgba(61,64,91,0.01)) !important;
-    border: 1px solid rgba(61,64,91,0.15) !important;
-    position: relative;
-    overflow: hidden;
-}
-
-.nju-special-card .insp-label {
-    background: rgba(61,64,91,0.06);
-    border-color: rgba(61,64,91,0.12);
-    color: rgba(61,64,91,0.7);
-}
-
-.nju-special-card::after {
-    content: "";
-    position: absolute;
-    right: -8px;
-    bottom: -6px;
-    width: 48px;
-    height: 36px;
-    opacity: 0.06;
-    background:
-        linear-gradient(to top, #3D405B 44%, transparent 44%),
-        linear-gradient(to right, #3D405B 2px, transparent 2px 18px, #3D405B 2px 20px, transparent 20px 36px, #3D405B 2px 38px);
-}
-
-/* ═══════════════════════════════════════
-   AI向导信封 · Guide Envelope
-   ═══════════════════════════════════════ */
-
-.guide-envelope {
-    padding: 8px 16px;
-    position: relative;
-    z-index: 3;
-}
-
-.envelope-card {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px;
-    cursor: pointer;
-}
-
-.envelope-mark {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: rgba(201,168,76,0.08);
-    border: 1.5px solid rgba(201,168,76,0.2);
-    flex-shrink: 0;
-    position: relative;
-}
-.envelope-mark::after {
-    content: "";
-    position: absolute;
-    inset: 8px;
-    border-radius: 50%;
-    background: var(--gold-deep);
-    opacity: 0.5;
-    box-shadow: 0 0 10px rgba(201,168,76,0.3);
-}
-
-.envelope-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.envelope-title {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: 0.04em;
-    margin-bottom: 4px;
-}
-
-.envelope-hint {
-    font-size: 12px;
-    color: var(--soft);
-    line-height: 1.4;
-    letter-spacing: 0.03em;
-}
-
-.envelope-open-btn {
-    flex-shrink: 0;
-    padding: 8px 14px;
-    border-radius: 8px;
-    background: var(--ink);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-    transition: transform 0.15s ease, opacity 0.2s ease;
-}
-.envelope-open-btn:active { transform: scale(0.95); opacity: 0.85; }
 
 /* ═══════════════════════════════════════
    新动画集 · New Animation Suite
@@ -5221,3 +4985,88 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
         grid-template-columns: 1fr 1fr 1fr;
     }
 }
+
+/* ═══ Minimal fallback card (元气极简) ═══ */
+.mucha-card {
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.05);
+    border-radius: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 16px rgba(24,33,43,0.04);
+}
+.mucha-card:active { transform: scale(0.97); }
+
+.route-card {
+    border-radius: 18px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.05);
+}
+.route-card:active { transform: scale(0.98); }
+
+.route-card-body {
+    position: relative;
+    z-index: 1;
+    padding: 20px 18px;
+}
+
+.route-card-title {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #18212B;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+}
+
+.route-card-desc {
+    font-size: 13px;
+    color: #6B7280;
+    margin-bottom: 10px;
+}
+
+.route-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.meta-tag {
+    font-size: 10.5px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #EEF0F5;
+    color: #6B7280;
+    letter-spacing: 0.04em;
+}
+
+.section-title {
+    font-family: "PingFang SC", "Helvetica Neue", "Noto Sans SC", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #18212B;
+    letter-spacing: -0.01em;
+    margin-bottom: 12px;
+}
+
+.inspiration-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 16px 8px 14px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 16px;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.05);
+    box-shadow: 0 2px 12px rgba(24,33,43,0.03);
+    transition: transform 0.2s ease;
+}
+.inspiration-card:active { transform: scale(0.96); }

@@ -5,56 +5,173 @@
 // ═══════════════════════════════════════════════
 
 const SUPPLY_DATA = (function() {
-  // ── Real photo pools by category (publicly accessible photos) ──
-  const FOOD_PHOTOS = [
-    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop", // 中餐
-    "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop", // 面馆
-    "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop", // 小吃
-    "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=400&fit=crop", // 火锅
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop", // 烧烤
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop", // 西餐
-    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop", // 沙拉
-    "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop", // 早餐
-    "https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&h=400&fit=crop", // 日料
-    "https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&h=400&fit=crop", // 韩料
-    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop", // 健康餐
-    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop", // 披萨
-    "https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=400&h=400&fit=crop", // 甜点
-    "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=400&fit=crop", // 面包
-    "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&h=400&fit=crop", // 早午餐
-    "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&h=400&fit=crop", // 中餐2
-    "https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400&h=400&fit=crop", // 海鲜
-    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop", // 高级餐厅
-    "https://images.unsplash.com/photo-1506354666786-959d6d497f1a?w=400&h=400&fit=crop", // 简餐
-    "https://images.unsplash.com/photo-1569058242567-93de6f36f8e6?w=400&h=400&fit=crop", // 水饺
-  ];
-  const COFFEE_PHOTOS = [
-    "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1514432324607-a09d9b4aefda?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=400&h=400&fit=crop",
-    "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400&h=400&fit=crop",
-  ];
-  const TICKET_PHOTOS = [
-    "https://images.unsplash.com/photo-1565967511849-76a60a516170?w=400&h=400&fit=crop", // 历史建筑
-    "https://images.unsplash.com/photo-1580657018950-c7f7d6a6d990?w=400&h=400&fit=crop", // 中式园林
-    "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop", // 博物馆
-    "https://images.unsplash.com/photo-1559827291-8691ee2da8e1?w=400&h=400&fit=crop", // 公园
-    "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=400&h=400&fit=crop", // 寺庙
-    "https://images.unsplash.com/photo-1544085311-11a0284650eb?w=400&h=400&fit=crop", // 水景
-    "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop", // 城市
-    "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop", // 山景
-  ];
+  // ── Subcategory → real matched photo (manually curated per cuisine/venue type) ──
+  const SUBCAT_IMAGE = {
+    // ── 南京经典 · Nanjing Classics ──
+    "鸭血粉丝汤": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop",
+    "鸡汁汤包": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "牛肉锅贴": "https://images.unsplash.com/photo-1569058242567-93de6f36f8e6?w=400&h=400&fit=crop",
+    "小笼包/面": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "小笼包/台菜": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "烤鸭": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    "板鸭": "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&h=400&fit=crop",
+    "卤味": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "蟹黄汤包": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "酥烧饼": "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=400&fit=crop",
+    "生煎包": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "生煎/锅贴": "https://images.unsplash.com/photo-1569058242567-93de6f36f8e6?w=400&h=400&fit=crop",
+    "梅花糕": "https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=400&h=400&fit=crop",
+    "糖粥藕": "https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=400&h=400&fit=crop",
+    "鸡蛋汉堡": "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop",
+    "豆腐涝": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "五香蛋": "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop",
+    "糕点甜品": "https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=400&h=400&fit=crop",
+    "糕点早点": "https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&h=400&fit=crop",
+    // ── 面馆 · Noodles ──
+    "面馆": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop",
+    "老卤面": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop",
+    "大肉面": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop",
+    "馄饨": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop",
+    "日式拉面": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop",
+    "日式乌冬": "https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&h=400&fit=crop",
+    // ── 火锅 · Hotpot ──
+    "火锅": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=400&fit=crop",
+    "川味火锅": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=400&fit=crop",
+    "潮汕火锅": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=400&fit=crop",
+    "猪肚鸡火锅": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=400&fit=crop",
+    // ── 中式菜系 · Chinese Regional ──
+    "淮扬菜": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "淮扬菜/粤菜": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "金陵菜": "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&h=400&fit=crop",
+    "江浙菜": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "粤菜": "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&h=400&fit=crop",
+    "粤菜茶点": "https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=400&h=400&fit=crop",
+    "云南菜": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "西北菜": "https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&h=400&fit=crop",
+    "徽菜/淮扬": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop",
+    "乐山翘脚牛肉": "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&h=400&fit=crop",
+    "酸菜鱼": "https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400&h=400&fit=crop",
+    "烤鱼": "https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400&h=400&fit=crop",
+    "炭烤牛蛙": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop",
+    // ── 家常/私房 · Casual & Private ──
+    "家常菜": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "私房菜": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "融合菜": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "校园食堂": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop",
+    // ── 清真 · Halal ──
+    "清真菜": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    "清真小吃": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    // ── 烧烤 · BBQ ──
+    "烧烤": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    "烧烤/酒吧": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    "砂锅/烧烤": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    // ── 日韩 · Japanese & Korean ──
+    "日料": "https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&h=400&fit=crop",
+    "高端日料": "https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&h=400&fit=crop",
+    "居酒屋": "https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&h=400&fit=crop",
+    "日式烧肉": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    "韩料": "https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&h=400&fit=crop",
+    "韩式烤肉": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop",
+    // ── 西式 · Western ──
+    "意式简餐": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop",
+    "比萨": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop",
+    "汉堡": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop",
+    "西式快餐": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop",
+    "港式茶餐厅": "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&h=400&fit=crop",
+    // ── 小吃/美食街区 · Street Food ──
+    "小吃集合": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "小吃快餐": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+    "美食街区": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop",
+
+    // ── 景点 · Attractions ──
+    "博物馆": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "历史遗迹": "https://images.unsplash.com/photo-1565967511849-76a60a516170?w=400&h=400&fit=crop",
+    "历史建筑": "https://images.unsplash.com/photo-1565967511849-76a60a516170?w=400&h=400&fit=crop",
+    "历史街区": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "寺庙": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=400&h=400&fit=crop",
+    "公园": "https://images.unsplash.com/photo-1559827291-8691ee2da8e1?w=400&h=400&fit=crop",
+    "园林": "https://images.unsplash.com/photo-1580657018950-c7f7d6a6d990?w=400&h=400&fit=crop",
+    "城墙": "https://images.unsplash.com/photo-1565967511849-76a60a516170?w=400&h=400&fit=crop",
+    "遗址": "https://images.unsplash.com/photo-1565967511849-76a60a516170?w=400&h=400&fit=crop",
+    "游船": "https://images.unsplash.com/photo-1544085311-11a0284650eb?w=400&h=400&fit=crop",
+    "景区": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop",
+    "景区套票": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop",
+    "山景": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop",
+    "地标": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "动物园": "https://images.unsplash.com/photo-1559827291-8691ee2da8e1?w=400&h=400&fit=crop",
+    "植物园": "https://images.unsplash.com/photo-1559827291-8691ee2da8e1?w=400&h=400&fit=crop",
+    "孔庙": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=400&h=400&fit=crop",
+    "纪念馆": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "科技馆": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "天文台": "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=400&h=400&fit=crop",
+    "数字艺术馆": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "美术馆": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "文化空间": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "戏曲表演": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "展览拍照": "https://images.unsplash.com/photo-1548013146-72479768bada?w=400&h=400&fit=crop",
+    "商业街区": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "景点": "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop",
+
+    // ── 住宿 · Hotels ──
+    "五星酒店": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "连锁酒店": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "人文酒店": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "精品酒店": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "民宿": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "经济酒店": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "青旅": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    "度假酒店": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+
+    // ── 购物 · Shopping ──
+    "购物中心": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "百货": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "高端百货": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "文创街区": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "商业街区": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "特产": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "文创纪念品": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "博物馆文创": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "书店文创": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "书店": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "批发市场": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+
+    // ── 娱乐 · Entertainment ──
+    "电影院": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "KTV": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "密室逃脱": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "电玩城": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "剧院": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "温泉": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "游乐园": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "水族馆": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "打卡拍照": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "潮玩盲盒": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    "运动娱乐": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+
+    // ── 饮品 · Drinks ──
+    "咖啡茶饮": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=400&fit=crop",
+  };
+
+  // ── Category-level fallback images ──
+  const CATEGORY_FALLBACK = {
+    food: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    coffee: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=400&fit=crop",
+    ticket: "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop",
+    hotel: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop",
+    shopping: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+    entertainment: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=400&fit=crop",
+  };
+
+  function getImage(cat, subcat) {
+    if (subcat && SUBCAT_IMAGE[subcat]) return SUBCAT_IMAGE[subcat];
+    if (SUBCAT_IMAGE[cat]) return SUBCAT_IMAGE[cat];
+    return CATEGORY_FALLBACK[cat] || CATEGORY_FALLBACK.food;
+  }
 
   // ── Shared helpers: gallery, highlights, services per business ──
   function makeGallery(baseId, count) {
     return Array.from({length: count || 4}, (_, j) =>
-      'https://loremflickr.com/400/400/storefront,interior,shop?lock=' + baseId + 'g' + j);
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop&sig=' + j);
   }
   const HIGHLIGHTS = {
     food: {
@@ -312,7 +429,7 @@ const SUPPLY_DATA = (function() {
     const [name, subcat, district, address, lat, lng, dist, rating, reviews, avgPrice, tagStr, dealStr, onRoute, detour, stayMin, phone, hours, photoIdx] = arr;
     const tags = tagStr ? tagStr.split(',') : [];
     const deals = dealStr ? dealStr.split(';').map(d => { const p = d.split('|'); return {desc:p[0], price:parseInt(p[1])||0, orig:parseInt(p[2])||0, sold:parseInt(p[3])||0}; }) : [];
-    const image = FOOD_PHOTOS[photoIdx % FOOD_PHOTOS.length];
+    const image = getImage('food', subcat);
     return { id:"f"+FOOD_DATA.indexOf(arr).toString().padStart(3,'0'), name, category:"food", subcategory:subcat, district, address, lat, lng, distance:dist, rating, reviewCount:reviews, avgPrice, tags, deals, image, phone:phone||"", hours:hours||"", photos:Math.floor(reviews*0.08), bookmarkCount:Math.floor(reviews*2.5), onRoute:!!onRoute, detour:detour||0, stayMin:stayMin||20, gallery:[] };
   }
 
@@ -368,7 +485,7 @@ const SUPPLY_DATA = (function() {
     const [name, subcat, district, address, lat, lng, dist, rating, reviews, avgPrice, tagStr, dealStr, onRoute, detour, stayMin, phone, hours, photoIdx] = arr;
     const tags = tagStr ? tagStr.split(',') : [];
     const deals = dealStr ? dealStr.split(';').filter(d=>d).map(d => { const p = d.split('|'); return {desc:p[0], price:parseInt(p[1])||0, orig:parseInt(p[2])||0, sold:parseInt(p[3])||0}; }) : [];
-    const image = 'https://loremflickr.com/400/400/food,restaurant,cuisine?lock='+i;
+    const image = getImage('food', subcat);
     return { id:"f"+i.toString().padStart(3,'0'), name, category:"food", subcategory:subcat, district, address, lat, lng, distance:dist, rating, reviewCount:reviews, avgPrice, tags, deals, image, phone:phone||"", hours:hours||"", photos:Math.floor(reviews*0.08), bookmarkCount:Math.floor(reviews*2.5), onRoute:!!onRoute, detour:detour||0, stayMin:stayMin||20, highlights:getHighlights('food',subcat), services:getServices('food'), gallery:makeGallery('nf'+i,4) };
   });
 
@@ -377,7 +494,7 @@ const SUPPLY_DATA = (function() {
     const [name, subcat, district, address, lat, lng, dist, rating, reviews, avgPrice, tagStr, dealStr, onRoute, detour, stayMin, phone, hours, photoIdx] = arr;
     const tags = tagStr ? tagStr.split(',') : [];
     const deals = dealStr ? dealStr.split(';').filter(d=>d).map(d => { const p = d.split('|'); return {desc:p[0], price:parseInt(p[1])||0, orig:parseInt(p[2])||0, sold:parseInt(p[3])||0}; }) : [];
-    const image = 'https://loremflickr.com/400/400/landmark,architecture,temple?lock='+i;
+    const image = getImage('ticket', subcat);
     return { id:"a"+i.toString().padStart(3,'0'), name, category:"ticket", subcategory:subcat, district, address, lat, lng, distance:dist, rating, reviewCount:reviews, avgPrice, tags, deals, image, phone:phone||"", hours:hours||"", photos:Math.floor(reviews*0.06), bookmarkCount:Math.floor(reviews*3), onRoute:!!onRoute, detour:detour||0, stayMin:stayMin||45, highlights:getHighlights('ticket',subcat), services:getServices('ticket'), gallery:makeGallery('na'+i,4) };
   });
 
@@ -402,7 +519,7 @@ const SUPPLY_DATA = (function() {
     const [name, district, address, dist, rating, reviews, avgPrice, tagsStr, dealsStr, onRoute, photoIdx] = arr;
     const tags = tagsStr ? tagsStr.split(',') : [];
     const deals = dealsStr ? dealsStr.split(';').filter(d=>d).map(d => { const p = d.split('|'); return {desc:p[0], price:parseInt(p[1])||0, orig:parseInt(p[2])||0, sold:parseInt(p[3])||0}; }) : [];
-    const image = 'https://loremflickr.com/400/400/coffee,cafe,drink?lock='+i;
+    const image = getImage('coffee', '咖啡茶饮');
     return { id:"c"+i.toString().padStart(3,'0'), name, category:"coffee", subcategory:"咖啡茶饮", district, address:"", lat:32.04, lng:118.78, distance:dist, rating, reviewCount:reviews, avgPrice, tags, deals, image, phone:"", hours:"", photos:Math.floor(reviews*0.06), bookmarkCount:Math.floor(reviews*2), onRoute:!!onRoute, detour:0, stayMin:20, highlights:getHighlights('coffee',''), services:getServices('coffee'), gallery:makeGallery('nc'+i,4) };
   });
 
@@ -415,7 +532,7 @@ const SUPPLY_DATA = (function() {
     const [name, subcat, district, address, dist, rating, reviews, avgPrice, tagsStr, dealsStr, onRoute, phone, photoIdx] = arr;
     const tags = tagsStr ? tagsStr.split(',') : [];
     const deals = dealsStr ? dealsStr.split(';').filter(d=>d).map(d => { const p = d.split('|'); return {desc:p[0], price:parseInt(p[1])||0, orig:parseInt(p[2])||0, sold:parseInt(p[3])||0}; }) : [];
-    return { id:"h"+i.toString().padStart(3,'0'), name, category:"hotel", subcategory:subcat, district, address, lat:32.04, lng:118.78, distance:dist, rating, reviewCount:reviews, avgPrice, tags, deals, image:'https://loremflickr.com/400/400/hotel,lobby,room?lock='+i, phone:phone||"", hours:"24小时", photos:Math.floor(reviews*0.04), bookmarkCount:Math.floor(reviews*2), onRoute:!!onRoute, detour:0, stayMin:480, highlights:getHighlights('hotel',subcat), services:getServices('hotel'), gallery:makeGallery('nh'+i,4) };
+    return { id:"h"+i.toString().padStart(3,'0'), name, category:"hotel", subcategory:subcat, district, address, lat:32.04, lng:118.78, distance:dist, rating, reviewCount:reviews, avgPrice, tags, deals, image: getImage('hotel', subcat), phone:phone||"", hours:"24小时", photos:Math.floor(reviews*0.04), bookmarkCount:Math.floor(reviews*2), onRoute:!!onRoute, detour:0, stayMin:480, highlights:getHighlights('hotel',subcat), services:getServices('hotel'), gallery:makeGallery('nh'+i,4) };
   });
 
   // ── Shopping / Entertainment (compact merger) ──
@@ -460,7 +577,7 @@ const SUPPLY_DATA = (function() {
   const allShopEnt = SHOP_ENT_DATA.map((s, i) => {
     const tags = s.tags ? s.tags.split(',') : [];
     const deals = s.deals ? s.deals.split(';').filter(d=>d).map(d => { const p = d.split('|'); return {desc:p[0], price:parseInt(p[1])||0, orig:parseInt(p[2])||0, sold:parseInt(p[3])||0}; }) : [];
-    return { id:s.id, name:s.name, category:s.cat, subcategory:s.sub, district:s.dist, address:s.addr, lat:32.04, lng:118.78, distance:s.distKm, rating:s.rate, reviewCount:s.rev, avgPrice:s.price||0, tags, deals, image:'https://loremflickr.com/400/400/store,shop,boutique?lock='+i, phone:"", hours:"", photos:Math.floor(s.rev*0.05), bookmarkCount:Math.floor(s.rev*2), onRoute:!!s.on, detour:0, stayMin:s.cat==="entertainment"?90:45, highlights:getHighlights(s.cat,s.sub), services:getServices(s.cat), gallery:makeGallery('ns'+i,4) };
+    return { id:s.id, name:s.name, category:s.cat, subcategory:s.sub, district:s.dist, address:s.addr, lat:32.04, lng:118.78, distance:s.distKm, rating:s.rate, reviewCount:s.rev, avgPrice:s.price||0, tags, deals, image: getImage(s.cat, s.sub), phone:"", hours:"", photos:Math.floor(s.rev*0.05), bookmarkCount:Math.floor(s.rev*2), onRoute:!!s.on, detour:0, stayMin:s.cat==="entertainment"?90:45, highlights:getHighlights(s.cat,s.sub), services:getServices(s.cat), gallery:makeGallery('ns'+i,4) };
   });
 
   // ── Coupons ──

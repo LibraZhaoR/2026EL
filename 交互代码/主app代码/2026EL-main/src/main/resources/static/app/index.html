@@ -86,12 +86,11 @@
     <button class="swiper-skip" id="swiper-skip">暂时跳过</button>
 </section>
 
-<!-- ═══ 主页面 · 金陵漫游画布 ═══ -->
+<!-- ═══ 主页面 · Swiss Minimal ═══ -->
 <div class="main-page" id="main-page">
 
-    <!-- 印象派地图舞台 · Impressionist Map Stage -->
+    <!-- 地图舞台 · Map Stage -->
     <div class="impressionist-map-stage" id="map-stage">
-        <!-- AMap container -->
         <div class="main-map-container" id="main-map-container">
             <header class="main-header">
                 <div class="header-left">
@@ -100,159 +99,69 @@
                 </div>
                 <div class="header-right">
                     <span class="header-budget">¥100</span>
+                    <div class="pet-companion" id="pet-companion">
+                        <span class="pet-avatar" id="pet-avatar">🦆</span>
+                        <div class="pet-bubble" id="pet-bubble">
+                            <span class="pet-bubble-text" id="pet-bubble-text"></span>
+                        </div>
+                    </div>
                     <button class="header-btn" id="header-ai-btn">AI</button>
                 </div>
             </header>
-            <div class="map-title-area">
-                <h1 class="map-main-title">今天想去哪玩？</h1>
-                <p class="map-sub-title">南京城市画布已展开，选一条路线出发吧</p>
-            </div>
         </div>
-
-        <!-- 印象派水彩纹理层 · Watercolor overlay -->
         <div class="map-canvas-overlay" id="map-canvas-overlay"></div>
         <canvas class="map-route-canvas" id="map-route-canvas"></canvas>
-
-        <!-- 巴斯奎特涂鸦标记层 · Graffiti markers layer -->
         <div class="graffiti-markers-layer" id="graffiti-markers"></div>
-
-        <!-- 向导气泡 · Guide bubble -->
-        <div class="guide-bubble" id="guide-bubble">
-            <span class="guide-dot"></span>
-            <span class="guide-text" id="guide-text">今天有2小时，要不要走一条轻松路线？</span>
-        </div>
-
-        <!-- 地图上的今日推荐浮卡 -->
-        <div class="map-recommend-card" id="map-recommend-card" data-route="night">
-            <span class="rec-badge">今日推荐</span>
-            <span class="rec-name">金陵夜游线</span>
-            <span class="rec-stops">秦淮河 → 夫子庙 → 老门东</span>
-            <button class="rec-go">出发</button>
-        </div>
     </div>
 
-    <!-- 可滚动内容层 · Scrollable content -->
+    <!-- 调暗覆盖层 -->
     <div class="map-dim-overlay" id="map-dim-overlay"></div>
 
-    <div class="main-scroll" id="main-scroll">
-        <!-- 上拉手柄 -->
-        <div class="scroll-pull-handle" id="scroll-pull-handle">
-            <span class="pull-line"></span>
-            <span class="pull-text">上拉查看更多路线</span>
-        </div>
+    <!-- ═══ 吸附滚动区 · Snap Scroll ═══ -->
+    <div class="snap-scroll" id="snap-scroll">
 
-        <!-- 今日漫游配方卡 · Recipe Card -->
-        <section class="recipe-card" id="recipe-card">
-            <h3 class="recipe-title">今日的漫游配方</h3>
-            <div class="recipe-ingredients" id="recipe-ingredients">
-                <button class="ingredient active" data-type="time" data-value="120">
-                    2小时
-                </button>
-                <span class="ingredient-sep">·</span>
-                <button class="ingredient active" data-type="mood" data-value="relax">
-                    放空
-                </button>
-                <span class="ingredient-sep">·</span>
-                <button class="ingredient" data-type="budget" data-value="low">
-                    低预算
-                </button>
+        <!-- Section 1: Hero + 横向轮播 -->
+        <section class="snap-section hero-section" id="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title">南京<br>今天去哪儿</h1>
+                <p class="hero-desc">选一条路线，开始城市探索</p>
             </div>
-            <button class="recipe-generate-btn" id="recipe-generate-btn">
-                生成路线
-            </button>
+            <div class="route-carousel" id="route-carousel">
+                <div class="carousel-track" id="carousel-track">
+                    <!-- JS 动态生成 -->
+                </div>
+            </div>
+            <div class="carousel-dots" id="carousel-dots"></div>
+            <div class="scroll-hint">
+                <span class="scroll-hint-arrow">↓</span>
+                <span class="scroll-hint-text">向下探索</span>
+            </div>
         </section>
 
-        <!-- 今日适合出发 · Today's Picks -->
-        <section class="today-section">
-            <h2 class="section-title">今日适合出发</h2>
+        <!-- Section 2: 推荐路线详情 -->
+        <section class="snap-section feature-section" id="feature-section">
+            <!-- JS 动态填充 -->
+        </section>
 
-            <div class="route-card route-card-primary mucha-card" id="route-card-primary" data-route="night">
-                <div class="route-card-badge">推荐</div>
-                <div class="route-card-body">
-                    <h3 class="route-card-title">金陵夜游线</h3>
-                    <div class="route-card-path">
-                        <span class="path-dot"></span>
-                        <span class="path-text">秦淮河</span>
-                        <span class="path-arrow">→</span>
-                        <span class="path-dot"></span>
-                        <span class="path-text">夫子庙</span>
-                        <span class="path-arrow">→</span>
-                        <span class="path-dot"></span>
-                        <span class="path-text">老门东</span>
-                    </div>
-                    <div class="route-card-meta">
-                        <span class="meta-tag">3小时</span>
-                        <span class="meta-tag">轻松</span>
-                        <span class="meta-tag">夜景</span>
-                        <span class="meta-tag">剧情</span>
-                    </div>
-                    <div class="route-card-actions">
-                        <button class="btn-primary-route" data-route="night">开始探索</button>
-                        <button class="btn-secondary-route">邀朋友一起走</button>
-                    </div>
-                </div>
+        <!-- Section 3: 更多路线 + 向导 -->
+        <section class="snap-section more-section" id="more-section">
+            <h2 class="section-heading">更多路线</h2>
+            <div class="route-grid" id="route-grid">
+                <!-- JS 动态生成 -->
             </div>
-
-            <div class="route-card route-card-secondary" data-route="nju">
-                <div class="route-card-body">
-                    <h3 class="route-card-title">南大校园漫步</h3>
-                    <p class="route-card-desc">梧桐树下，从三江师范到今天</p>
-                    <div class="route-card-meta">
-                        <span class="meta-tag">2.5小时</span>
-                        <span class="meta-tag">校园</span>
-                        <span class="meta-tag">剧情线</span>
+            <div class="guide-block" id="guide-block">
+                <div class="guide-block-card">
+                    <span class="guide-block-mark">?</span>
+                    <div class="guide-block-text">
+                        <p class="guide-block-title">不知道去哪？</p>
+                        <p class="guide-block-hint">让我帮你抽一条今天的南京路线</p>
                     </div>
-                </div>
-            </div>
-
-            <div class="route-card route-card-secondary" data-route="food">
-                <div class="route-card-body">
-                    <h3 class="route-card-title">午后餐茶漫步</h3>
-                    <p class="route-card-desc">不赶路，把下午慢慢花掉</p>
-                    <div class="route-card-meta">
-                        <span class="meta-tag">2小时</span>
-                        <span class="meta-tag">休闲</span>
-                        <span class="meta-tag">美食</span>
-                    </div>
+                    <button class="guide-block-btn" id="guide-block-btn">拆开看看</button>
                 </div>
             </div>
         </section>
 
-        <!-- 路线灵感 · Route Inspiration -->
-        <section class="inspiration-section">
-            <h2 class="section-title">路线灵感</h2>
-            <div class="inspiration-grid">
-                <div class="inspiration-card mucha-card" data-cat="life">
-                    <span class="insp-label">生活</span>
-                    <span class="insp-name">生活路线</span>
-                    <span class="insp-desc">美食·萌宠·散步</span>
-                </div>
-                <div class="inspiration-card mucha-card" data-cat="culture">
-                    <span class="insp-label">文化</span>
-                    <span class="insp-name">文化路线</span>
-                    <span class="insp-desc">展览·图书馆·剧院</span>
-                </div>
-                <div class="inspiration-card mucha-card nju-special-card" data-route="nju">
-                    <span class="insp-label">南大</span>
-                    <span class="insp-name">南大1902剧情线</span>
-                    <span class="insp-desc">从三江师范到今天</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- AI向导信封 · Guide Envelope -->
-        <section class="guide-envelope" id="guide-envelope">
-            <div class="envelope-card mucha-card">
-                <span class="envelope-mark"></span>
-                <div class="envelope-content">
-                    <p class="envelope-title">路线推荐信</p>
-                    <p class="envelope-hint">不知道去哪？让我帮你抽一条今天的南京路线</p>
-                </div>
-                <button class="envelope-open-btn">拆开看看</button>
-            </div>
-        </section>
-
-        <div class="bottom-spacer"></div>
+        <div class="snap-bottom-spacer"></div>
     </div>
 
     <!-- ═══ Tab: 路线列表 ═══ -->
@@ -270,7 +179,7 @@
         <div class="tab-content-inner" id="tab-profile-inner"></div>
     </div>
 
-    <!-- 手账贴纸式底部导航 · Sticker Tab Bar -->
+    <!-- 底部导航 · Bottom Nav -->
     <nav class="bottom-nav">
         <div class="nav-item active" data-tab="home">
             <span class="nav-label">首页</span>
