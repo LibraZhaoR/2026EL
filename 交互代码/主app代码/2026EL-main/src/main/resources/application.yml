@@ -1,0 +1,24 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: campus-nanjing-travel
+
+travel:
+  ai:
+    # 可选: mock(离线关键词回复) | openai(兼容OpenAI接口,如DeepSeek) | doubao(火山引擎豆包)
+    provider: openai
+    # DeepSeek API (兼容OpenAI格式), 换成其他兼容API只需改此地址
+    base-url: https://api.deepseek.com/v1/chat/completions
+    api-key: sk-0c4f9bc4e734467e98d1996aa4811c95
+    model: deepseek-chat
+  meituan:
+    enabled: false
+    developer-id: ""
+    sign-key: ${MEITUAN_SIGN_KEY:your-sign-key-here}
+    base-url: https://api-open-cater.meituan.com
+  share:
+    base-url: https://example.com/invite/

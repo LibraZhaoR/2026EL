@@ -1,0 +1,58 @@
+# Maven
+target/
+*.jar
+*.war
+!*.jar.orig
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Node (if any)
+node_modules/
+.npm/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.local
+.env.*
+
+# Temp
+*.tmp
+*.temp
+*.bak
+
+# Large dependency dirs (keep only source code)
+blender-mcp-main/
+fabric.js-master/
+GSAP-master/
+gsap-skills-main/
+impeccable-main/
+nanogl-develop/
+taste-skill-main/
+three.js-dev/
+
+# IDE
+.claude/
