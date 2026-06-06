@@ -1,9 +1,14 @@
 package com.nju.travel.mycode;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nju.travel.common.result.ApiResult;
 import com.nju.travel.module.route.service.RouteService;
 import com.nju.travel.module.route.vo.UserRouteVO;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * RoutePlanningController - 自由绘制路径规划与路线保存
@@ -17,24 +22,38 @@ public class RoutePlanningController {
 
     private final AMapRouteService aMapRouteService;
     private final RouteService routeService;
+    private final ObjectMapper objectMapper;
 
-    public RoutePlanningController(AMapRouteService aMapRouteService, RouteService routeService) {
+    public RoutePlanningController(AMapRouteService aMapRouteService, RouteService routeService, ObjectMapper objectMapper) {
         this.aMapRouteService = aMapRouteService;
         this.routeService = routeService;
+        this.objectMapper = objectMapper;
     }
 
     /**
      * 路径规划代理接口 (步行/驾车)
-     * 前端逐段调用，后端代理转发至高德 API
+     * 返回标准 JSON Content-Type，确保浏览器 fetch().json() 正常解析
      */
     @GetMapping("/plan")
-    public Object getRoutePlan(
+    public ResponseEntity<Object> getRoutePlan(
             @RequestParam String origin,
             @RequestParam String destination,
             @RequestParam(required = false) String waypoints,
             @RequestParam(defaultValue = "walking") String mode) {
 
-        return aMapRouteService.planRoute(origin, destination, waypoints, mode);
+        try {
+            String amapJson = aMapRouteService.planRoute(origin, destination, waypoints, mode);
+            Object jsonNode = objectMapper.readTree(amapJson);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(jsonNode);
+        } catch (Exception e) {
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(objectMapper.createObjectNode()
+                        .put("status", "0")
+                        .put("info", "地图服务暂时不可用: " + e.getMessage()));
+        }
     }
 
     /**
