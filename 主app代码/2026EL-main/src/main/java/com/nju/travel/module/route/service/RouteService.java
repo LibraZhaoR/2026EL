@@ -125,6 +125,33 @@ public class RouteService {
         userRoutes.remove(userRouteId);
     }
 
+    /**
+     * 保存用户自由绘制的自定义路线
+     */
+    public UserRouteVO saveCustomRoute(Long userId, String title, String description, String routeDataJson) {
+        UserRouteVO userRoute = new UserRouteVO(
+                userRouteIdGenerator.incrementAndGet(),
+                userId,
+                null,                  // 无源路线，表示用户自创
+                title,
+                description,
+                false,                 // 默认不公开
+                List.of(),             // 无官方点位引用
+                LocalDateTime.now()
+        );
+        userRoutes.put(userRoute.userRouteId(), userRoute);
+        return userRoute;
+    }
+
+    /**
+     * 获取用户自定义路线的原始数据 (存储在 description 中)
+     */
+    public String getCustomRouteData(Long userRouteId) {
+        UserRouteVO route = userRoutes.get(userRouteId);
+        if (route == null) return null;
+        return route.description();
+    }
+
     private RouteVO findRoute(Long routeId) {
         return routes.stream()
                 .filter(route -> route.routeId().equals(routeId))

@@ -2672,8 +2672,19 @@ function renderRoutesTab(container) {
         `<div class="tab-page-header">
             <div class="tab-page-title">🗺 全部路线</div>
             <div class="tab-page-subtitle">${Object.keys(routes).length} 条路线，等你出发</div>
+        </div>
+        <div class="upload-route-entry" id="upload-route-entry">
+            <span class="upload-icon">✏️</span>
+            <span>在地图上自由绘制我的路线</span>
         </div>`;
 
+    // 绑定上传按钮
+    setTimeout(() => {
+        const entry = document.getElementById("upload-route-entry");
+        if (entry) entry.addEventListener("click", openFreeDraw);
+    }, 50);
+
+    // 渲染 4 条官方路线
     Object.entries(routes).forEach(([key, route]) => {
         const info = TAB_ROUTE_ICONS[key] || { icon: "📍", bg: "rgba(78,126,122,0.12)" };
         const metaHtml = route.meta.map(m => `<span>${m}</span>`).join("");
@@ -2690,6 +2701,88 @@ function renderRoutesTab(container) {
         div.addEventListener("click", () => openRoute(key));
         container.appendChild(div);
     });
+
+    // 加载并渲染用户自定义路线
+    fetch("/api/user-routes?userId=1")
+        .then(r => r.json())
+        .then(d => {
+            const userRoutes = (d.data || []).filter(ur => !ur.sourceRouteId); // 仅自定义路线
+            if (userRoutes.length === 0) return;
+
+            // 添加分隔
+            const sep = document.createElement("div");
+            sep.style.cssText = "padding:12px 0 8px;font-size:12px;color:var(--faint);font-weight:600;letter-spacing:1px;text-transform:uppercase;";
+            sep.textContent = "📝 我的自定义路线";
+            container.appendChild(sep);
+
+            userRoutes.forEach(ur => {
+                const div = document.createElement("div");
+                div.className = "route-list-item custom-route";
+                div.innerHTML =
+                    `<div class="route-list-icon" style="background:rgba(122,92,255,0.12)">🗺</div>
+                     <div class="route-list-info">
+                         <div class="route-list-name">${escapeHtml(ur.title)}<span class="custom-badge">自创</span></div>
+                         <div class="route-list-desc">自由绘制 · ${ur.createdAt ? new Date(ur.createdAt).toLocaleDateString("zh-CN") : "刚刚"}</div>
+                     </div>
+                     <span class="route-list-arrow">›</span>`;
+                div.addEventListener("click", () => {
+                    showCustomRouteDetail(ur);
+                });
+                container.appendChild(div);
+            });
+        })
+        .catch(() => {}); // 静默失败
+
+    container.dataset.rendered = "true";
+}
+
+// 显示自定义路线详情
+function showCustomRouteDetail(userRoute) {
+    // 解析路线数据
+    const parts = (userRoute.description || "").split("|");
+    const transportMode = parts[0] || "walking";
+    const totalDist = parseInt(parts[1]) || 0;
+    const totalDur = parseInt(parts[2]) || 0;
+    const originName = parts[3] ? parts[3].split("|")[0] : "起点";
+    const destName = parts[4] ? parts[4].split("|")[0] : "终点";
+
+    // 移除已有
+    const existing = document.querySelector(".custom-route-detail-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "custom-route-detail-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:300;background:rgba(26,28,27,0.35);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;";
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+    const modeLabel = transportMode === "walking" ? "🚶 步行" : "🚗 驾车";
+    const distKm = (totalDist / 1000).toFixed(1);
+
+    const sheet = document.createElement("div");
+    sheet.style.cssText = "width:100%;max-height:80%;background:var(--stone);border-radius:20px 20px 0 0;padding:24px 20px 36px;animation:rise 0.3s ease;overflow-y:auto;";
+    sheet.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+                <div style="font-family:'Noto Serif SC',serif;font-size:20px;font-weight:500;color:var(--ink);">${escapeHtml(userRoute.title)}</div>
+                <div style="font-size:12px;color:var(--faint);margin-top:4px;">
+                    <span class="custom-badge">自创路线</span>
+                    ${userRoute.createdAt ? ' · ' + new Date(userRoute.createdAt).toLocaleDateString("zh-CN") : ""}
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:16px;padding:14px;background:var(--surface);border-radius:12px;">
+            <div style="text-align:center;"><b style="font-size:18px;color:var(--accent);">${distKm}</b><span style="display:block;font-size:11px;color:var(--faint);">公里</span></div>
+            <div style="text-align:center;"><b style="font-size:18px;color:var(--nju-purple);">${Math.ceil(totalDur/60)}</b><span style="display:block;font-size:11px;color:var(--faint);">分钟</span></div>
+            <div style="text-align:center;"><b style="font-size:18px;color:var(--gold-deep);">${modeLabel}</b><span style="display:block;font-size:11px;color:var(--faint);">出行方式</span></div>
+        </div>
+        <div style="font-size:13px;color:var(--soft);line-height:1.6;margin-bottom:16px;">
+            <p>📍 起点：${escapeHtml(originName)}</p>
+            <p>🏁 终点：${escapeHtml(destName)}</p>
+        </div>
+        <button onclick="this.closest('.custom-route-detail-overlay').remove()" style="display:block;width:100%;padding:10px;border-radius:999px;border:1px solid var(--rule);background:transparent;font-size:13px;color:var(--soft);cursor:pointer;font-family:inherit;">关闭</button>
+    `;
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
 }
 
 // ── Route coordinates for Meituan API ──
@@ -3456,7 +3549,7 @@ function showMyRoutes() {
                 <div style="font-family:'Noto Serif SC',serif;font-size:20px;font-weight:500;color:var(--ink);">📋 我的路线</div>
                 <div style="font-size:12px;color:var(--soft);margin-top:4px;">${apiRoutes.length + localRoutes.length} 条已保存路线</div>
             </div>
-            <button onclick="showCreateRouteForm()" style="padding:8px 16px;border-radius:999px;background:var(--nju-purple);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;">+ 新建路线</button>
+            <button onclick="this.closest('.my-routes-overlay').remove();openFreeDraw();" style="padding:8px 16px;border-radius:999px;background:var(--nju-purple);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;">+ 自由绘制</button>
         </div>`;
 
         if (apiRoutes.length === 0 && localRoutes.length === 0) {
@@ -4151,6 +4244,65 @@ function closeGame() {
         gameCloseBtn.addEventListener("click", closeGame);
     }
 })();
+
+// ═══════════════════════════════════════
+//  自由绘制路线集成
+// ═══════════════════════════════════════
+
+function openFreeDraw() {
+    const overlay = document.getElementById("freedraw-overlay");
+    const iframe = document.getElementById("freedraw-iframe");
+    if (!overlay || !iframe) return;
+
+    iframe.src = "./mycode4.html";
+    overlay.classList.add("open");
+    document.body.style.overflow = "hidden";
+}
+
+function closeFreeDraw() {
+    const overlay = document.getElementById("freedraw-overlay");
+    const iframe = document.getElementById("freedraw-iframe");
+    if (!overlay) return;
+
+    overlay.classList.remove("open");
+    document.body.style.overflow = "";
+    setTimeout(() => {
+        if (iframe) iframe.src = "";
+    }, 400);
+
+    // 刷新路线列表
+    setTimeout(() => {
+        refreshRoutesTab();
+    }, 600);
+}
+
+// Hook freedraw close button
+(function bindFreeDrawClose() {
+    const closeBtn = document.getElementById("freedraw-close-btn");
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeFreeDraw);
+    }
+})();
+
+// 监听 iframe 发来的 postMessage
+window.addEventListener("message", (e) => {
+    if (e.data && e.data.type === "route-saved") {
+        showToast("✅ 路线「" + (e.data.routeName || "未命名") + "」已保存");
+        // 可选：自动关闭面板
+        // closeFreeDraw();
+    }
+    if (e.data && e.data.type === "close-freedraw") {
+        closeFreeDraw();
+    }
+});
+
+// 刷新路线 Tab 内容
+function refreshRoutesTab() {
+    const container = document.getElementById("tab-routes-inner");
+    if (container && container.dataset.rendered === "true") {
+        renderRoutesTab(container);
+    }
+}
 
 // Handle enter buttons in the opening scene for NJU
 document.querySelectorAll(".enter[data-route='nju']").forEach(btn => {

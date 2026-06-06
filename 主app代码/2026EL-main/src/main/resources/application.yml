@@ -7,6 +7,13 @@ spring:
   application:
     name: campus-nanjing-travel
 
+# 高德地图配置
+amap:
+  # 环境变量 AMAP_API_KEY 设置高德地图 API Key
+  api-key: ${AMAP_API_KEY:5427cfbccb2209b756af7fc782e8105b}
+  # 环境变量 AMAP_SECURITY_JS_CODE 设置高德地图安全密钥
+  security-js-code: ${AMAP_SECURITY_JS_CODE:}
+
 travel:
   ai:
     # 可选: mock(离线关键词回复) | doubao(火山引擎豆包,需配API_KEY)
