@@ -102,13 +102,6 @@
                 </div>
                 <div class="header-right">
                     <span class="header-budget">¥100</span>
-                    <div class="pet-companion" id="pet-companion">
-                        <span class="pet-avatar" id="pet-avatar">🦆</span>
-                        <div class="pet-bubble" id="pet-bubble">
-                            <span class="pet-bubble-text" id="pet-bubble-text"></span>
-                        </div>
-                    </div>
-                    <button class="header-btn" id="header-ai-btn">AI</button>
                 </div>
             </header>
         </div>
@@ -177,33 +170,48 @@
         <div class="tab-content-inner" id="tab-nearby-inner"></div>
     </div>
 
+    <!-- ═══ Tab: 宠物 ═══ -->
+    <div class="main-tab-content" id="tab-pet" data-tab="pet">
+        <div class="tab-content-inner" id="tab-pet-inner"></div>
+    </div>
+
     <!-- ═══ Tab: 我的 ═══ -->
     <div class="main-tab-content" id="tab-profile" data-tab="profile">
         <div class="tab-content-inner" id="tab-profile-inner"></div>
     </div>
 
-    <!-- 底部导航 · Bottom Nav -->
-    <nav class="bottom-nav">
-        <div class="nav-item active" data-tab="home">
-            <span class="nav-label">首页</span>
-            <span class="nav-indicator"></span>
+    <!-- 底部导航 · Wheel Nav -->
+    <nav class="wheel-nav" id="wheel-nav">
+        <div class="wheel-bg"></div>
+        <div class="wheel-track" id="wheel-track">
+            <div class="wheel-item" data-tab="routes" style="--wheel-hue:4;--wheel-color:#FF6B6B;">
+                <span class="wheel-icon">🧭</span>
+                <span class="wheel-label">路线</span>
+                <span class="wheel-dot"></span>
+            </div>
+            <div class="wheel-item" data-tab="nearby" style="--wheel-hue:35;--wheel-color:#FFB347;">
+                <span class="wheel-icon">⚡</span>
+                <span class="wheel-label">补给</span>
+                <span class="wheel-dot"></span>
+            </div>
+            <div class="wheel-item center active" data-tab="home" style="--wheel-hue:140;--wheel-color:#4ECB71;">
+                <span class="wheel-icon">🏠</span>
+                <span class="wheel-label">首页</span>
+                <span class="wheel-dot"></span>
+                <div class="wheel-ring"></div>
+            </div>
+            <div class="wheel-item" data-tab="pet" style="--wheel-hue:220;--wheel-color:#6B8EFF;">
+                <span class="wheel-icon">🐾</span>
+                <span class="wheel-label">宠物</span>
+                <span class="wheel-dot"></span>
+            </div>
+            <div class="wheel-item" data-tab="profile" style="--wheel-hue:275;--wheel-color:#C67BFF;">
+                <span class="wheel-icon">👤</span>
+                <span class="wheel-label">我的</span>
+                <span class="wheel-dot"></span>
+            </div>
         </div>
-        <div class="nav-item" data-tab="routes">
-            <span class="nav-label">路线</span>
-            <span class="nav-indicator"></span>
-        </div>
-        <div class="nav-item" data-tab="map">
-            <span class="nav-label">地图</span>
-            <span class="nav-indicator"></span>
-        </div>
-        <div class="nav-item" data-tab="nearby">
-            <span class="nav-label">补给站</span>
-            <span class="nav-indicator"></span>
-        </div>
-        <div class="nav-item" data-tab="profile">
-            <span class="nav-label">我的</span>
-            <span class="nav-indicator"></span>
-        </div>
+        <div class="wheel-active-indicator" id="wheel-indicator"></div>
     </nav>
 </div>
 

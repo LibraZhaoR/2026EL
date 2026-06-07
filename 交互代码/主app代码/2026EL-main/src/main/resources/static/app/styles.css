@@ -1263,13 +1263,16 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     top: 0;
     left: 0;
     right: 0;
-    z-index: 25;
+    z-index: 999;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 12px 18px;
     padding-top: max(12px, env(safe-area-inset-top));
     background: transparent;
+    pointer-events: none;
+}
+.main-header > * {
     pointer-events: auto;
 }
 
@@ -1685,6 +1688,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     display: flex;
     gap: 8px;
     align-items: center;
+    pointer-events: auto;
 }
 
 .header-budget {
@@ -1724,22 +1728,24 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     display: flex;
     align-items: center;
     cursor: pointer;
-    z-index: 1;
+    z-index: 30;
+    pointer-events: auto;
 }
 
 .pet-avatar {
     display: grid;
     place-items: center;
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    font-size: 24px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(8px);
-    border: 2px solid rgba(46, 125, 79, 0.35);
+    font-size: 26px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2.5px solid rgba(46, 139, 87, 0.5);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 2px 14px rgba(46, 125, 79, 0.18);
+    box-shadow: 0 2px 16px rgba(46, 139, 87, 0.25);
     user-select: none;
+    pointer-events: auto;
+    cursor: pointer;
 }
 .pet-avatar:active {
     transform: scale(1.12);
@@ -2265,52 +2271,57 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 /* Route Grid — 3 energy cards */
 .route-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px;
 }
 
 .mini-route-card {
-    aspect-ratio: 4 / 5;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #FFFFFF;
-    border: 1px solid rgba(24,33,43,0.04);
-    box-shadow: 0 4px 12px rgba(24,33,43,0.03);
-    padding: 10px 8px;
+    border: 1px solid rgba(24,33,43,0.06);
+    box-shadow: 0 2px 8px rgba(24,33,43,0.04);
     display: flex;
     flex-direction: column;
     cursor: pointer;
-    position: relative;
     overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease;
 }
-.mini-route-card:active { transform: scale(0.96); }
+.mini-route-card:active { transform: scale(0.95); }
 
-.mini-route-card .mini-accent {
-    width: 16px;
-    height: 3px;
-    border-radius: 999px;
-    margin-bottom: 8px;
+.mini-route-card .mini-thumb {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    flex-shrink: 0;
+}
+.mini-route-card .mini-thumb::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--card-accent);
+    opacity: 0.3;
 }
 
-.mini-route-card .mini-icon {
-    font-size: 20px;
-    line-height: 1;
-    margin-bottom: auto;
+.mini-route-card .mini-body {
+    padding: 6px 7px 7px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 
 .mini-route-card .mini-name {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: #18212B;
-    letter-spacing: -0.01em;
-    margin-top: auto;
+    line-height: 1.2;
 }
 
 .mini-route-card .mini-meta {
     font-size: 8px;
     color: #8B939E;
     margin-top: 2px;
-    letter-spacing: 0.03em;
 }
 
 /* ═══ Guide Block — 能量卡 ═══ */
@@ -2391,66 +2402,138 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     transform: translateY(0);
 }
 
-/* ── Bottom Navigation — 元气极简 ── */
-.bottom-nav {
+/* ── Wheel Navigation — White Glass ── */
+.wheel-nav {
     position: absolute;
-    bottom: 0;
-    left: 0; right: 0;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 10;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(24,33,43,0.05);
-    gap: 0;
-}
-
-.nav-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-radius: 20px;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+    width: fit-content;
+    max-width: calc(100vw - 24px);
+}
+.wheel-bg {
+    position: absolute;
+    inset: -1px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255,107,107,0.06), rgba(255,179,71,0.04), rgba(76,203,113,0.05), rgba(107,142,255,0.04), rgba(198,123,255,0.05));
+    z-index: -1;
+    pointer-events: none;
+}
+.wheel-track {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    position: relative;
+    z-index: 2;
+}
+.wheel-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 0;
     cursor: pointer;
     position: relative;
-    min-width: 48px;
-    transition: transform 0.2s ease;
+    width: 56px;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 14px;
 }
-
-.nav-label {
-    font-size: 12px;
+.wheel-item.center {
+    width: 64px;
+    margin: 0 4px;
+    background: rgba(76,203,113,0.08);
+    border-radius: 18px;
+    padding: 10px 0 8px;
+}
+.wheel-item.active {
+    background: rgba(0,0,0,0.03);
+}
+.wheel-icon {
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.35s ease;
+    filter: grayscale(0.3) opacity(0.5);
+}
+.wheel-item.center .wheel-icon {
+    font-size: 22px;
+}
+.wheel-item.active .wheel-icon {
+    transform: translateY(-3px) scale(1.15);
+    filter: grayscale(0) opacity(1);
+}
+.wheel-item.center.active .wheel-icon {
+    transform: translateY(-5px) scale(1.3);
+    filter: grayscale(0) opacity(1);
+}
+.wheel-label {
+    font-size: 10px;
     font-weight: 500;
-    color: #A0A8A0;
+    color: rgba(0,0,0,0.35);
     letter-spacing: 0.04em;
-    transition: color 0.25s ease, font-weight 0.25s ease;
+    transition: all 0.35s ease;
 }
-
-.nav-indicator {
-    width: 4px;
-    height: 4px;
+.wheel-item.center .wheel-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(0,0,0,0.5);
+}
+.wheel-item.active .wheel-label {
+    color: rgba(0,0,0,0.85);
+    font-weight: 700;
+}
+.wheel-dot {
+    width: 3px;
+    height: 3px;
     border-radius: 50%;
     background: transparent;
-    transition: background 0.25s ease, box-shadow 0.25s ease, width 0.25s ease;
+    transition: all 0.35s ease;
 }
-
-.nav-item.active .nav-label {
-    color: #18212B;
-    font-weight: 600;
-}
-
-.nav-item.active .nav-indicator {
-    width: 16px;
+.wheel-item.active .wheel-dot {
+    width: 20px;
     border-radius: 999px;
-    background: #3A8C5C;
-    box-shadow: 0 0 8px rgba(46,125,79,0.25);
+    background: var(--wheel-color, #3A8C5C);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--wheel-color, #3A8C5C) 40%, transparent);
+}
+.wheel-ring {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(76,203,113,0.25);
+    opacity: 0;
+    transition: all 0.35s ease;
+    pointer-events: none;
+}
+.wheel-item.center.active .wheel-ring {
+    opacity: 1;
+    width: 56px;
+    height: 56px;
+    border-color: rgba(76,203,113,0.4);
+    box-shadow: 0 0 20px rgba(76,203,113,0.12);
+}
+.wheel-item:active {
+    transform: scale(0.9);
+}
+.wheel-item.center:active {
+    transform: scale(0.92);
 }
 
-.nav-item:active {
-    transform: scale(0.95);
-}
+/* Keep old nav classes for compatibility */
+.bottom-nav { display: none; }
 
 /* ═══ 人格滑动教程覆盖层 ═══ */
 .swiper-tutorial {
@@ -2864,7 +2947,6 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     background: var(--gold-gradient);
     color: #2A2A1A;
     font-weight: 600;
-}
 }
 
 /* ── Profile Tab ── */
@@ -5071,3 +5153,878 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     transition: transform 0.2s ease;
 }
 .inspiration-card:active { transform: scale(0.96); }
+
+/* ═══════════════════════════════════════
+   宠物系统首页 · Pet System Homepage
+   绣球花主视觉 · Hydrangea Centerpiece
+   ═══════════════════════════════════════ */
+
+.pet-home {
+    padding: 0 0 100px;
+    overflow-y: auto;
+    max-height: calc(100vh - 120px);
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ── 绣球花舞台 · Hydrangea Stage ── */
+.hydrangea-stage {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    background: radial-gradient(ellipse at 50% 40%, rgba(180,160,220,0.12) 0%, rgba(200,220,240,0.06) 40%, transparent 70%),
+                radial-gradient(ellipse at 50% 70%, rgba(160,200,180,0.08) 0%, transparent 50%);
+}
+
+/* ── 绣球花主体 · Hydrangea Flower ── */
+.hydrangea-flower {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    z-index: 2;
+}
+.hydrangea-flower:hover {
+    transform: scale(1.05);
+}
+.hydrangea-flower.bloom-burst {
+    animation: hydrangeaBloom 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes hydrangeaBloom {
+    0% { transform: scale(1); filter: brightness(1); }
+    40% { transform: scale(1.18); filter: brightness(1.3) saturate(1.4); }
+    70% { transform: scale(0.95); filter: brightness(1.1); }
+    100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* ── 绣球花心 · Flower Center ── */
+.hydrangea-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #F5E6FF 0%, #E0C8F0 30%, #C8A0DD 60%, #A078C0 100%);
+    box-shadow: 0 0 24px rgba(180,140,220,0.5),
+                0 0 48px rgba(180,140,220,0.2),
+                inset 0 0 8px rgba(255,255,255,0.4);
+    z-index: 10;
+    animation: centerPulse 3s ease-in-out infinite;
+}
+
+@keyframes centerPulse {
+    0%, 100% { box-shadow: 0 0 24px rgba(180,140,220,0.5), 0 0 48px rgba(180,140,220,0.2), inset 0 0 8px rgba(255,255,255,0.4); }
+    50% { box-shadow: 0 0 36px rgba(200,160,240,0.7), 0 0 64px rgba(180,140,220,0.35), inset 0 0 12px rgba(255,255,255,0.6); }
+}
+
+/* ── 绣球花瓣 · Individual Petals ── */
+.hydrangea-petal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--size, 16px);
+    height: var(--size, 16px);
+    border-radius: 50% 50% 55% 45%;
+    background: radial-gradient(circle at 35% 30%,
+        hsl(var(--hue, 280), var(--sat, 60%), calc(var(--light, 70%) + 15%)),
+        hsl(var(--hue, 280), var(--sat, 55%), var(--light, 65%)) 40%,
+        hsl(var(--hue, 280), calc(var(--sat, 50%) - 10%), calc(var(--light, 60%) - 15%)) 100%);
+    transform: translate(-50%, -50%)
+               rotate(calc(var(--angle, 0deg) + var(--rot, 0deg)))
+               translateY(calc(-1 * var(--dist, 20px)));
+    opacity: 0.85;
+    animation: petalFloat var(--dur, 3.5s) ease-in-out infinite;
+    box-shadow: 0 1px 3px rgba(140,100,180,0.15),
+                inset 0 -2px 4px rgba(120,80,160,0.1);
+    z-index: 5;
+}
+
+@keyframes petalFloat {
+    0%, 100% { transform: translate(-50%, -50%) rotate(calc(var(--angle, 0deg) + var(--rot, 0deg))) translateY(calc(-1 * var(--dist, 20px))); }
+    50% { transform: translate(-50%, -50%) rotate(calc(var(--angle, 0deg) + var(--rot, 0deg) + 3deg)) translateY(calc(-1 * var(--dist, 20px) - 4px)); }
+}
+
+/* ── 绣球叶子 · Hydrangea Leaves ── */
+.hydrangea-leaves {
+    position: absolute;
+    bottom: 28%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.hydrangea-leaf {
+    position: absolute;
+    width: 60px;
+    height: 36px;
+    border-radius: 0 70% 0 70%;
+    background: linear-gradient(135deg, #7BAE8B, #5A8A6A);
+    box-shadow: 0 2px 8px rgba(90,130,100,0.25);
+}
+
+.hydrangea-leaf.leaf-left {
+    left: -55px;
+    top: -20px;
+    transform: rotate(-30deg);
+    animation: leafSway 4s ease-in-out infinite;
+}
+
+.hydrangea-leaf.leaf-right {
+    right: -55px;
+    top: -20px;
+    transform: rotate(30deg) scaleX(-1);
+    animation: leafSway 4s ease-in-out 0.5s infinite;
+}
+
+@keyframes leafSway {
+    0%, 100% { transform: rotate(-30deg); }
+    50% { transform: rotate(-35deg) translateY(-3px); }
+}
+
+/* ── 花盆 · Flower Pot ── */
+.hydrangea-pot {
+    position: absolute;
+    bottom: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+.pot-rim {
+    width: 90px;
+    height: 12px;
+    background: linear-gradient(180deg, #D4C8B0, #C0B498);
+    border-radius: 3px 3px 0 0;
+    margin: 0 auto;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.pot-body {
+    width: 78px;
+    height: 48px;
+    margin: 0 auto;
+    background: linear-gradient(180deg, #C8B898, #B0A080 40%, #A09070 100%);
+    border-radius: 0 0 8px 8px;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.2),
+                0 4px 12px rgba(0,0,0,0.1);
+}
+
+.pot-base {
+    width: 66px;
+    height: 8px;
+    margin: 0 auto;
+    background: linear-gradient(180deg, #A09070, #908060);
+    border-radius: 0 0 4px 4px;
+}
+
+/* ── 光点粒子 · Sparkles ── */
+.pet-sparkles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.pet-sparkle {
+    position: absolute;
+    font-size: 10px;
+    color: #C8A8E8;
+    opacity: 0;
+    animation: sparkleFloat 3.5s ease-in-out infinite;
+}
+
+.pet-sparkle:nth-child(odd) { color: #A8D8C8; }
+.pet-sparkle:nth-child(3n) { color: #E8D0A8; }
+
+@keyframes sparkleFloat {
+    0% { opacity: 0; transform: translateY(0) scale(0.5); }
+    30% { opacity: 0.8; }
+    60% { opacity: 0.3; transform: translateY(-20px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-40px) scale(0.3); }
+}
+
+/* ── 宠物状态卡 · Pet Status Card ── */
+.pet-status-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: -20px 20px 20px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.06);
+    box-shadow: 0 4px 20px rgba(24,33,43,0.06);
+    position: relative;
+    z-index: 5;
+    transition: all 0.3s ease;
+}
+
+.pet-status-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 32px;
+    border: 2px solid rgba(139,174,127,0.4);
+    background: rgba(139,174,127,0.08);
+    flex-shrink: 0;
+}
+
+.pet-status-emoji {
+    line-height: 1;
+    animation: petStatusBounce 2.5s ease-in-out infinite;
+}
+
+@keyframes petStatusBounce {
+    0%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+    60% { transform: translateY(0); }
+}
+
+.pet-status-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pet-status-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #18212B;
+}
+
+.pet-status-personality {
+    font-size: 12px;
+    color: #6B7280;
+    line-height: 1.3;
+}
+
+.pet-status-fn {
+    font-size: 11px;
+    color: #2E8B57;
+    margin-top: 1px;
+}
+
+.pet-status-change {
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: #EEF0F5;
+    border: none;
+    color: #6B7280;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.pet-status-change:active {
+    background: #E2E5ED;
+    transform: scale(0.95);
+}
+
+/* ── 互动按钮 · Pet Action Buttons ── */
+.pet-actions {
+    display: flex;
+    gap: 12px;
+    margin: 0 20px 24px;
+    justify-content: center;
+}
+
+.pet-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 18px;
+    border-radius: 16px;
+    background: #FFFFFF;
+    border: 1px solid rgba(24,33,43,0.06);
+    box-shadow: 0 2px 12px rgba(24,33,43,0.03);
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+    min-width: 64px;
+}
+.pet-action-btn:active {
+    transform: scale(0.94);
+    box-shadow: 0 4px 20px rgba(24,33,43,0.08);
+}
+
+.pet-action-icon {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.pet-action-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #4A5568;
+    letter-spacing: 0.04em;
+}
+
+/* ── 宠物收集 · Pet Collection Grid ── */
+.pet-collection {
+    margin: 0 20px 30px;
+}
+
+.pet-collection-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #18212B;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pet-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6B7280;
+    background: #EEF0F5;
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+.pet-collection-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.pet-collection-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 6px 10px;
+    border-radius: 14px;
+    background: #FFFFFF;
+    border: 1.5px solid rgba(24,33,43,0.06);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+.pet-collection-item:active {
+    transform: scale(0.94);
+}
+.pet-collection-item.active {
+    border-color: rgba(46,139,87,0.4);
+    background: rgba(46,139,87,0.04);
+    box-shadow: 0 0 0 3px rgba(46,139,87,0.08);
+}
+.pet-collection-item.locked {
+    opacity: 0.45;
+    cursor: default;
+    filter: grayscale(0.6);
+}
+
+.pet-col-emoji {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.pet-col-name {
+    font-size: 10px;
+    font-weight: 500;
+    color: #18212B;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.pet-col-lock {
+    font-size: 10px;
+    position: absolute;
+    top: 4px;
+    right: 6px;
+}
+
+.pet-col-active {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: #2E8B57;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════
+   美团风格补给站卡片 · Meituan-Style Supply Cards
+   ═══════════════════════════════════════ */
+
+/* ── Dianping Card (大众点评风格) ── */
+.dianping-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.dianping-coupons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dp-card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.04);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.dp-card:active {
+    transform: scale(0.97);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+/* ── Card Photo ── */
+.dp-card-photo {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    background: #F0F2F5;
+}
+.dp-photo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.dp-photo-placeholder {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    font-size: 36px;
+}
+.dp-photo-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #FF6B35, #FF3D00);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.dp-photo-count-tag {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.5);
+    color: rgba(255,255,255,0.9);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+/* ── Card Body ── */
+.dp-card-body {
+    padding: 10px 10px 12px;
+}
+
+.dp-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #18212B;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.dp-card-rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.dp-stars {
+    color: #FF9F0A;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+.dp-star-half {
+    position: relative;
+    display: inline-block;
+    color: #FF9F0A;
+    opacity: 0.5;
+}
+.dp-star-empty {
+    color: #D0D5DD;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+.dp-rating-num {
+    font-weight: 700;
+    color: #FF9F0A;
+}
+.dp-review-count {
+    color: #9CA3AF;
+}
+.dp-dist {
+    margin-left: auto;
+    color: #9CA3AF;
+}
+
+.dp-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 10px;
+}
+
+.dp-cat-label {
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #FFF1E6;
+    color: #FF7A45;
+    font-weight: 500;
+}
+
+.dp-district {
+    color: #9CA3AF;
+}
+
+.dp-avg-price {
+    margin-left: auto;
+    font-weight: 600;
+    color: #FF6B35;
+    font-size: 11px;
+}
+
+.dp-card-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.dp-tag {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: #F5F6F8;
+    color: #5A6270;
+    border: 1px solid rgba(0,0,0,0.04);
+}
+
+/* ── Deal Tags ── */
+.dp-card-deals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.dp-deal-tag {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #FFF5F0, #FFEEE6);
+    color: #FF6B35;
+    border: 1px solid rgba(255,107,53,0.15);
+    font-weight: 500;
+}
+.dp-deal-tag s {
+    color: #C0C4CC;
+    margin-left: 3px;
+    text-decoration: line-through;
+}
+
+/* ── Coupon Card (优惠券卡片) ── */
+.dp-coupon-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #FFFFFF;
+    border: 1px solid rgba(0,0,0,0.04);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    transition: transform 0.2s;
+    gap: 12px;
+}
+.dp-coupon-card:active { transform: scale(0.98); }
+
+.dp-coupon-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.dp-coupon-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.dp-coupon-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.dp-coupon-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #18212B;
+}
+
+.dp-coupon-desc {
+    font-size: 11px;
+    color: #9CA3AF;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dp-coupon-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    color: #9CA3AF;
+    margin-top: 2px;
+}
+
+.dp-coupon-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.dp-coupon-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.dp-coupon-price {
+    font-size: 22px;
+    font-weight: 700;
+    color: #FF3D00;
+}
+
+.dp-coupon-orig {
+    font-size: 12px;
+    color: #C0C4CC;
+    text-decoration: line-through;
+}
+
+.dp-coupon-discount {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: #FFF1E6;
+    color: #FF6B35;
+    font-weight: 600;
+}
+
+.dp-coupon-grab {
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #FF6B35, #FF3D00);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.2s;
+}
+.dp-coupon-grab:active { opacity: 0.8; }
+
+/* ── 补给站标签页整体样式 · Supply Tab Layout ── */
+.main-tab-content {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    bottom: 64px;
+    z-index: 8;
+    display: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #F4F6F9;
+}
+.main-tab-content.visible {
+    display: block;
+}
+.main-tab-content::-webkit-scrollbar { display: none; }
+
+.tab-content-inner {
+    min-height: 100%;
+    padding-bottom: 20px;
+}
+
+/* ── Pet Tab specific scroll ── */
+#tab-pet {
+    background: linear-gradient(180deg, #F8F6FC 0%, #F4F6F9 30%, #F0F4F0 100%);
+}
+
+/* ── Meituan API Section in Supply Tab ── */
+.supply-meituan-section {
+    margin: 0 16px 18px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #FFF8F0, #FFF3E8);
+    border-radius: 16px;
+    border: 2px solid rgba(255,107,53,0.2);
+    position: relative;
+    overflow: hidden;
+}
+.supply-meituan-section::before {
+    content: "";
+    position: absolute;
+    top: -30px;
+    right: -20px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255,107,53,0.06);
+    pointer-events: none;
+}
+.supply-meituan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.supply-meituan-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #FF6B35;
+    letter-spacing: 0.03em;
+}
+.supply-meituan-badge {
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: rgba(255,107,53,0.1);
+    color: #FF6B35;
+    font-weight: 600;
+}
+.supply-meituan-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.supply-meituan-content .dianping-cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* ── Home page background ── */
+.main-page {
+    background: linear-gradient(170deg,
+        #F0F4F8 0%,
+        #F4F6F9 20%,
+        #F8F7F4 45%,
+        #F3F4F0 70%,
+        #EEF2ED 100%) !important;
+}
+
+/* ── Pet Character Display ── */
+.pet-character-stage {
+    background: radial-gradient(ellipse at 50% 35%, rgba(var(--pet-r, 180), var(--pet-g, 160), var(--pet-b, 220), 0.15) 0%, transparent 60%);
+}
+.pet-character-display {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.pet-character-emoji {
+    font-size: 120px;
+    line-height: 1;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.12));
+    transition: transform 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+}
+.pet-character-emoji:active {
+    transform: scale(1.1);
+}
+.pet-character-glow {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--pet-color, #FF7A45) 0%, transparent 70%);
+    opacity: 0.25;
+    filter: blur(20px);
+    z-index: 1;
+}
+.pet-character-shadow {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.08);
+    z-index: 1;
+}
+@keyframes petBounce {
+    0%, 100% { transform: scale(1); }
+    30% { transform: scale(1.15); }
+    60% { transform: scale(0.95); }
+}
+.pet-character-display.pet-bounce .pet-character-emoji {
+    animation: petBounce 0.6s ease;
+}
+
+/* ── Vibrant route cards ── */
+.mini-route-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.mini-route-card:hover { box-shadow: 0 4px 16px rgba(24,33,43,0.08); }
+
+.carousel-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.carousel-card:hover {
+    box-shadow: 0 6px 20px rgba(24,33,43,0.1);
+}
+
+/* ── Bottom nav vibrancy ── */
+.nav-item[data-tab="routes"] .nav-indicator { background: #FF6B6B; }
+.nav-item[data-tab="nearby"] .nav-indicator { background: #FFB347; }
+.nav-item[data-tab="home"] .nav-indicator { background: #4ECB71; }
+.nav-item[data-tab="pet"] .nav-indicator { background: #6B8EFF; }
+.nav-item[data-tab="profile"] .nav-indicator { background: #C67BFF; }
+
+/* ── Feature section vibrancy ── */
+.feature-header { border-left: 3px solid var(--feature-accent, #4ECB71); }
+
+/* ── Guide block vibrancy ── */
+.guide-block-card {
+    background: linear-gradient(135deg, #FFE0D0 0%, #FFF8E0 40%, #E0F0FF 70%, #F0E0FF 100%);
+}

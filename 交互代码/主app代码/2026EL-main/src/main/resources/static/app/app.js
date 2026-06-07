@@ -1778,7 +1778,8 @@ function showMainPage() {
 
     mainPage.classList.add("visible");
     mainPage.classList.remove("drawer-open");
-    initAMap();
+    // Lazy-init map only when needed (no longer a main tab)
+    window._amapDeferredInit = true;
     window.addEventListener("resize", onMainResize);
 
     // ── Render new Swiss layout components ──
@@ -1805,17 +1806,8 @@ function showMainPage() {
         guideBlockCard.addEventListener("click", generateRecipeRoute);
     }
 
-    // ── Header AI button → toggle AI chat ──
-    const headerAiBtn = document.getElementById("header-ai-btn");
-    if (headerAiBtn) {
-        headerAiBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleAiChat();
-        });
-    }
-
-    // ── Bottom nav — full tab switching system
-    document.querySelectorAll(".nav-item").forEach(item => {
+    // ── Bottom nav — full tab switching system (wheel + legacy)
+    document.querySelectorAll(".wheel-item, .nav-item").forEach(item => {
         item.addEventListener("click", () => {
             switchTab(item.dataset.tab);
         });
@@ -1837,18 +1829,7 @@ function showMainPage() {
     // Sync initial tab state
     switchTab("home");
 
-    // ── Pet Companion Init ──
-    const petAvatar = document.getElementById("pet-avatar");
-    if (petAvatar) {
-        petAvatar.addEventListener("click", (e) => {
-            e.stopPropagation();
-            showPetSelector();
-        });
-    }
-    updatePetDisplay("duck");
-    setPetState("welcome");
-    setTimeout(() => setPetState("idle"), 4000);
-
+    // ── Pet idle timer ──
     ["click", "scroll", "touchstart"].forEach(evt => {
         document.addEventListener(evt, resetPetIdleTimer, { passive: true });
     });
@@ -1871,10 +1852,10 @@ const ROUTE_ICON = {
     expo: "🏺",
 };
 const ROUTE_IMAGE = {
-    night: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=800&h=500&fit=crop&q=80",
-    nju: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=500&fit=crop&q=80",
-    food: "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=800&h=500&fit=crop&q=80",
-    expo: "https://images.unsplash.com/photo-1590266767102-17a207ce37d3?w=800&h=500&fit=crop&q=80",
+    night: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1A2A3A"/><stop offset="100%" stop-color="#2E5A6E"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><circle cx="140" cy="40" r="20" fill="#F5E6A3" opacity="0.9"/><text x="15" y="30" font-size="48">🏮</text></svg>'),
+    nju: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1B3A2A"/><stop offset="100%" stop-color="#2E8B57"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><text x="15" y="32" font-size="48">🎓</text></svg>'),
+    food: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4A2020"/><stop offset="100%" stop-color="#C06830"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><text x="15" y="32" font-size="48">🍜</text></svg>'),
+    expo: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2A3040"/><stop offset="100%" stop-color="#5B7BA0"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><text x="15" y="32" font-size="48">🏺</text></svg>'),
 };
 
 function renderCarouselCards() {
@@ -2000,15 +1981,18 @@ function renderRouteGrid() {
     const grid = document.getElementById("route-grid");
     if (!grid) return;
 
-    grid.innerHTML = CAROUSEL_ROUTES.slice(0, 3).map(key => {
+    const gridKeys = ["night", "nju", "food", "expo"];
+
+    grid.innerHTML = gridKeys.map(key => {
         const r = routes[key];
         const accent = ROUTE_ACCENT[key];
-        const icon = ROUTE_ICON[key];
-        return `<div class="mini-route-card" data-route="${key}" style="aspect-ratio:4/5;border-radius:10px;padding:10px 6px">
-            <span class="mini-accent" style="background:${accent}"></span>
-            <span class="mini-icon">${icon}</span>
-            <span class="mini-name">${r.title.split("：")[0].split(":")[0]}</span>
-            <span class="mini-meta">${r.duration || "?"}min · ${(r.stops || []).length}站</span>
+        const img = ROUTE_IMAGE[key];
+        return `<div class="mini-route-card" data-route="${key}" style="--card-accent:${accent}">
+            <div class="mini-thumb" style="background-image:url(${img});background-color:${accent}"></div>
+            <div class="mini-body">
+                <span class="mini-name">${r.title.split("：")[0].split(":")[0]}</span>
+                <span class="mini-meta">${(r.stops || []).length}站 · ${r.duration || "?"}min</span>
+            </div>
         </div>`;
     }).join("");
 
@@ -2705,14 +2689,48 @@ function showRouteOnMap(routeKey) {
 
     closeSheet();
 
-    // Check AMap readiness BEFORE switching
+    // Lazy-init map if not yet loaded
     if (!amapInstance || !amapReady) {
-        showToast("⏳ 地图加载中，请稍后再试…");
+        showToast("⏳ 地图加载中，请稍候…");
+        initAMap();
+        // Retry once after init
+        let retries = 0;
+        const retryInterval = setInterval(() => {
+            if (amapInstance && amapReady) {
+                clearInterval(retryInterval);
+                showRouteOnMap(routeKey);
+            }
+            retries++;
+            if (retries > 20) {
+                clearInterval(retryInterval);
+                showToast("地图加载失败，请检查网络");
+            }
+        }, 500);
         return;
     }
 
-    // Switch to map tab (fullscreen) first, then set single-route mode
-    switchTab("map");
+    // Show map as temporary overlay (map is no longer a main tab)
+    const mapStage = document.getElementById("map-stage");
+    const mapContainer = document.getElementById("main-map-container");
+    const dimOverlay = document.getElementById("map-dim-overlay");
+    const snapScroll = document.getElementById("snap-scroll");
+    const header = document.querySelector(".main-header");
+
+    // Hide all tab content
+    hideAllTabContent();
+
+    // Show map fullscreen
+    if (mapStage) mapStage.style.display = "";
+    if (mapContainer) {
+        mapContainer.style.display = "block";
+        mapContainer.classList.add("amap-fullscreen");
+    }
+    if (dimOverlay) dimOverlay.style.display = "none";
+    if (snapScroll) snapScroll.style.display = "none";
+    if (header) header.style.display = "none";
+
+    amapFullscreen = true;
+    document.querySelector(".bottom-nav").style.zIndex = "60";
 
     activeRouteOnMap = routeKey;
 
@@ -2722,6 +2740,38 @@ function showRouteOnMap(routeKey) {
         drawRouteOnMap(routeKey);
         showFloatCard(routeKey);
     }, 350);
+
+    // Add map close button if not exists
+    ensureMapCloseBtn();
+}
+
+function ensureMapCloseBtn() {
+    if (document.getElementById("map-close-btn")) return;
+    const btn = document.createElement("button");
+    btn.id = "map-close-btn";
+    btn.textContent = "✕ 返回";
+    btn.style.cssText = "position:fixed;top:max(16px,env(safe-area-inset-top));left:16px;z-index:70;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border:1px solid rgba(0,0,0,0.08);font-size:13px;font-weight:600;color:#18212B;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.1);";
+    btn.addEventListener("click", exitMapOverlay);
+    document.body.appendChild(btn);
+}
+
+function exitMapOverlay() {
+    amapFullscreen = false;
+    activeRouteOnMap = null;
+    const mapContainer = document.getElementById("main-map-container");
+    if (mapContainer) mapContainer.classList.remove("amap-fullscreen");
+    document.querySelector(".bottom-nav").style.zIndex = "10";
+    const mapStage = document.getElementById("map-stage");
+    if (mapStage) mapStage.style.display = "none";
+    hideFloatCard();
+    const btn = document.getElementById("map-close-btn");
+    if (btn) btn.remove();
+    if (amapInstance) {
+        restoreAllMapOverlays();
+        setTimeout(() => amapInstance.resize(), 50);
+    }
+    document.querySelector(".main-header").style.display = "";
+    switchTab("home");
 }
 
 function clearRouteOverlays() {
@@ -2922,92 +2972,48 @@ function restoreAllMapOverlays() {
 }
 
 function switchTab(tab) {
-    if (tab === currentTab && tab !== "map") return;
+    if (tab === currentTab) return;
 
-    // Update nav active state
-    document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
-    const navItem = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+    // Update nav active state (wheel nav)
+    document.querySelectorAll(".wheel-item, .nav-item").forEach(i => i.classList.remove("active"));
+    const navItem = document.querySelector(`.wheel-item[data-tab="${tab}"], .nav-item[data-tab="${tab}"]`);
     if (navItem) navItem.classList.add("active");
 
     resetPetIdleTimer();
+    hideFloatCard();
 
-    // Hide floating card when leaving map
-    if (tab !== "map") {
-        hideFloatCard();
-    }
-
-    // Restore all overlays when entering map tab from anywhere (single-route view → full view)
-    if (tab === "map" && activeRouteOnMap) {
-        restoreAllMapOverlays();
-    }
-
-    // Exit fullscreen if leaving map tab
-    if (tab !== "map" && amapFullscreen) {
+    // Exit map fullscreen if active
+    if (amapFullscreen) {
         amapFullscreen = false;
         document.getElementById("main-map-container").classList.remove("amap-fullscreen");
         document.querySelector(".bottom-nav").style.zIndex = "10";
-
-        // Restore all overlays when returning from single-route map view
-        if (activeRouteOnMap && amapInstance) {
-            restoreAllMapOverlays();
-        }
-
         if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
     }
 
     const mapStage = document.getElementById("map-stage");
-    const mapContainer = document.getElementById("main-map-container");
     const mainPage = document.getElementById("main-page");
     const dimOverlay = document.getElementById("map-dim-overlay");
-    if (!mapStage || !mapContainer) return;
 
-    // Always clean up drawer-open state when leaving home
+    // Always clean up drawer-open state
     if (mainPage) mainPage.classList.remove("drawer-open");
 
-    if (tab === "map") {
-        // Map full screen — skip re-init if already in fullscreen mode (header hidden)
-        const headerCheck = document.querySelector(".main-header");
-        if (headerCheck && headerCheck.style.display === "none") return;
+    // Hide map stage by default (map is no longer a primary tab)
+    if (mapStage) mapStage.style.display = "none";
+    if (dimOverlay) dimOverlay.style.display = "none";
 
-        mapStage.style.display = "";
-        mapContainer.style.display = "block";
+    if (tab === "home") {
+        // Home — map as visual backdrop, snap scroll on top
+        if (mapStage) mapStage.style.display = "";
         if (dimOverlay) dimOverlay.style.display = "none";
-        hideAllTabContent();
-        const header = document.querySelector(".main-header");
-        const mapOverlay = document.getElementById("map-canvas-overlay");
-        const routeCanvas = document.getElementById("map-route-canvas");
-        const graffitiLayer = document.getElementById("graffiti-markers");
-        if (header) header.style.display = "none";
-        if (mapOverlay) mapOverlay.style.display = "none";
-        if (routeCanvas) routeCanvas.style.display = "none";
-        if (graffitiLayer) graffitiLayer.style.display = "none";
-        if (!amapFullscreen) {
-            amapFullscreen = true;
-            document.querySelector(".bottom-nav").style.zIndex = "60";
-            if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
-        }
-    } else if (tab === "home") {
-        // Home — map fills screen, snap scroll visible
-        mapStage.style.display = "";
-        mapContainer.style.display = "block";
-        if (dimOverlay) dimOverlay.style.display = "";
-        const header = document.querySelector(".main-header");
-        const mapOverlay = document.getElementById("map-canvas-overlay");
-        const routeCanvas = document.getElementById("map-route-canvas");
-        const graffitiLayer = document.getElementById("graffiti-markers");
-        if (header) { header.style.display = ""; header.style.opacity = "1"; }
-        if (mapOverlay) mapOverlay.style.display = "";
-        if (routeCanvas) routeCanvas.style.display = "";
-        if (graffitiLayer) graffitiLayer.style.display = "";
-        if (amapFullscreen) {
-            amapFullscreen = false;
+        const mapContainer = document.getElementById("main-map-container");
+        if (mapContainer) {
+            mapContainer.style.display = "block";
             mapContainer.classList.remove("amap-fullscreen");
-            document.querySelector(".bottom-nav").style.zIndex = "10";
-            if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
+            mapContainer.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
+            mapContainer.style.pointerEvents = "none";
         }
-        if (amapInstance && window.AMap && amapMarkers.length === 0 && amapRouteLines.length === 0) {
-            addAllRouteOverlays(window.AMap);
-        }
+        const header = document.querySelector(".main-header");
+        if (header) { header.style.display = ""; header.style.opacity = "1"; }
         hideAllTabContent();
         const snapScroll = document.getElementById("snap-scroll");
         if (snapScroll) {
@@ -3015,9 +3021,7 @@ function switchTab(tab) {
             snapScroll.scrollTop = 0;
         }
     } else {
-        // routes / nearby / profile — hide entire map stage, dim overlay, and all other tabs
-        mapStage.style.display = "none";
-        if (dimOverlay) dimOverlay.style.display = "none";
+        // routes / nearby / pet / profile — hide map stage and all other tabs
         hideAllTabContent();
         const tabEl = document.querySelector(`.main-tab-content[data-tab="${tab}"]`);
         if (tabEl) {
@@ -3028,6 +3032,7 @@ function switchTab(tab) {
                 inner.dataset.rendered = "1";
                 if (tab === "routes") renderRoutesTab(inner);
                 else if (tab === "nearby") renderNearbyTab(inner);
+                else if (tab === "pet") renderPetTab(inner);
                 else if (tab === "profile") renderProfileTab(inner);
             }
         }
@@ -3169,8 +3174,8 @@ function showPoiDetailOverlay(storeId) {
 }
 
 function showPoiDetailOverlayDianping(storeId) {
-    // Find business in SUPPLY_DATA
-    const biz = (typeof SUPPLY_DATA !== 'undefined')
+    // Find business in SUPPLY_DATA first
+    let biz = (typeof SUPPLY_DATA !== 'undefined')
         ? SUPPLY_DATA.getAll().find(b => b.id === storeId)
         : null;
 
@@ -3183,6 +3188,41 @@ function showPoiDetailOverlayDianping(storeId) {
         if (e.target === overlay) overlay.remove();
     });
 
+    // Try Meituan API for real detail if storeId starts with 'm'
+    if (storeId && storeId.startsWith('m')) {
+        fetch(`/api/meituan/poi/detail/${storeId}`)
+            .then(r => r.json())
+            .then(d => {
+                const detail = d.data;
+                if (detail) {
+                    biz = {
+                        id: detail.storeId,
+                        name: detail.name,
+                        address: detail.address,
+                        category: detail.category === 'coffee' ? 'coffee' : detail.category === 'rest' ? 'hotel' : 'food',
+                        rating: detail.rating,
+                        avgPrice: detail.avgPrice,
+                        image: detail.imageUrls && detail.imageUrls.length > 0 ? detail.imageUrls[0] : null,
+                        gallery: detail.imageUrls || [],
+                        tags: detail.tags || [],
+                        desc: detail.description || '',
+                        reviewCount: detail.reviewCount || 0,
+                        phone: detail.phone || '',
+                        hours: detail.openTime || '',
+                        district: detail.address ? detail.address.split('市')[1] || detail.address : '',
+                        deals: [],
+                        photos: (detail.imageUrls || []).length,
+                        bookmarkCount: detail.reviewCount ? Math.floor(detail.reviewCount * 0.6) : 0,
+                    };
+                }
+                renderDetailOverlay(overlay, biz);
+            })
+            .catch(() => renderDetailOverlay(overlay, biz));
+    } else {
+        renderDetailOverlay(overlay, biz);
+    }
+
+    function renderDetailOverlay(overlay, biz) {
     if (!biz) {
         overlay.innerHTML = `<div class="poi-detail-sheet" onclick="event.stopPropagation()">
             <button class="poi-detail-close" onclick="this.closest('.poi-detail-overlay').remove()">✕</button>
@@ -3288,7 +3328,8 @@ function showPoiDetailOverlayDianping(storeId) {
         }, 100);
     }
     document.body.appendChild(overlay);
-}
+    } // end renderDetailOverlay
+} // end showPoiDetailOverlayDianping
 
 function escapeHtml(str) {
     if (!str) return "";
@@ -3348,9 +3389,69 @@ function renderNearbyTab(container) {
         </div>
     </div>`;
 
+    // ── Meituan API real-time section ──
+    html += `<div class="supply-meituan-section" id="supply-meituan">
+        <div class="supply-meituan-header">
+            <span class="supply-meituan-title">🔴 美团实时推荐</span>
+            <span class="supply-meituan-badge">附近好店</span>
+        </div>
+        <div class="supply-meituan-content" id="supply-meituan-content">
+            <div class="supply-loading">📍 正在获取附近商家...</div>
+        </div>
+    </div>`;
+
     // ── Dynamic content ──
     html += `<div class="supply-dynamic" id="supply-dynamic"></div>`;
     container.innerHTML = html;
+
+    // Fetch Meituan API data
+    const { lat, lng } = getCurrentLatLng();
+    fetchMeituanPois(lat, lng).then(pois => {
+        const meituanContent = document.getElementById("supply-meituan-content");
+        if (meituanContent && pois.length > 0) {
+            meituanContent.innerHTML = pois.map(p => {
+                const item = {
+                    id: p.storeId || 'api_' + Math.random(),
+                    name: p.name,
+                    category: p.category === 'coffee' ? 'coffee' : p.category === 'rest' ? 'hotel' : 'food',
+                    rating: p.rating || 4.0,
+                    distance: p.distance || 500,
+                    avgPrice: p.avgPrice || 30,
+                    image: p.imageUrl || null,
+                    address: p.address || '',
+                    tags: p.tags || [],
+                    dealCount: p.dealCount || 0,
+                };
+                return renderDianpingCard(item);
+            }).join('');
+            // Also fetch deals
+            fetch(`/api/meituan/deals?lat=${lat}&lng=${lng}`).then(r => r.json()).then(d => {
+                const deals = d.data || [];
+                if (deals.length > 0) {
+                    const dealsHtml = `<div class="supply-group" style="margin-top:16px;">
+                        <h3 class="supply-group-title">今日优惠套餐 <span class="savings-badge">${deals.length}个套餐</span></h3>
+                        <div class="dianping-coupons">${deals.map(dl => renderDianpingCouponCard({
+                            icon: dl.category === 'food' ? '🍜' : dl.category === 'coffee' ? '☕' : dl.category === 'ticket' ? '🎫' : '🏨',
+                            name: dl.title,
+                            desc: dl.storeName || '',
+                            shop: dl.storeName || '',
+                            distance: 500,
+                            price: dl.price,
+                            origPrice: dl.originalPrice,
+                            discount: dl.originalPrice > 0 ? Math.round((1 - dl.price/dl.originalPrice) * 100) + '%' : '',
+                            sold: dl.soldCount || 1000,
+                        })).join('')}</div>
+                    </div>`;
+                    meituanContent.insertAdjacentHTML('beforeend', dealsHtml);
+                }
+            }).catch(() => {});
+        } else if (meituanContent) {
+            meituanContent.innerHTML = '<div class="supply-loading">暂无美团实时数据，以下是本地商家推荐</div>';
+        }
+    }).catch(() => {
+        const meituanContent = document.getElementById("supply-meituan-content");
+        if (meituanContent) meituanContent.innerHTML = '<div class="supply-loading">美团数据加载中，先看看本地推荐吧</div>';
+    });
 
     const dynamicArea = document.getElementById("supply-dynamic");
     renderSupplyDynamic(dynamicArea, allData, coupons, false);
@@ -3735,10 +3836,9 @@ function addSupplyEntryToRouteSheet(sheetBody, routeKey) {
 }
 
 function addHomeSupplyEntry() {
-    // Check if already added
     if (document.querySelector('.home-supply-entry')) return;
-    const guideEnv = document.getElementById('guide-envelope');
-    if (!guideEnv) return;
+    const guideBlock = document.getElementById('guide-block');
+    if (!guideBlock) return;
 
     const entry = document.createElement('div');
     entry.className = 'home-supply-entry mucha-card';
@@ -3752,7 +3852,147 @@ function addHomeSupplyEntry() {
         <span style="font-size:18px;color:var(--faint);">›</span>
     `;
     entry.addEventListener('click', () => switchTab('nearby'));
-    guideEnv.before(entry);
+    guideBlock.before(entry);
+}
+
+// ═══════════════════════════════════════════
+//  Pet System Homepage · 宠物系统首页
+//  绣球花中心视觉 · Hydrangea Flower
+// ═══════════════════════════════════════════
+
+function renderPetTab(container) {
+    const unlockedPets = PET_DEFS.filter(p => isPetUnlocked(p.id));
+    const lockedPets = PET_DEFS.filter(p => !isPetUnlocked(p.id));
+
+    container.innerHTML = `
+        <div class="pet-home">
+            <!-- 宠物主视觉 -->
+            <div class="hydrangea-stage pet-character-stage">
+                <div class="pet-character-display" id="pet-character-display" style="--pet-color:${currentPet.color}">
+                    <span class="pet-character-emoji" id="pet-character-emoji">${currentPet.emoji}</span>
+                    <div class="pet-character-glow"></div>
+                    <div class="pet-character-shadow"></div>
+                </div>
+                <!-- 光点粒子 -->
+                <div class="pet-sparkles" id="pet-sparkles">
+                    ${Array.from({length: 12}, (_, i) => `
+                        <span class="pet-sparkle" style="
+                            left: ${10 + Math.random() * 80}%;
+                            top: ${10 + Math.random() * 80}%;
+                            animation-delay: ${Math.random() * 3}s;
+                            animation-duration: ${3 + Math.random() * 4}s;
+                        ">✦</span>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- 当前旅伴状态 -->
+            <div class="pet-status-card" id="pet-status-card">
+                <div class="pet-status-avatar" style="background:${hexToRgba(currentPet.color, 0.12)};border-color:${hexToRgba(currentPet.color, 0.35)};">
+                    <span class="pet-status-emoji">${currentPet.emoji}</span>
+                </div>
+                <div class="pet-status-info">
+                    <div class="pet-status-name">${currentPet.name}</div>
+                    <div class="pet-status-personality">${currentPet.personality}</div>
+                    <div class="pet-status-fn">✨ ${currentPet.fn}</div>
+                </div>
+                <button class="pet-status-change" onclick="showPetSelector()">更换</button>
+            </div>
+
+            <!-- 互动按钮区 -->
+            <div class="pet-actions">
+                <button class="pet-action-btn" onclick="petActionFeed()">
+                    <span class="pet-action-icon">🍎</span>
+                    <span class="pet-action-label">喂食</span>
+                </button>
+                <button class="pet-action-btn" onclick="petActionTalk()">
+                    <span class="pet-action-icon">💬</span>
+                    <span class="pet-action-label">聊天</span>
+                </button>
+                <button class="pet-action-btn" onclick="petActionExplore()">
+                    <span class="pet-action-icon">🗺</span>
+                    <span class="pet-action-label">探索</span>
+                </button>
+                <button class="pet-action-btn" onclick="petActionSleep()">
+                    <span class="pet-action-icon">💤</span>
+                    <span class="pet-action-label">休息</span>
+                </button>
+            </div>
+
+            <!-- 已解锁旅伴 -->
+            <div class="pet-collection">
+                <h3 class="pet-collection-title">我的旅伴 <span class="pet-count">${unlockedPets.length}/${PET_DEFS.length}</span></h3>
+                <div class="pet-collection-grid">
+                    ${PET_DEFS.map(p => {
+                        const unlocked = isPetUnlocked(p.id);
+                        const isActive = currentPet.id === p.id;
+                        return `<div class="pet-collection-item${unlocked ? '' : ' locked'}${isActive ? ' active' : ''}"
+                            data-pet="${p.id}"
+                            onclick="${unlocked ? "updatePetDisplay('" + p.id + "');setPetState('welcome');setTimeout(()=>setPetState('idle'),3000);refreshPetStatusCard();" : "showToast('🔒 完成对应路线解锁这个旅伴')"}"
+                            style="${isActive ? '--pet-color:' + hexToRgba(p.color, 0.15) + ';border-color:' + hexToRgba(p.color, 0.4) + ';' : ''}">
+                            <span class="pet-col-emoji">${p.emoji}</span>
+                            <span class="pet-col-name">${p.name}</span>
+                            ${!unlocked ? '<span class="pet-col-lock">🔒</span>' : ''}
+                            ${isActive ? '<span class="pet-col-active">同行中</span>' : ''}
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </div>`;
+
+    // Hydrangea animation: gentle pulse on center
+    const flower = document.getElementById("hydrangea-flower");
+    if (flower) {
+        flower.addEventListener("click", () => {
+            flower.classList.add("bloom-burst");
+            setPetState("happy");
+            setTimeout(() => flower.classList.remove("bloom-burst"), 800);
+        });
+    }
+}
+
+// ── Pet action handlers ──
+function petActionFeed() {
+    setPetState("happy");
+    showToast("🍎 给" + currentPet.name + "喂了食！它很开心~");
+    const charDisplay = document.getElementById("pet-character-display");
+    if (charDisplay) { charDisplay.classList.add("pet-bounce"); setTimeout(() => charDisplay.classList.remove("pet-bounce"), 600); }
+}
+function petActionTalk() {
+    const dialogues = currentPet.dialogues["idle"];
+    const msg = dialogues[Math.floor(Math.random() * dialogues.length)];
+    showPetBubble(msg);
+    setPetState("welcome");
+    setTimeout(() => setPetState("idle"), 2500);
+}
+function petActionExplore() {
+    setPetState("guiding");
+    showToast("🗺 " + currentPet.name + "想带你出去走走！去首页选一条路线吧~");
+    setTimeout(() => switchTab("home"), 800);
+}
+function petActionSleep() {
+    setPetState("confused");
+    showToast("💤 " + currentPet.name + "正在休息中...zzZ");
+    setTimeout(() => setPetState("idle"), 3000);
+}
+function refreshPetStatusCard() {
+    const card = document.getElementById("pet-status-card");
+    if (!card) return;
+    card.querySelector(".pet-status-emoji").textContent = currentPet.emoji;
+    card.querySelector(".pet-status-name").textContent = currentPet.name;
+    card.querySelector(".pet-status-personality").textContent = currentPet.personality;
+    card.querySelector(".pet-status-fn").textContent = "✨ " + currentPet.fn;
+    card.querySelector(".pet-status-avatar").style.background = hexToRgba(currentPet.color, 0.12);
+    card.querySelector(".pet-status-avatar").style.borderColor = hexToRgba(currentPet.color, 0.35);
+    // Update main character display
+    const charEmoji = document.getElementById("pet-character-emoji");
+    if (charEmoji) charEmoji.textContent = currentPet.emoji;
+    const charDisplay = document.getElementById("pet-character-display");
+    if (charDisplay) charDisplay.style.setProperty("--pet-color", currentPet.color);
+    // Update grid active state
+    document.querySelectorAll(".pet-collection-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.pet === currentPet.id);
+    });
 }
 
 function renderProfileTab(container) {
