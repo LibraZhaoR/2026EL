@@ -390,6 +390,630 @@ let petUrgeTimer = null;
 let lastUserInteraction = Date.now();
 const PET_IDLE_THRESHOLD = 45000;
 
+// ── Pet77 V2 Raising System ──
+const PET77_STORAGE_KEY = "nj_pet_v2";
+const PET77_CHAT_LAYOUT_KEY = "nj_pet77_chat_layout";
+const USER_PROFILE_STORAGE_KEY = "nj_user_profile";
+const APP_GITHUB_URL = "";
+const PET77_FRAME = { width: 192, height: 208 };
+const PET77_DISPLAY_FRAME = { width: 96, height: 104 };
+const PET77_ASSET = "assets/pets/77/spritesheet.webp";
+// 77 spritesheet rows: 0 loaf idle, 1 move right, 2 move left, 3 wave/tap,
+// 4 playful crouch, 5 sad/sleepy, 6 sit idle, 7 relaxed interaction, 8 grooming.
+const PET77_ANIMATIONS = {
+    idle: { row: 0, frameCount: 6, frameDurationMs: 180, loop: true },
+    dragRight: { row: 1, frameCount: 8, frameDurationMs: 90, loop: true },
+    dragLeft: { row: 2, frameCount: 8, frameDurationMs: 90, loop: true },
+    tap: { row: 3, frameCount: 4, frameDurationMs: 130, loop: false },
+    petting: { row: 8, frameCount: 6, frameDurationMs: 140, loop: false },
+    happy: { row: 7, frameCount: 6, frameDurationMs: 120, loop: false },
+    thinking: { row: 6, frameCount: 6, frameDurationMs: 150, loop: true },
+    failed: { row: 5, frameCount: 8, frameDurationMs: 150, loop: false },
+    sleep: { row: 5, frameCount: 8, frameDurationMs: 220, loop: true },
+    play: { row: 4, frameCount: 5, frameDurationMs: 120, loop: false },
+};
+const PET77_ACTIONS = {
+    petting: { happiness: 8, intimacy: 3, limit: 10, state: "petting", label: "抚摸" },
+    feed: { happiness: 12, intimacy: 2, limit: 5, state: "happy", label: "喂食" },
+    talk: { happiness: 5, intimacy: 4, limit: 8, state: "tap", label: "聊天" },
+    sleep: { happiness: 4, intimacy: 0, limit: null, state: "sleep", label: "休息" },
+};
+const PET77_FOODS = [
+    { id: "osmanthus", name: "桂花小点", desc: "香甜，开心值多一点", happiness: 14, intimacy: 2 },
+    { id: "duckling", name: "金陵饭团", desc: "扎实，亲密度多一点", happiness: 10, intimacy: 4 },
+    { id: "tea", name: "热热麦茶", desc: "温柔，适合休息前", happiness: 9, intimacy: 3 },
+];
+const PET77_TALK_LINES = [
+    "我在这里陪你慢慢逛南京。",
+    "今天也要把开心值攒满。",
+    "如果不知道去哪，就先摸摸我。",
+    "路线想好了叫我，我会跟上。",
+];
+const PET77_LOW_MOOD_LINES = [
+    "我有点没精神，陪我一下吧。",
+    "开心值有点低，想被摸摸。",
+    "今天可以多和我说几句话吗？",
+];
+
+let pet77Data = loadPet77Data();
+let pet77State = "idle";
+let pet77FrameIndex = 0;
+let pet77AnimationTimer = null;
+let pet77IdleTimer = null;
+let pet77Dragging = false;
+let pet77PointerStart = null;
+let pet77ChatSessionId = "pet77-" + todayKey();
+let pet77TapTimer = null;
+let pet77LastTapAt = 0;
+let pet77ChatDragState = null;
+
+function todayKey() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function clampNumber(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function createDefaultPet77Data() {
+    return {
+        visible: true,
+        position: null,
+        intimacy: 10,
+        happiness: 70,
+        lastInteractionAt: Date.now(),
+        dailyActions: { date: todayKey(), petting: 0, feed: 0, talk: 0 },
+    };
+}
+
+function normalizePet77Data(data) {
+    const defaults = createDefaultPet77Data();
+    const merged = Object.assign({}, defaults, data || {});
+    merged.visible = merged.visible !== false;
+    merged.intimacy = clampNumber(Number(merged.intimacy ?? defaults.intimacy), 0, 100);
+    merged.happiness = clampNumber(Number(merged.happiness ?? defaults.happiness), 0, 100);
+    merged.lastInteractionAt = Number(merged.lastInteractionAt || defaults.lastInteractionAt);
+    if (!merged.dailyActions || merged.dailyActions.date !== todayKey()) {
+        merged.dailyActions = { date: todayKey(), petting: 0, feed: 0, talk: 0 };
+    }
+    return merged;
+}
+
+function loadPet77Data() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(PET77_STORAGE_KEY) || "null");
+        const data = normalizePet77Data(stored);
+        return applyPet77Decay(data);
+    } catch {
+        return createDefaultPet77Data();
+    }
+}
+
+function savePet77Data() {
+    pet77Data = normalizePet77Data(pet77Data);
+    localStorage.setItem(PET77_STORAGE_KEY, JSON.stringify(pet77Data));
+}
+
+function applyPet77Decay(data) {
+    const normalized = normalizePet77Data(data);
+    const elapsed = Date.now() - normalized.lastInteractionAt;
+    const decaySteps = Math.floor(elapsed / (6 * 60 * 60 * 1000));
+    if (decaySteps > 0) {
+        normalized.happiness = Math.max(20, normalized.happiness - decaySteps * 5);
+        normalized.lastInteractionAt = Date.now();
+    }
+    return normalized;
+}
+
+function getPet77IntimacyTitle() {
+    if (pet77Data.intimacy >= 90) return "挚友";
+    if (pet77Data.intimacy >= 60) return "亲近";
+    if (pet77Data.intimacy >= 30) return "熟悉";
+    return "陌生";
+}
+
+function getPet77MoodTitle() {
+    if (pet77Data.happiness >= 70) return "开心";
+    if (pet77Data.happiness >= 30) return "平静";
+    return "低落";
+}
+
+function syncPet77Panels() {
+    const intimacy = document.getElementById("pet77-intimacy-value");
+    const happiness = document.getElementById("pet77-happiness-value");
+    const intimacyBar = document.getElementById("pet77-intimacy-bar");
+    const happinessBar = document.getElementById("pet77-happiness-bar");
+    const title = document.getElementById("pet77-stage-title");
+    const mood = document.getElementById("pet77-mood-title");
+    const daily = document.getElementById("pet77-daily-actions");
+    const toggle = document.getElementById("pet77-visible-toggle");
+    if (intimacy) intimacy.textContent = String(pet77Data.intimacy);
+    if (happiness) happiness.textContent = String(pet77Data.happiness);
+    if (intimacyBar) intimacyBar.style.width = pet77Data.intimacy + "%";
+    if (happinessBar) happinessBar.style.width = pet77Data.happiness + "%";
+    if (title) title.textContent = getPet77IntimacyTitle();
+    if (mood) mood.textContent = getPet77MoodTitle();
+    if (daily) {
+        const d = pet77Data.dailyActions;
+        daily.textContent = `抚摸 ${d.petting || 0}/10 · 喂食 ${d.feed || 0}/5 · 聊天 ${d.talk || 0}/8`;
+    }
+    if (toggle) toggle.checked = pet77Data.visible;
+}
+
+function setPet77Visibility(visible) {
+    pet77Data.visible = !!visible;
+    savePet77Data();
+    const overlay = document.getElementById("pet77-overlay");
+    if (overlay) overlay.classList.toggle("hidden", !pet77Data.visible);
+    syncPet77Panels();
+}
+
+function setPet77Frame(row, col) {
+    const sprite = document.getElementById("pet77-sprite");
+    const preview = document.getElementById("pet77-preview-sprite");
+    const x = -(col * PET77_DISPLAY_FRAME.width) + "px";
+    const y = -(row * PET77_DISPLAY_FRAME.height) + "px";
+    if (sprite) sprite.style.backgroundPosition = `${x} ${y}`;
+    if (preview) preview.style.backgroundPosition = `${x} ${y}`;
+}
+
+function setPet77State(state, options = {}) {
+    if (!PET77_ANIMATIONS[state]) state = "idle";
+    pet77State = state;
+    pet77FrameIndex = 0;
+    if (pet77AnimationTimer) clearTimeout(pet77AnimationTimer);
+    document.getElementById("pet77-overlay")?.setAttribute("data-state", state);
+    playPet77Frame(options.returnToIdle !== false);
+}
+
+function playPet77Frame(returnToIdle = true) {
+    const spec = PET77_ANIMATIONS[pet77State] || PET77_ANIMATIONS.idle;
+    setPet77Frame(spec.row, pet77FrameIndex);
+    pet77FrameIndex += 1;
+    if (pet77FrameIndex >= spec.frameCount) {
+        if (spec.loop) {
+            pet77FrameIndex = 0;
+        } else if (returnToIdle) {
+            pet77AnimationTimer = setTimeout(() => setPet77State("idle"), spec.frameDurationMs);
+            return;
+        } else {
+            pet77FrameIndex = spec.frameCount - 1;
+        }
+    }
+    pet77AnimationTimer = setTimeout(() => playPet77Frame(returnToIdle), spec.frameDurationMs);
+}
+
+function showPet77Bubble(message) {
+    const bubble = document.getElementById("pet77-bubble");
+    if (!bubble) return;
+    bubble.textContent = message;
+    bubble.classList.add("show");
+    clearTimeout(bubble._timer);
+    bubble._timer = setTimeout(() => bubble.classList.remove("show"), 3000);
+}
+
+function showPet77Affection(message = "亲密度升级") {
+    const overlay = document.getElementById("pet77-overlay");
+    if (!overlay || overlay.classList.contains("hidden")) return;
+    overlay.querySelector(".pet77-affection-pop")?.remove();
+    overlay.querySelector(".pet77-heart-burst")?.remove();
+
+    const pop = document.createElement("div");
+    pop.className = "pet77-affection-pop";
+    pop.textContent = message;
+
+    const burst = document.createElement("div");
+    burst.className = "pet77-heart-burst";
+    burst.innerHTML = Array.from({ length: 9 }, (_, i) =>
+        `<span style="--i:${i};--x:${(i - 4) * 10}px;--d:${0.06 * i}s">${i % 3 === 0 ? "○" : "♡"}</span>`
+    ).join("");
+
+    overlay.appendChild(pop);
+    overlay.appendChild(burst);
+    setTimeout(() => {
+        pop.remove();
+        burst.remove();
+    }, 1700);
+}
+
+function pet77ResetIdleTimer() {
+    if (pet77IdleTimer) clearTimeout(pet77IdleTimer);
+    if (pet77State === "sleep") setPet77State("idle");
+    pet77IdleTimer = setTimeout(() => {
+        if (pet77Data.visible) {
+            setPet77State("sleep", { returnToIdle: false });
+            showPet77Bubble("我先眯一会儿。");
+        }
+    }, PET_IDLE_THRESHOLD);
+}
+
+function pet77RecordInteraction() {
+    pet77Data.lastInteractionAt = Date.now();
+    savePet77Data();
+    pet77ResetIdleTimer();
+}
+
+function pet77ApplyAction(action, options = {}) {
+    pet77Data = applyPet77Decay(pet77Data);
+    if (action === "summon") {
+        setPet77Visibility(true);
+        setPet77State("happy");
+        showPet77Bubble("我回来啦。");
+        pet77RecordInteraction();
+        return;
+    }
+    const rule = PET77_ACTIONS[action];
+    if (!rule) return;
+    const dailyKey = action === "petting" ? "petting" : action === "feed" ? "feed" : action === "talk" ? "talk" : null;
+    let canGain = true;
+    if (dailyKey && rule.limit !== null) {
+        const used = pet77Data.dailyActions[dailyKey] || 0;
+        canGain = used < rule.limit;
+        if (canGain) pet77Data.dailyActions[dailyKey] = used + 1;
+    }
+    const gain = options.food || {};
+    if (canGain) {
+        pet77Data.happiness = clampNumber(pet77Data.happiness + (gain.happiness ?? rule.happiness), 0, 100);
+        pet77Data.intimacy = clampNumber(pet77Data.intimacy + (gain.intimacy ?? rule.intimacy), 0, 100);
+    }
+    pet77RecordInteraction();
+    setPet77State(rule.state);
+    const lines = action === "talk" ? PET77_TALK_LINES : [];
+    const msg = !canGain
+        ? `${rule.label}次数到达今日上限啦，明天再继续。`
+        : action === "sleep"
+            ? "休息一下，等会儿继续出发。"
+            : action === "feed" && gain.name
+                ? `喂了${gain.name}，77 很满足。`
+            : lines.length
+                ? lines[Math.floor(Math.random() * lines.length)]
+                : `${rule.label}完成，开心值和亲密度都变好了。`;
+    showPet77Bubble(options.bubbleMessage || msg);
+    if (canGain) showPet77Affection("亲密度升级");
+    if (!options.skipToast) showToast(msg);
+    syncPet77Panels();
+    if (action === "sleep") setTimeout(() => setPet77State("idle"), 3000);
+}
+
+function pet77HandleOverlayTap() {
+    pet77Data = applyPet77Decay(pet77Data);
+    pet77RecordInteraction();
+    setPet77State("tap");
+    const now = Date.now();
+    if (now - pet77LastTapAt < 320) {
+        pet77LastTapAt = 0;
+        if (pet77TapTimer) clearTimeout(pet77TapTimer);
+        showPet77Bubble("我在，想和我说什么？");
+        openPet77Chat();
+        return;
+    }
+    pet77LastTapAt = now;
+    if (pet77TapTimer) clearTimeout(pet77TapTimer);
+    pet77TapTimer = setTimeout(() => {
+        const lines = pet77Data.happiness < 30 ? PET77_LOW_MOOD_LINES : PET77_TALK_LINES;
+        showPet77Bubble(lines[Math.floor(Math.random() * lines.length)]);
+        pet77LastTapAt = 0;
+    }, 330);
+}
+
+function showPet77FeedMenu(anchor) {
+    document.querySelector(".pet77-feed-menu")?.remove();
+    const menu = document.createElement("div");
+    menu.className = "pet77-feed-menu";
+    const rect = anchor?.getBoundingClientRect();
+    if (rect) {
+        menu.style.left = Math.min(window.innerWidth - 260, Math.max(16, rect.left - 84)) + "px";
+        menu.style.top = Math.max(80, rect.top - 172) + "px";
+    }
+    menu.innerHTML = `
+        <div class="pet77-feed-title">选择食物</div>
+        ${PET77_FOODS.map(food => `
+            <button class="pet77-food-option" type="button" data-food="${food.id}">
+                <span class="pet77-food-name">${food.name}</span>
+                <span class="pet77-food-desc">${food.desc}</span>
+            </button>
+        `).join("")}
+    `;
+    document.body.appendChild(menu);
+    menu.querySelectorAll(".pet77-food-option").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const food = PET77_FOODS.find(f => f.id === btn.dataset.food);
+            menu.remove();
+            pet77ApplyAction("feed", { food });
+        });
+    });
+    setTimeout(() => {
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener("pointerdown", close);
+            }
+        };
+        document.addEventListener("pointerdown", close);
+    }, 0);
+}
+
+function placePet77Overlay(overlay) {
+    const pos = pet77Data.position;
+    const x = pos && Number.isFinite(pos.x) ? pos.x : Math.max(12, window.innerWidth - 126);
+    const y = pos && Number.isFinite(pos.y) ? pos.y : Math.max(64, window.innerHeight - 244);
+    const maxX = Math.max(12, window.innerWidth - PET77_DISPLAY_FRAME.width - 18);
+    const maxY = Math.max(56, window.innerHeight - PET77_DISPLAY_FRAME.height - 92);
+    overlay.style.left = clampNumber(x, 12, maxX) + "px";
+    overlay.style.top = clampNumber(y, 56, maxY) + "px";
+}
+
+function bindPet77Drag(overlay) {
+    overlay.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".pet77-hide")) return;
+        pet77PointerStart = {
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            lastX: e.clientX,
+            left: parseFloat(overlay.style.left || "0"),
+            top: parseFloat(overlay.style.top || "0"),
+            moved: false,
+        };
+        overlay.setPointerCapture(e.pointerId);
+    });
+    overlay.addEventListener("pointermove", (e) => {
+        if (!pet77PointerStart || pet77PointerStart.pointerId !== e.pointerId) return;
+        const dx = e.clientX - pet77PointerStart.startX;
+        const dy = e.clientY - pet77PointerStart.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 6) {
+            pet77PointerStart.moved = true;
+            pet77Dragging = true;
+            overlay.classList.add("dragging");
+        }
+        if (!pet77Dragging) return;
+        const directionState = e.clientX >= pet77PointerStart.lastX ? "dragRight" : "dragLeft";
+        if (pet77State !== directionState) setPet77State(directionState, { returnToIdle: false });
+        pet77PointerStart.lastX = e.clientX;
+        const maxX = Math.max(12, window.innerWidth - PET77_DISPLAY_FRAME.width - 18);
+        const maxY = Math.max(56, window.innerHeight - PET77_DISPLAY_FRAME.height - 92);
+        overlay.style.left = clampNumber(pet77PointerStart.left + dx, 12, maxX) + "px";
+        overlay.style.top = clampNumber(pet77PointerStart.top + dy, 56, maxY) + "px";
+    });
+    overlay.addEventListener("pointerup", (e) => {
+        if (!pet77PointerStart || pet77PointerStart.pointerId !== e.pointerId) return;
+        overlay.releasePointerCapture(e.pointerId);
+        overlay.classList.remove("dragging");
+        if (pet77PointerStart.moved) {
+            pet77Data.position = {
+                x: parseFloat(overlay.style.left || "0"),
+                y: parseFloat(overlay.style.top || "0"),
+            };
+            savePet77Data();
+            setPet77State("idle");
+        } else {
+            pet77HandleOverlayTap();
+        }
+        pet77PointerStart = null;
+        pet77Dragging = false;
+    });
+    overlay.addEventListener("pointercancel", () => {
+        overlay.classList.remove("dragging");
+        pet77PointerStart = null;
+        pet77Dragging = false;
+        setPet77State("idle");
+    });
+}
+
+function openPet77Chat() {
+    let panel = document.getElementById("pet77-chat-panel");
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "pet77-chat-panel";
+        panel.className = "pet77-chat-panel";
+        panel.innerHTML = `
+            <div class="pet77-chat-head">
+                <span>77</span>
+                <button class="pet77-chat-close" type="button" aria-label="关闭宠物聊天">×</button>
+            </div>
+            <div class="pet77-chat-messages" id="pet77-chat-messages">
+                <div class="pet77-chat-msg bot">我在这里，短短聊几句也可以。</div>
+            </div>
+            <div class="pet77-chat-input-row">
+                <input class="pet77-chat-input" id="pet77-chat-input" type="text" placeholder="和 77 说句话..." />
+                <button class="pet77-chat-send" id="pet77-chat-send" type="button">发送</button>
+            </div>
+            <div class="pet77-chat-resize" aria-label="调整聊天框大小"></div>
+        `;
+        document.body.appendChild(panel);
+        panel.querySelector(".pet77-chat-close").addEventListener("click", closePet77Chat);
+        panel.querySelector("#pet77-chat-send").addEventListener("click", sendPet77ChatMessage);
+        panel.querySelector("#pet77-chat-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendPet77ChatMessage();
+        });
+        bindPet77ChatPanelControls(panel);
+    }
+    placePet77ChatPanel(panel);
+    panel.classList.add("open");
+    document.getElementById("pet77-chat-input")?.focus();
+}
+
+function closePet77Chat() {
+    document.getElementById("pet77-chat-panel")?.classList.remove("open");
+}
+
+function placePet77ChatPanel(panel) {
+    const saved = loadPet77ChatLayout();
+    if (saved) {
+        const width = clampNumber(saved.width || 300, 240, Math.min(380, window.innerWidth - 24));
+        const height = clampNumber(saved.height || 220, 176, Math.min(360, window.innerHeight - 96));
+        panel.style.width = width + "px";
+        panel.style.height = height + "px";
+        panel.style.left = clampNumber(saved.left || 16, 12, window.innerWidth - width - 12) + "px";
+        panel.style.top = clampNumber(saved.top || 96, 56, window.innerHeight - height - 12) + "px";
+        panel.style.bottom = "auto";
+        return;
+    }
+    const overlay = document.getElementById("pet77-overlay");
+    const rect = overlay?.getBoundingClientRect();
+    const width = Math.min(300, window.innerWidth - 24);
+    panel.style.width = width + "px";
+    panel.style.height = "220px";
+    if (rect) {
+        panel.style.left = clampNumber(rect.left - width + 102, 12, window.innerWidth - width - 12) + "px";
+        panel.style.top = clampNumber(rect.top - 126, 64, window.innerHeight - 236) + "px";
+    } else {
+        panel.style.left = "16px";
+        panel.style.bottom = "92px";
+    }
+}
+
+function loadPet77ChatLayout() {
+    try {
+        return JSON.parse(localStorage.getItem(PET77_CHAT_LAYOUT_KEY) || "null");
+    } catch {
+        return null;
+    }
+}
+
+function savePet77ChatLayout(panel) {
+    if (!panel) return;
+    localStorage.setItem(PET77_CHAT_LAYOUT_KEY, JSON.stringify({
+        left: parseFloat(panel.style.left || "16"),
+        top: parseFloat(panel.style.top || "96"),
+        width: panel.offsetWidth,
+        height: panel.offsetHeight,
+    }));
+}
+
+function bindPet77ChatPanelControls(panel) {
+    if (!panel || panel.dataset.dragBound === "1") return;
+    panel.dataset.dragBound = "1";
+    const head = panel.querySelector(".pet77-chat-head");
+    const resize = panel.querySelector(".pet77-chat-resize");
+
+    const start = (e, mode) => {
+        if (e.target.closest("button, input")) return;
+        e.preventDefault();
+        pet77ChatDragState = {
+            mode,
+            startX: e.clientX,
+            startY: e.clientY,
+            left: parseFloat(panel.style.left || "0"),
+            top: parseFloat(panel.style.top || "0"),
+            width: panel.offsetWidth,
+            height: panel.offsetHeight,
+        };
+        panel.classList.add(mode === "move" ? "moving" : "resizing");
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", end, { once: true });
+    };
+
+    const move = (e) => {
+        if (!pet77ChatDragState) return;
+        const dx = e.clientX - pet77ChatDragState.startX;
+        const dy = e.clientY - pet77ChatDragState.startY;
+        if (pet77ChatDragState.mode === "move") {
+            const maxLeft = window.innerWidth - panel.offsetWidth - 12;
+            const maxTop = window.innerHeight - panel.offsetHeight - 12;
+            panel.style.left = clampNumber(pet77ChatDragState.left + dx, 12, Math.max(12, maxLeft)) + "px";
+            panel.style.top = clampNumber(pet77ChatDragState.top + dy, 56, Math.max(56, maxTop)) + "px";
+            panel.style.bottom = "auto";
+        } else {
+            const maxWidth = Math.min(420, window.innerWidth - pet77ChatDragState.left - 12);
+            const maxHeight = Math.min(380, window.innerHeight - pet77ChatDragState.top - 12);
+            panel.style.width = clampNumber(pet77ChatDragState.width + dx, 240, Math.max(240, maxWidth)) + "px";
+            panel.style.height = clampNumber(pet77ChatDragState.height + dy, 176, Math.max(176, maxHeight)) + "px";
+        }
+    };
+
+    const end = () => {
+        window.removeEventListener("pointermove", move);
+        panel.classList.remove("moving", "resizing");
+        savePet77ChatLayout(panel);
+        pet77ChatDragState = null;
+    };
+
+    head?.addEventListener("pointerdown", (e) => start(e, "move"));
+    resize?.addEventListener("pointerdown", (e) => start(e, "resize"));
+}
+
+function appendPet77ChatMsg(type, text) {
+    const container = document.getElementById("pet77-chat-messages");
+    if (!container) return null;
+    const msg = document.createElement("div");
+    msg.className = "pet77-chat-msg " + type;
+    msg.textContent = text;
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
+    return msg;
+}
+
+function sendPet77ChatMessage() {
+    const input = document.getElementById("pet77-chat-input");
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    appendPet77ChatMsg("user", text);
+    const typing = appendPet77ChatMsg("bot thinking", "77 正在想...");
+    setPet77State("thinking", { returnToIdle: false });
+    pet77ApplyAction("talk", { skipToast: true, bubbleMessage: "我在认真听。" });
+
+    fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            userId: 1,
+            sessionId: pet77ChatSessionId,
+            guideRole: "pet77",
+            message: "你是南京城市漫游应用里的轻量桌宠 77。请用温柔、简短、陪伴感的中文回复，不超过两句话。用户说：" + text,
+        }),
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("AI chat unavailable");
+        return res.json();
+    })
+    .then(data => {
+        const reply = data.data?.content || data.content || data.message || "我听见啦，我们慢慢来。";
+        if (typing) typing.textContent = reply;
+        setPet77State("happy");
+        showPet77Bubble("聊完更亲近啦。");
+        showPet77Affection("亲密度升级");
+    })
+    .catch(() => {
+        const fallbacks = [
+            "我陪着你。想出门的话，我们就从近一点的地方开始。",
+            "今天可以慢慢走，不用急着把所有地方都逛完。",
+            "我记住啦。等你想路线的时候，我会一起想。",
+        ];
+        if (typing) typing.textContent = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+        setPet77State("happy");
+    });
+}
+
+function initPet77Overlay() {
+    if (document.getElementById("pet77-overlay")) return;
+    pet77Data = loadPet77Data();
+    const overlay = document.createElement("div");
+    overlay.id = "pet77-overlay";
+    overlay.className = "pet77-overlay";
+    overlay.innerHTML = `
+        <div class="pet77-bubble" id="pet77-bubble"></div>
+        <button class="pet77-hide" type="button" aria-label="隐藏 77">×</button>
+        <div class="pet77-sprite" id="pet77-sprite" aria-label="77 桌宠"></div>
+        <div class="pet77-shadow"></div>
+    `;
+    document.body.appendChild(overlay);
+    placePet77Overlay(overlay);
+    overlay.classList.toggle("hidden", !pet77Data.visible);
+    overlay.querySelector(".pet77-hide").addEventListener("click", (e) => {
+        e.stopPropagation();
+        setPet77Visibility(false);
+        showToast("已隐藏 77，可在宠物页重新召唤");
+    });
+    bindPet77Drag(overlay);
+    window.addEventListener("resize", () => placePet77Overlay(overlay));
+    setPet77State("idle");
+    pet77ResetIdleTimer();
+    syncPet77Panels();
+}
+
 // ── Pet Display Functions ──
 function updatePetDisplay(petId) {
     const pet = petId ? PET_DEFS.find(p => p.id === petId) : currentPet;
@@ -405,6 +1029,17 @@ function updatePetDisplay(petId) {
 
 function setPetState(state) {
     petState = state;
+    const pet77StateMap = {
+        idle: "idle",
+        welcome: "tap",
+        happy: "happy",
+        guiding: "thinking",
+        confused: "failed",
+        urging: "tap",
+    };
+    if (typeof setPet77State === "function" && pet77StateMap[state]) {
+        setPet77State(pet77StateMap[state]);
+    }
     const avatar = document.getElementById("pet-avatar");
     if (!avatar) return;
     avatar.classList.remove("state-idle", "state-welcome", "state-happy", "state-guiding", "state-confused", "state-urging");
@@ -452,18 +1087,18 @@ function showPetSelector() {
     panel.className = "pet-selector-panel";
     panel.innerHTML =
         `<h3 style="font-family:'Noto Serif SC',serif;margin:0 0 4px;font-size:18px;font-weight:500;">选择旅伴</h3>
-        <p style="font-size:12px;color:var(--soft);margin-bottom:16px;">选一个伙伴陪你探索南京</p>
+        <p style="font-size:12px;color:var(--soft);margin-bottom:16px;">更多旅伴将在后续解锁</p>
         <div class="pet-selector-grid">
             ${PET_DEFS.map(p => {
                 const unlocked = isPetUnlocked(p.id);
                 const isActive = currentPet.id === p.id;
-                return `<div class="pet-selector-item${unlocked ? '' : ' locked'}" data-pet="${p.id}"
-                    style="background:${isActive ? hexToRgba(p.color, 0.15) : 'var(--surface)'};
-                    border:1px solid ${isActive ? hexToRgba(p.color, 0.4) : 'var(--rule)'};
-                    opacity:${unlocked ? '1' : '0.4'};">
-                    <span class="pet-sel-emoji">${p.emoji}</span>
+                return `<div class="pet-selector-item locked" data-pet="${p.id}"
+                    style="background:${isActive ? hexToRgba(p.color, 0.10) : 'var(--surface)'};
+                    border:1px solid ${isActive ? hexToRgba(p.color, 0.24) : 'var(--rule)'};
+                    opacity:${unlocked ? '0.82' : '0.45'};">
+                    <span class="pet-sel-emoji">?</span>
                     <span class="pet-sel-name">${p.name}</span>
-                    ${!unlocked ? '<span class="pet-sel-lock">🔒</span>' : ''}
+                    <span class="pet-sel-lock">待解锁</span>
                 </div>`;
             }).join("")}
         </div>
@@ -492,6 +1127,7 @@ function showPetSelector() {
 function resetPetIdleTimer() {
     lastUserInteraction = Date.now();
     if (petState === "urging") setPetState("idle");
+    if (typeof pet77ResetIdleTimer === "function") pet77ResetIdleTimer();
     if (petUrgeTimer) clearTimeout(petUrgeTimer);
     petUrgeTimer = setTimeout(() => {
         if (Date.now() - lastUserInteraction >= PET_IDLE_THRESHOLD && mainPageShown && currentTab === "home") {
@@ -1828,6 +2464,8 @@ function showMainPage() {
 
     // Sync initial tab state
     switchTab("home");
+    setTimeout(initAMap, 300);
+    initPet77Overlay();
 
     // ── Pet idle timer ──
     ["click", "scroll", "touchstart"].forEach(evt => {
@@ -2090,10 +2728,17 @@ function initAMap() {
     if (!container) return;
 
     amapInitializing = true;
+    let loaderRetryCount = 0;
 
     function tryInit() {
         if (typeof AMapLoader === "undefined") {
-            // Retry after AMap loader loads
+            loaderRetryCount += 1;
+            if (loaderRetryCount > 30) {
+                console.warn("AMap loader unavailable, using canvas fallback.");
+                startCanvasMapFallback();
+                amapInitializing = false;
+                return;
+            }
             setTimeout(tryInit, 300);
             return;
         }
@@ -3101,14 +3746,15 @@ function getCurrentLatLng() {
 const MEITUAN_CATEGORIES = [
     { key: "food", icon: "🍜", label: "美食", need: "food" },
     { key: "coffee", icon: "☕", label: "咖啡", need: "drink" },
-    { key: "rest", icon: "🏨", label: "休息", need: "rest" }
+    { key: "hotel", icon: "🏨", label: "休息", need: "hotel" }
 ];
 
 async function fetchMeituanPois(lat, lng) {
     const allPois = [];
-    for (const cat of ["food", "coffee", "rest"]) {
+    for (const cat of MEITUAN_CATEGORIES.map(c => c.key)) {
         try {
             const resp = await fetch(`/api/meituan/poi/search?lat=${lat}&lng=${lng}&category=${cat}`);
+            if (!resp.ok) throw new Error("Meituan POI API unavailable");
             const data = await resp.json();
             const pois = (data.data || []).map(p => ({ ...p, _category: cat }));
             allPois.push(...pois);
@@ -3116,17 +3762,58 @@ async function fetchMeituanPois(lat, lng) {
             // Fall back silently
         }
     }
-    return allPois;
+    if (allPois.length) {
+        return { source: "api", items: allPois };
+    }
+    return { source: "local", items: getLocalMeituanPois() };
 }
 
 async function fetchMeituanDealsData(lat, lng) {
     try {
         const resp = await fetch(`/api/meituan/deals?lat=${lat}&lng=${lng}`);
+        if (!resp.ok) throw new Error("Meituan deals API unavailable");
         const data = await resp.json();
         return data.data || [];
     } catch (e) {
-        return [];
+        return getLocalMeituanDeals();
     }
+}
+
+function getLocalMeituanPois() {
+    if (typeof SUPPLY_DATA === "undefined") return [];
+    return SUPPLY_DATA.getAll()
+        .filter(i => ["food", "coffee", "hotel"].includes(i.category))
+        .sort((a, b) => (a.distance || 9999) - (b.distance || 9999))
+        .slice(0, 12)
+        .map(i => ({
+            storeId: i.id,
+            name: i.name,
+            address: i.address,
+            category: i.category,
+            rating: i.rating,
+            avgPrice: i.avgPrice,
+            imageUrl: i.image,
+            distance: i.distance,
+            tags: i.tags,
+            district: i.district,
+            subcategory: i.subcategory,
+            reviewCount: i.reviewCount,
+            deals: i.deals,
+            photos: i.photos,
+        }));
+}
+
+function getLocalMeituanDeals() {
+    if (typeof SUPPLY_DATA === "undefined") return [];
+    return SUPPLY_DATA.getCoupons().slice(0, 8).map(c => ({
+        dealId: c.id,
+        title: c.name,
+        storeName: c.shop,
+        price: Number(c.price) || 0,
+        originalPrice: Number(c.origPrice) || 0,
+        soldCount: c.sold,
+        category: c.category || "food",
+    }));
 }
 
 function poiToSupplyItem(poi) {
@@ -3406,27 +4093,37 @@ function renderNearbyTab(container) {
 
     // Fetch Meituan API data
     const { lat, lng } = getCurrentLatLng();
-    fetchMeituanPois(lat, lng).then(pois => {
+    fetchMeituanPois(lat, lng).then(result => {
         const meituanContent = document.getElementById("supply-meituan-content");
+        const pois = Array.isArray(result) ? result : result.items || [];
+        const source = Array.isArray(result) ? "api" : result.source;
+        const badge = document.querySelector(".supply-meituan-badge");
+        if (badge) {
+            badge.textContent = source === "api" ? "实时在线" : "离线推荐";
+            badge.classList.toggle("offline", source !== "api");
+        }
         if (meituanContent && pois.length > 0) {
-            meituanContent.innerHTML = pois.map(p => {
+            meituanContent.innerHTML = `<div class="dianping-cards">${pois.slice(0, 8).map(p => {
                 const item = {
-                    id: p.storeId || 'api_' + Math.random(),
+                    id: p.storeId || p.id || 'api_' + Math.random(),
                     name: p.name,
-                    category: p.category === 'coffee' ? 'coffee' : p.category === 'rest' ? 'hotel' : 'food',
+                    category: p.category === 'coffee' ? 'coffee' : p.category === 'hotel' ? 'hotel' : 'food',
                     rating: p.rating || 4.0,
                     distance: p.distance || 500,
                     avgPrice: p.avgPrice || 30,
                     image: p.imageUrl || null,
                     address: p.address || '',
+                    district: p.district || '',
+                    subcategory: p.subcategory || '',
+                    reviewCount: p.reviewCount || 1200,
                     tags: p.tags || [],
-                    dealCount: p.dealCount || 0,
+                    deals: p.deals || [],
+                    photos: p.photos || 0,
                 };
                 return renderDianpingCard(item);
-            }).join('');
+            }).join('')}</div>`;
             // Also fetch deals
-            fetch(`/api/meituan/deals?lat=${lat}&lng=${lng}`).then(r => r.json()).then(d => {
-                const deals = d.data || [];
+            fetchMeituanDealsData(lat, lng).then(deals => {
                 if (deals.length > 0) {
                     const dealsHtml = `<div class="supply-group" style="margin-top:16px;">
                         <h3 class="supply-group-title">今日优惠套餐 <span class="savings-badge">${deals.length}个套餐</span></h3>
@@ -3446,11 +4143,11 @@ function renderNearbyTab(container) {
                 }
             }).catch(() => {});
         } else if (meituanContent) {
-            meituanContent.innerHTML = '<div class="supply-loading">暂无美团实时数据，以下是本地商家推荐</div>';
+            meituanContent.innerHTML = '<div class="supply-loading">附近实时接口暂不可用，以下已切换本地推荐</div>';
         }
     }).catch(() => {
         const meituanContent = document.getElementById("supply-meituan-content");
-        if (meituanContent) meituanContent.innerHTML = '<div class="supply-loading">美团数据加载中，先看看本地推荐吧</div>';
+        if (meituanContent) meituanContent.innerHTML = '<div class="supply-loading">附近实时接口暂不可用，以下已切换本地推荐</div>';
     });
 
     const dynamicArea = document.getElementById("supply-dynamic");
@@ -3463,6 +4160,7 @@ function renderNearbyTab(container) {
 // ═══════════════════════
 
 function renderStars(rating) {
+    rating = Number(rating) || 4.0;
     const full = Math.floor(rating);
     const half = rating - full >= 0.5 ? 1 : 0;
     const empty = 5 - full - half;
@@ -3474,7 +4172,10 @@ function renderStars(rating) {
 }
 
 function renderDianpingCard(item) {
-    const stars = renderStars(item.rating);
+    const rating = Number(item.rating) || 4.0;
+    const reviewCount = Number(item.reviewCount) || 0;
+    const distance = Number(item.distance) || 0;
+    const stars = renderStars(rating);
     const deals = item.deals || [];
     const dealHtml = deals.length ? deals.map(d =>
         `<span class="dp-deal-tag">${d.desc} ¥${d.price}<s>¥${d.orig}</s></span>`
@@ -3484,7 +4185,7 @@ function renderDianpingCard(item) {
         `<span class="dp-tag">${escapeHtml(t)}</span>`
     ).join('');
 
-    const distKm = item.distance >= 1000 ? `${(item.distance/1000).toFixed(1)}km` : `${item.distance}m`;
+    const distKm = distance >= 1000 ? `${(distance/1000).toFixed(1)}km` : `${distance || 500}m`;
 
     const catLabel = {
         food: '美食', coffee: '咖啡', ticket: '景点', hotel: '酒店',
@@ -3492,8 +4193,9 @@ function renderDianpingCard(item) {
     }[item.category] || item.subcategory || '';
 
     // Use real image if available, otherwise gradient placeholder
+    const safeName = item.name || "南京本地商家";
     const photoHtml = item.image
-        ? `<img class="dp-photo-img" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'dp-photo-placeholder\\' style=\\'background:${categoryGradient(item.category)}\\'><span>${categoryIcon(item.category)}</span></div>'">`
+        ? `<img class="dp-photo-img" src="${escapeHtml(item.image)}" alt="${escapeHtml(safeName)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'dp-photo-placeholder\\' style=\\'background:${categoryGradient(item.category)}\\'><span>${categoryIcon(item.category)}</span></div>'">`
         : `<div class="dp-photo-placeholder" style="background:${categoryGradient(item.category)};"><span>${categoryIcon(item.category)}</span></div>`;
 
     return `<div class="dp-card mucha-card" data-supply-id="${item.id}" data-type="${item.category}" data-store-id="${escapeHtml(item.id)}">
@@ -3503,16 +4205,16 @@ function renderDianpingCard(item) {
             ${item.photos ? `<span class="dp-photo-count-tag">${item.photos}图</span>` : ''}
         </div>
         <div class="dp-card-body">
-            <div class="dp-card-name">${escapeHtml(item.name)}</div>
+            <div class="dp-card-name">${escapeHtml(safeName)}</div>
             <div class="dp-card-rating">
                 ${stars}
-                <span class="dp-rating-num">${item.rating}</span>
-                <span class="dp-review-count">${formatReviewCount(item.reviewCount)}条评论</span>
+                <span class="dp-rating-num">${rating.toFixed(1)}</span>
+                <span class="dp-review-count">${reviewCount ? formatReviewCount(reviewCount) + '条评论' : '暂无评论'}</span>
                 <span class="dp-dist">${distKm}</span>
             </div>
             <div class="dp-card-meta">
                 <span class="dp-cat-label">${catLabel}</span>
-                <span class="dp-district">${item.district}</span>
+                ${item.district ? `<span class="dp-district">${escapeHtml(item.district)}</span>` : ''}
                 ${item.avgPrice ? `<span class="dp-avg-price">人均 ¥${item.avgPrice}</span>` : ''}
             </div>
             <div class="dp-card-tags">${tagsHtml}</div>
@@ -3861,144 +4563,315 @@ function addHomeSupplyEntry() {
 // ═══════════════════════════════════════════
 
 function renderPetTab(container) {
-    const unlockedPets = PET_DEFS.filter(p => isPetUnlocked(p.id));
-    const lockedPets = PET_DEFS.filter(p => !isPetUnlocked(p.id));
+    pet77Data = loadPet77Data();
 
     container.innerHTML = `
         <div class="pet-home">
-            <!-- 宠物主视觉 -->
-            <div class="hydrangea-stage pet-character-stage">
-                <div class="pet-character-display" id="pet-character-display" style="--pet-color:${currentPet.color}">
-                    <span class="pet-character-emoji" id="pet-character-emoji">${currentPet.emoji}</span>
-                    <div class="pet-character-glow"></div>
-                    <div class="pet-character-shadow"></div>
+            <div class="pet77-home-panel">
+                <div class="pet77-preview">
+                    <div class="pet77-preview-sprite" id="pet77-preview-sprite" aria-label="77 预览"></div>
+                    <div class="pet77-preview-shadow"></div>
                 </div>
-                <!-- 光点粒子 -->
-                <div class="pet-sparkles" id="pet-sparkles">
-                    ${Array.from({length: 12}, (_, i) => `
-                        <span class="pet-sparkle" style="
-                            left: ${10 + Math.random() * 80}%;
-                            top: ${10 + Math.random() * 80}%;
-                            animation-delay: ${Math.random() * 3}s;
-                            animation-duration: ${3 + Math.random() * 4}s;
-                        ">✦</span>
-                    `).join('')}
+                <div class="pet77-info">
+                    <div class="pet77-kicker">常驻桌宠 V2</div>
+                    <h2>77</h2>
+                    <p>77 是一只安静又黏人的南京小旅伴，会记得你的路线、心情和每一次摸摸。</p>
+                    <label class="pet77-toggle-row">
+                        <input type="checkbox" id="pet77-visible-toggle" ${pet77Data.visible ? "checked" : ""}>
+                        <span>前端常驻显示 77</span>
+                    </label>
                 </div>
             </div>
 
-            <!-- 当前旅伴状态 -->
-            <div class="pet-status-card" id="pet-status-card">
-                <div class="pet-status-avatar" style="background:${hexToRgba(currentPet.color, 0.12)};border-color:${hexToRgba(currentPet.color, 0.35)};">
-                    <span class="pet-status-emoji">${currentPet.emoji}</span>
+            <div class="pet77-growth-card">
+                <div class="pet77-meter-row">
+                    <div>
+                        <span class="pet77-meter-label">亲密度</span>
+                        <strong><span id="pet77-intimacy-value">${pet77Data.intimacy}</span>/100</strong>
+                    </div>
+                    <span class="pet77-pill" id="pet77-stage-title">${getPet77IntimacyTitle()}</span>
                 </div>
-                <div class="pet-status-info">
-                    <div class="pet-status-name">${currentPet.name}</div>
-                    <div class="pet-status-personality">${currentPet.personality}</div>
-                    <div class="pet-status-fn">✨ ${currentPet.fn}</div>
+                <div class="pet77-meter"><i id="pet77-intimacy-bar" style="width:${pet77Data.intimacy}%"></i></div>
+                <div class="pet77-meter-row">
+                    <div>
+                        <span class="pet77-meter-label">开心值</span>
+                        <strong><span id="pet77-happiness-value">${pet77Data.happiness}</span>/100</strong>
+                    </div>
+                    <span class="pet77-pill warm" id="pet77-mood-title">${getPet77MoodTitle()}</span>
                 </div>
-                <button class="pet-status-change" onclick="showPetSelector()">更换</button>
+                <div class="pet77-meter mood"><i id="pet77-happiness-bar" style="width:${pet77Data.happiness}%"></i></div>
+                <div class="pet77-daily" id="pet77-daily-actions"></div>
             </div>
 
-            <!-- 互动按钮区 -->
-            <div class="pet-actions">
-                <button class="pet-action-btn" onclick="petActionFeed()">
-                    <span class="pet-action-icon">🍎</span>
+            <div class="pet77-actions">
+                <button class="pet77-action-btn" onclick="petActionPetting()">
+                    <span class="pet-action-icon">♡</span>
+                    <span class="pet-action-label">抚摸</span>
+                </button>
+                <button class="pet77-action-btn" onclick="petActionFeed()">
+                    <span class="pet-action-icon">+</span>
                     <span class="pet-action-label">喂食</span>
                 </button>
-                <button class="pet-action-btn" onclick="petActionTalk()">
-                    <span class="pet-action-icon">💬</span>
+                <button class="pet77-action-btn" onclick="petActionTalk()">
+                    <span class="pet-action-icon">…</span>
                     <span class="pet-action-label">聊天</span>
                 </button>
-                <button class="pet-action-btn" onclick="petActionExplore()">
-                    <span class="pet-action-icon">🗺</span>
-                    <span class="pet-action-label">探索</span>
-                </button>
-                <button class="pet-action-btn" onclick="petActionSleep()">
-                    <span class="pet-action-icon">💤</span>
+                <button class="pet77-action-btn" onclick="petActionSleep()">
+                    <span class="pet-action-icon">z</span>
                     <span class="pet-action-label">休息</span>
+                </button>
+                <button class="pet77-action-btn" onclick="petActionSummon()">
+                    <span class="pet-action-icon">↗</span>
+                    <span class="pet-action-label">召唤</span>
                 </button>
             </div>
 
-            <!-- 已解锁旅伴 -->
             <div class="pet-collection">
-                <h3 class="pet-collection-title">我的旅伴 <span class="pet-count">${unlockedPets.length}/${PET_DEFS.length}</span></h3>
+                <h3 class="pet-collection-title">旅伴 <span class="pet-count">${PET_DEFS.length} 位</span></h3>
                 <div class="pet-collection-grid">
+                    ${/* Keep the original companion slots and data hooks for future asset unlocks. */ ""}
                     ${PET_DEFS.map(p => {
                         const unlocked = isPetUnlocked(p.id);
-                        const isActive = currentPet.id === p.id;
-                        return `<div class="pet-collection-item${unlocked ? '' : ' locked'}${isActive ? ' active' : ''}"
+                        return `<div class="pet-collection-item pet-placeholder${unlocked ? '' : ' locked'}"
                             data-pet="${p.id}"
-                            onclick="${unlocked ? "updatePetDisplay('" + p.id + "');setPetState('welcome');setTimeout(()=>setPetState('idle'),3000);refreshPetStatusCard();" : "showToast('🔒 完成对应路线解锁这个旅伴')"}"
-                            style="${isActive ? '--pet-color:' + hexToRgba(p.color, 0.15) + ';border-color:' + hexToRgba(p.color, 0.4) + ';' : ''}">
-                            <span class="pet-col-emoji">${p.emoji}</span>
+                            onclick="showToast('这个旅伴还没有解锁')">
+                            <span class="pet-col-emoji">?</span>
                             <span class="pet-col-name">${p.name}</span>
-                            ${!unlocked ? '<span class="pet-col-lock">🔒</span>' : ''}
-                            ${isActive ? '<span class="pet-col-active">同行中</span>' : ''}
+                            <span class="pet-col-active">待解锁</span>
                         </div>`;
                     }).join('')}
                 </div>
             </div>
         </div>`;
 
-    // Hydrangea animation: gentle pulse on center
-    const flower = document.getElementById("hydrangea-flower");
-    if (flower) {
-        flower.addEventListener("click", () => {
-            flower.classList.add("bloom-burst");
-            setPetState("happy");
-            setTimeout(() => flower.classList.remove("bloom-burst"), 800);
-        });
-    }
+    document.getElementById("pet77-visible-toggle")?.addEventListener("change", (e) => {
+        setPet77Visibility(e.target.checked);
+    });
+    syncPet77Panels();
+    const previewSpec = PET77_ANIMATIONS[pet77State] || PET77_ANIMATIONS.idle;
+    setPet77Frame(previewSpec.row, clampNumber(pet77FrameIndex || 0, 0, previewSpec.frameCount - 1));
 }
 
 // ── Pet action handlers ──
+function petActionPetting() {
+    pet77ApplyAction("petting");
+}
 function petActionFeed() {
-    setPetState("happy");
-    showToast("🍎 给" + currentPet.name + "喂了食！它很开心~");
-    const charDisplay = document.getElementById("pet-character-display");
-    if (charDisplay) { charDisplay.classList.add("pet-bounce"); setTimeout(() => charDisplay.classList.remove("pet-bounce"), 600); }
+    showPet77FeedMenu(document.activeElement);
 }
 function petActionTalk() {
-    const dialogues = currentPet.dialogues["idle"];
-    const msg = dialogues[Math.floor(Math.random() * dialogues.length)];
-    showPetBubble(msg);
-    setPetState("welcome");
-    setTimeout(() => setPetState("idle"), 2500);
+    pet77ApplyAction("talk", { skipToast: true, bubbleMessage: "我在，想聊什么？" });
+    openPet77Chat();
 }
 function petActionExplore() {
+    setPet77State("thinking");
     setPetState("guiding");
     showToast("🗺 " + currentPet.name + "想带你出去走走！去首页选一条路线吧~");
     setTimeout(() => switchTab("home"), 800);
 }
 function petActionSleep() {
-    setPetState("confused");
-    showToast("💤 " + currentPet.name + "正在休息中...zzZ");
-    setTimeout(() => setPetState("idle"), 3000);
+    pet77ApplyAction("sleep");
+}
+function petActionSummon() {
+    pet77ApplyAction("summon");
 }
 function refreshPetStatusCard() {
-    const card = document.getElementById("pet-status-card");
-    if (!card) return;
-    card.querySelector(".pet-status-emoji").textContent = currentPet.emoji;
-    card.querySelector(".pet-status-name").textContent = currentPet.name;
-    card.querySelector(".pet-status-personality").textContent = currentPet.personality;
-    card.querySelector(".pet-status-fn").textContent = "✨ " + currentPet.fn;
-    card.querySelector(".pet-status-avatar").style.background = hexToRgba(currentPet.color, 0.12);
-    card.querySelector(".pet-status-avatar").style.borderColor = hexToRgba(currentPet.color, 0.35);
-    // Update main character display
-    const charEmoji = document.getElementById("pet-character-emoji");
-    if (charEmoji) charEmoji.textContent = currentPet.emoji;
-    const charDisplay = document.getElementById("pet-character-display");
-    if (charDisplay) charDisplay.style.setProperty("--pet-color", currentPet.color);
-    // Update grid active state
-    document.querySelectorAll(".pet-collection-item").forEach(item => {
-        item.classList.toggle("active", item.dataset.pet === currentPet.id);
+    syncPet77Panels();
+}
+
+function getUserProfile() {
+    const defaults = {
+        userId: 1,
+        name: "旅行者",
+        tagline: "南京城市探索中",
+        avatarUrl: "",
+        loggedIn: true,
+        lastLoginAt: new Date().toISOString(),
+    };
+    try {
+        return Object.assign(defaults, JSON.parse(localStorage.getItem(USER_PROFILE_STORAGE_KEY) || "{}"));
+    } catch {
+        return defaults;
+    }
+}
+
+function saveUserProfile(profile) {
+    localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(Object.assign(getUserProfile(), profile || {})));
+}
+
+function renderProfileAvatar(profile, fallbackIcon) {
+    if (profile.avatarUrl) {
+        return `<img class="profile-avatar-img" src="${escapeHtml(profile.avatarUrl)}" alt="用户头像">`;
+    }
+    return `<span class="profile-avatar-fallback">${fallbackIcon}</span>`;
+}
+
+function bindProfileAvatarUpload(container) {
+    const input = container.querySelector("#profile-avatar-input");
+    if (!input) return;
+    input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            showToast("请选择图片文件");
+            return;
+        }
+        if (file.size > 1024 * 1024 * 2) {
+            showToast("头像图片请控制在 2MB 内");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            saveUserProfile({ avatarUrl: reader.result, loggedIn: true, lastLoginAt: new Date().toISOString() });
+            renderProfileTab(container);
+            showToast("头像已更新");
+        };
+        reader.readAsDataURL(file);
     });
+}
+
+function openSettingsDrawer() {
+    let overlay = document.getElementById("settings-drawer-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "settings-drawer-overlay";
+        overlay.className = "settings-drawer-overlay";
+        overlay.innerHTML = `
+            <aside class="settings-drawer" onclick="event.stopPropagation()">
+                <div class="settings-drawer-header">
+                    <div>
+                        <span class="settings-drawer-kicker">Settings</span>
+                        <h3>设置</h3>
+                    </div>
+                    <button class="settings-drawer-close" type="button" aria-label="关闭设置">×</button>
+                </div>
+                <div class="settings-drawer-list">
+                    <button class="settings-item" type="button" data-setting="account"><span>账户管理</span><i>›</i></button>
+                    <button class="settings-item" type="button" data-setting="cache"><span>缓存清理</span><i>›</i></button>
+                    <button class="settings-item" type="button" data-setting="github"><span>GitHub 仓库地址</span><i>›</i></button>
+                    <button class="settings-item" type="button" data-setting="privacy"><span>安全隐私</span><i>›</i></button>
+                    <button class="settings-item danger" type="button" data-setting="logout"><span>退出登录</span><i>›</i></button>
+                </div>
+                <div class="settings-detail" id="settings-detail"></div>
+            </aside>
+        `;
+        document.body.appendChild(overlay);
+        overlay.addEventListener("click", closeSettingsDrawer);
+        overlay.querySelector(".settings-drawer-close").addEventListener("click", closeSettingsDrawer);
+        overlay.querySelectorAll(".settings-item").forEach(btn => {
+            btn.addEventListener("click", () => showSettingsDetail(btn.dataset.setting));
+        });
+    }
+    overlay.classList.add("open");
+    showSettingsDetail("account");
+}
+
+function closeSettingsDrawer() {
+    document.getElementById("settings-drawer-overlay")?.classList.remove("open");
+}
+
+function showSettingsDetail(type) {
+    const detail = document.getElementById("settings-detail");
+    if (!detail) return;
+    const profile = getUserProfile();
+    if (type === "account") {
+        detail.innerHTML = `
+            <div class="settings-detail-card">
+                <h4>账户管理</h4>
+                <label class="settings-field">
+                    <span>昵称</span>
+                    <input id="settings-name-input" type="text" value="${escapeHtml(profile.name)}" maxlength="16">
+                </label>
+                <p>用户 ID：${profile.userId} · ${profile.loggedIn ? "已登录" : "已退出"}</p>
+                <button class="settings-primary" type="button" id="settings-save-account">保存账户</button>
+            </div>
+        `;
+        detail.querySelector("#settings-save-account").addEventListener("click", () => {
+            const name = detail.querySelector("#settings-name-input").value.trim() || "旅行者";
+            saveUserProfile({ name, loggedIn: true, lastLoginAt: new Date().toISOString() });
+            const profileTab = document.getElementById("tab-profile-inner");
+            if (profileTab) renderProfileTab(profileTab);
+            showToast("账户信息已保存");
+            showSettingsDetail("account");
+        });
+        return;
+    }
+    if (type === "cache") {
+        detail.innerHTML = `
+            <div class="settings-detail-card">
+                <h4>缓存清理</h4>
+                <p>将清理临时面板位置、会话缓存和页面临时状态，保留头像、登录资料、路线与宠物成长数据。</p>
+                <button class="settings-primary" type="button" id="settings-clear-cache">清理缓存</button>
+            </div>
+        `;
+        detail.querySelector("#settings-clear-cache").addEventListener("click", clearAppCache);
+        return;
+    }
+    if (type === "github") {
+        detail.innerHTML = `
+            <div class="settings-detail-card">
+                <h4>GitHub 仓库地址</h4>
+                <p>${APP_GITHUB_URL ? escapeHtml(APP_GITHUB_URL) : "暂未配置仓库地址，可在 APP_GITHUB_URL 中填写。"}</p>
+                <button class="settings-primary" type="button" id="settings-open-github">${APP_GITHUB_URL ? "打开仓库" : "复制占位地址"}</button>
+            </div>
+        `;
+        detail.querySelector("#settings-open-github").addEventListener("click", () => {
+            if (APP_GITHUB_URL) {
+                window.open(APP_GITHUB_URL, "_blank", "noopener");
+            } else {
+                navigator.clipboard?.writeText("APP_GITHUB_URL").catch(() => {});
+                showToast("仓库地址未配置，已复制配置项名称");
+            }
+        });
+        return;
+    }
+    if (type === "privacy") {
+        detail.innerHTML = `
+            <div class="settings-detail-card">
+                <h4>安全隐私</h4>
+                <p>头像和偏好仅保存在当前浏览器本地；AI 聊天只在发送消息时请求内置接口。</p>
+                <button class="settings-primary" type="button" id="settings-reset-avatar">移除本地头像</button>
+            </div>
+        `;
+        detail.querySelector("#settings-reset-avatar").addEventListener("click", () => {
+            saveUserProfile({ avatarUrl: "" });
+            const profileTab = document.getElementById("tab-profile-inner");
+            if (profileTab) renderProfileTab(profileTab);
+            showToast("本地头像已移除");
+        });
+        return;
+    }
+    if (type === "logout") {
+        detail.innerHTML = `
+            <div class="settings-detail-card danger">
+                <h4>退出登录</h4>
+                <p>退出后会保留头像、路线、成就和宠物数据，下次进入可在账户管理中恢复登录状态。</p>
+                <button class="settings-danger" type="button" id="settings-logout-confirm">确认退出</button>
+            </div>
+        `;
+        detail.querySelector("#settings-logout-confirm").addEventListener("click", () => {
+            saveUserProfile({ loggedIn: false, lastLogoutAt: new Date().toISOString() });
+            const profileTab = document.getElementById("tab-profile-inner");
+            if (profileTab) renderProfileTab(profileTab);
+            showToast("已退出登录");
+            closeSettingsDrawer();
+        });
+    }
+}
+
+function clearAppCache() {
+    sessionStorage.clear();
+    localStorage.removeItem(PET77_CHAT_LAYOUT_KEY);
+    localStorage.removeItem("nj_temp_route_preview");
+    localStorage.removeItem("nj_meituan_cache");
+    showToast("缓存已清理，用户资料已保留");
 }
 
 function renderProfileTab(container) {
     const persona = personaCards.find(p => p.id === selectedPersonaId);
     const personaName = persona ? persona.title : "未选择";
     const personaIcon = persona ? persona.elements[0].emoji : "👤";
+    const profile = getUserProfile();
     const unlockedData = getAchievements();
     const achievements = ACHIEVEMENT_DEFS;
     const unlockedCount = achievements.filter(a => unlockedData[a.id]).length;
@@ -4006,10 +4879,14 @@ function renderProfileTab(container) {
     container.innerHTML =
         `<div class="profile-section">
             <div class="profile-card">
-                <div class="profile-avatar">${personaIcon}</div>
+                <label class="profile-avatar uploadable" title="上传头像">
+                    ${renderProfileAvatar(profile, personaIcon)}
+                    <input id="profile-avatar-input" type="file" accept="image/*">
+                    <span class="profile-avatar-edit">更换</span>
+                </label>
                 <div class="profile-info">
-                    <div class="profile-name">旅行者</div>
-                    <div class="profile-tag">南京城市探索中</div>
+                    <div class="profile-name">${escapeHtml(profile.name)}</div>
+                    <div class="profile-tag">${escapeHtml(profile.tagline)} · ${profile.loggedIn ? "已登录" : "未登录"}</div>
                     <div class="persona-badge">
                         <span>${personaIcon}</span>
                         <span>${personaName}</span>
@@ -4038,6 +4915,11 @@ function renderProfileTab(container) {
                     <span class="menu-text">关于应用</span>
                     <span class="menu-arrow">›</span>
                 </button>
+                <button class="profile-menu-item" onclick="openSettingsDrawer()">
+                    <span class="menu-icon">⚙</span>
+                    <span class="menu-text">设置</span>
+                    <span class="menu-arrow">›</span>
+                </button>
             </div>
         </div>
 
@@ -4059,6 +4941,7 @@ function renderProfileTab(container) {
                 </div>
             </div>
         </div>`;
+    bindProfileAvatarUpload(container);
 }
 
 // ═══════════════════════════════════════
@@ -4906,6 +5789,8 @@ function sendAiMessage() {
     typingEl.innerHTML = '<span class="ai-msg-avatar">AI</span><div class="ai-msg-bubble">思考中...</div>';
     msgContainer.appendChild(typingEl);
     msgContainer.scrollTop = msgContainer.scrollHeight;
+    setPet77State("thinking", { returnToIdle: false });
+    showPet77Bubble("我也在帮你想。");
 
     // Call AI API
     fetch("/api/ai/chat", {
@@ -4918,9 +5803,12 @@ function sendAiMessage() {
         typingEl.remove();
         const reply = data.data?.content || data.content || data.message || "让我想想...";
         appendChatMsg("bot", reply);
+        setPet77State("happy");
     })
     .catch(() => {
         typingEl.remove();
+        setPet77State("failed");
+        showPet77Bubble("网络没接上，我先给你备用建议。");
         // Fallback responses
         const fallbacks = [
             "南京的梧桐大道很美，推荐你去走走！从南大出发，一路走到中山路，两边都是百年梧桐。",
