@@ -1777,6 +1777,128 @@ const routes = {
     }
 };
 
+// ── Custom Routes Management ──
+let customRoutes = {};
+let CUSTOM_ROUTE_COUNTER = 0;
+
+function loadCustomRoutes() {
+    try {
+        const saved = JSON.parse(localStorage.getItem("nj_custom_routes") || "[]");
+        customRoutes = {};
+        saved.forEach(cr => {
+            const key = "custom_" + cr.id;
+            routes[key] = {
+                title: cr.title,
+                desc: cr.desc || "我的自定义路线",
+                meta: [(cr.duration || 120) + " 分钟", "自由探索", cr.budget || "自由预算"],
+                duration: cr.duration || 120,
+                stops: cr.stops || [],
+                isCustom: true,
+                budget: cr.budget || "自由预算",
+                hasMapData: !!(cr.coords && cr.coords.length)
+            };
+            customRoutes[key] = cr;
+            // Restore map data for routes created via map editor
+            if (cr.coords && cr.coords.length) {
+                ROUTE_MAP_DATA[key] = {
+                    coords: cr.coords,
+                    stops: (cr.stops || []).map(s => s.name || s)
+                };
+            }
+        });
+        CUSTOM_ROUTE_COUNTER = saved.length;
+    } catch(e) { customRoutes = {}; }
+}
+
+function saveCustomRoutesToStorage() {
+    const arr = Object.values(customRoutes);
+    localStorage.setItem("nj_custom_routes", JSON.stringify(arr));
+}
+
+// ── Save custom route from route-editor postMessage ──
+function saveCustomRouteFromEditor(d) {
+    const id = Date.now();
+    const key = "custom_" + id;
+    const title = d.routeName || "自定义路线";
+    const duration = Math.ceil((d.totalDuration || 3600) / 60); // seconds → minutes
+    const distKm = d.totalDistance ? (d.totalDistance / 1000).toFixed(1) : "?";
+
+    // Build stops array from origin + waypoints + destination
+    const stopNames = [];
+    if (d.stops && d.stops.length) {
+        d.stops.forEach(s => stopNames.push(s.name));
+    } else {
+        // Fallback: parse from origin/destination/waypoints strings
+        if (d.origin) stopNames.push(d.origin.split("|")[0]);
+        if (d.waypoints) {
+            d.waypoints.split(";").filter(Boolean).forEach(w => stopNames.push(w.split("|")[0]));
+        }
+        if (d.destination) stopNames.push(d.destination.split("|")[0]);
+    }
+
+    // Build ROUTE_MAP_DATA entry with path coordinates
+    let mapCoords = [];
+    if (d.pathCoords && d.pathCoords.length) {
+        // pathCoords is [[lng, lat], ...] → convert to [[lat, lng], ...] for ROUTE_MAP_DATA
+        mapCoords = d.pathCoords.map(c => [c[1], c[0]]);
+    } else if (d.stops && d.stops.length) {
+        // Fallback: use stop lnglat strings
+        mapCoords = d.stops.filter(s => s.lnglat).map(s => {
+            const parts = s.lnglat.split(",");
+            return [parseFloat(parts[1]), parseFloat(parts[0])];
+        });
+    }
+
+    // Store in ROUTE_MAP_DATA for map display
+    if (mapCoords.length) {
+        ROUTE_MAP_DATA[key] = {
+            coords: mapCoords,
+            stops: stopNames
+        };
+    }
+
+    // Store route data
+    routes[key] = {
+        title: title,
+        desc: (d.transportMode === "walking" ? "🚶 步行" : "🚗 驾车") + " · " + distKm + "km · " + stopNames.length + "站",
+        meta: [duration + " 分钟", distKm + "公里", stopNames.length + "个站点"],
+        duration: duration,
+        stops: stopNames.map((name, i) => ({ name, detail: "" })),
+        isCustom: true,
+        budget: "自由预算",
+        hasMapData: mapCoords.length > 0
+    };
+
+    // Save to localStorage
+    customRoutes[key] = {
+        id: id,
+        title: title,
+        desc: routes[key].desc,
+        duration: duration,
+        stops: stopNames.map((name, i) => ({ name, detail: "" })),
+        isCustom: true,
+        budget: "自由预算",
+        coords: mapCoords,
+        hasMapData: mapCoords.length > 0
+    };
+
+    // Add map accent color for custom routes
+    ROUTE_ACCENT[key] = "#E07A5F";
+    ROUTE_PERSONA_COLORS[key] = { color: "#E07A5F" };
+
+    saveCustomRoutesToStorage();
+    CUSTOM_ROUTE_COUNTER++;
+}
+
+function getAllDisplayRouteKeys() {
+    const builtin = ["night", "nju", "food", "expo"];
+    const custom = Object.keys(customRoutes);
+    return [...builtin, ...custom];
+}
+
+// Load custom routes on startup
+loadCustomRoutes();
+
 function openRoute(key) {
     const r = routes[key];
     if (!r) return;
@@ -1813,6 +1935,10 @@ function openRoute(key) {
                 <span class="icon">💾</span>
                 <span class="label">存入我的路线</span>
             </button>
+            ${r.isCustom ? `<button class="route-action-btn danger-action" onclick="handleDeleteCustomRoute('${key}')">
+                <span class="icon">🗑️</span>
+                <span class="label">删除路线</span>
+            </button>` : ""}
         </div>` +
         `<button class="sheet-close">收起画卷</button>`;
     sheet.classList.add("open");
@@ -2414,7 +2540,7 @@ function showMainPage() {
 
     mainPage.classList.add("visible");
     mainPage.classList.remove("drawer-open");
-    // Lazy-init map only when needed (no longer a main tab)
+    // Lazy-init map only when needed
     window._amapDeferredInit = true;
     window.addEventListener("resize", onMainResize);
 
@@ -2619,25 +2745,48 @@ function renderRouteGrid() {
     const grid = document.getElementById("route-grid");
     if (!grid) return;
 
-    const gridKeys = ["night", "nju", "food", "expo"];
+    const builtinKeys = ["night", "nju", "food", "expo"];
+    const customKeys = Object.keys(customRoutes);
+    const allKeys = [...builtinKeys, ...customKeys];
 
-    grid.innerHTML = gridKeys.map(key => {
+    grid.innerHTML = allKeys.map(key => {
         const r = routes[key];
-        const accent = ROUTE_ACCENT[key];
-        const img = ROUTE_IMAGE[key];
+        const accent = ROUTE_ACCENT[key] || "#E07A5F";
+        const img = ROUTE_IMAGE[key] || ROUTE_IMAGE.food;
+        const isCustom = key.startsWith("custom_");
+        const badge = isCustom ? '<span class="mini-custom-badge">自定义</span>' : "";
         return `<div class="mini-route-card" data-route="${key}" style="--card-accent:${accent}">
-            <div class="mini-thumb" style="background-image:url(${img});background-color:${accent}"></div>
+            <div class="mini-thumb" style="background-image:url(${img});background-color:${accent}">
+                ${badge}
+            </div>
             <div class="mini-body">
                 <span class="mini-name">${r.title.split("：")[0].split(":")[0]}</span>
                 <span class="mini-meta">${(r.stops || []).length}站 · ${r.duration || "?"}min</span>
             </div>
         </div>`;
-    }).join("");
+    }).join("") +
+    // Custom route upload button
+    `<div class="mini-route-card mini-route-upload" id="custom-route-upload-btn" style="--card-accent:#E07A5F;border:2px dashed rgba(224,122,95,0.35);background:rgba(224,122,95,0.03);">
+        <div class="mini-thumb" style="background:rgba(224,122,95,0.06);display:flex;align-items:center;justify-content:center;">
+            <span class="upload-plus-icon">➕</span>
+        </div>
+        <div class="mini-body" style="align-items:center;text-align:center;">
+            <span class="mini-name" style="color:#E07A5F;">自主上传路线</span>
+            <span class="mini-meta">设计你的专属路线</span>
+        </div>
+    </div>`;
 
+    // Bind click handlers
     grid.querySelectorAll(".mini-route-card").forEach(card => {
         card.addEventListener("click", () => {
             const routeKey = card.dataset.route;
+            if (!routeKey) {
+                // Custom route upload button clicked → open map editor
+                showMapRouteEditor();
+                return;
+            }
             if (routeKey === "nju") openGame();
+            else if (routeKey.startsWith("custom_")) openRoute(routeKey);
             else openRoute(routeKey);
         });
     });
@@ -3673,12 +3822,15 @@ function switchTab(tab) {
             tabEl.style.display = "block";
             tabEl.classList.add("visible");
             const inner = tabEl.querySelector(".tab-content-inner");
-            if (inner && !inner.dataset.rendered) {
-                inner.dataset.rendered = "1";
+            if (inner) {
+                // Routes tab always re-renders (dynamic custom routes + upload hero)
                 if (tab === "routes") renderRoutesTab(inner);
-                else if (tab === "nearby") renderNearbyTab(inner);
-                else if (tab === "pet") renderPetTab(inner);
-                else if (tab === "profile") renderProfileTab(inner);
+                else if (!inner.dataset.rendered) {
+                    inner.dataset.rendered = "1";
+                    if (tab === "nearby") renderNearbyTab(inner);
+                    else if (tab === "pet") renderPetTab(inner);
+                    else if (tab === "profile") renderProfileTab(inner);
+                }
             }
         }
     }
@@ -3707,17 +3859,35 @@ function renderRoutesTab(container) {
         `<div class="tab-page-header">
             <div class="tab-page-title">全部路线</div>
             <div class="tab-page-subtitle">${Object.keys(routes).length} 条路线，等你出发</div>
+        </div>
+        <!-- Upload route button -->
+        <div class="upload-route-hero" id="upload-route-hero">
+            <div class="upload-route-hero-icon">🗺️</div>
+            <div class="upload-route-hero-text">
+                <span class="upload-route-hero-title">上传我的路线</span>
+                <span class="upload-route-hero-sub">在地图上标记起点、途经点和终点，创建你自己的南京路线</span>
+            </div>
+            <button class="upload-route-hero-btn" id="upload-route-hero-btn">开始标记</button>
         </div>`;
+
+    // Bind upload button
+    container.querySelector("#upload-route-hero-btn").addEventListener("click", showMapRouteEditor);
+    // Also make the whole card clickable
+    container.querySelector("#upload-route-hero").addEventListener("click", (e) => {
+        if (e.target.tagName !== "BUTTON") showMapRouteEditor();
+    });
 
     Object.entries(routes).forEach(([key, route]) => {
         const info = TAB_ROUTE_ICONS[key] || { icon: "📍", bg: "rgba(78,126,122,0.12)" };
         const metaHtml = route.meta.map(m => `<span>${m}</span>`).join("");
+        const isCustom = key.startsWith("custom_");
+        const badge = isCustom ? '<span style="display:inline-block;background:#E07A5F;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;margin-left:6px;vertical-align:middle;">自定义</span>' : "";
         const div = document.createElement("div");
         div.className = "route-list-item";
         div.innerHTML =
             `<div class="route-list-icon" style="background:${info.bg}">${info.icon}</div>
              <div class="route-list-info">
-                 <div class="route-list-name">${route.title}</div>
+                 <div class="route-list-name">${route.title}${badge}</div>
                  <div class="route-list-desc">${route.desc}</div>
                  <div class="route-list-meta">${metaHtml}</div>
              </div>
@@ -3740,6 +3910,418 @@ function getCurrentLatLng() {
         return ROUTE_COORDINATES[currentRouteKey];
     }
     return { lat: 32.060, lng: 118.796 }; // Nanjing center
+}
+
+// ═══════════════════════════════════════
+//  🗺️ Map Route Editor — 地图选点路线编辑器
+// ═══════════════════════════════════════
+
+let mapEditor = null;          // { overlay, amap, markers, polylines, waypoints, ... }
+
+function showMapRouteEditor() {
+    closeSheet();
+
+    // Remove previous editor iframe
+    document.querySelector(".map-editor-iframe-overlay")?.remove();
+    if (mapEditor) { closeMapEditor(); }
+
+    // ── Create fullscreen iframe overlay for route editor ──
+    const overlay = document.createElement("div");
+    overlay.className = "map-editor-iframe-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:200;background:#fff;";
+
+    const iframe = document.createElement("iframe");
+    iframe.src = "./route-editor.html";
+    iframe.style.cssText = "width:100%;height:100%;border:none;";
+    overlay.appendChild(iframe);
+    document.body.appendChild(overlay);
+
+    // ── Listen for messages from the editor iframe ──
+    const msgHandler = function(e) {
+        if (e.data && e.data.type === "close-editor") {
+            closeMapEditor();
+        }
+        if (e.data && e.data.type === "route-saved") {
+            const d = e.data.data;
+            showToast("✅ 路线「" + (d.routeName || "自定义") + "」已保存！");
+            // Save to localStorage so loadCustomRoutes() can find it
+            saveCustomRouteFromEditor(d);
+            // Reload custom routes from localStorage
+            loadCustomRoutes();
+            renderRouteGrid();
+            // Also refresh carousel (may pick up new custom routes if added)
+            renderCarouselCards();
+            const routesTab = document.querySelector("#tab-routes .tab-content-inner");
+            if (routesTab) renderRoutesTab(routesTab);
+            // Close the map editor
+            closeMapEditor();
+        }
+    };
+    window.addEventListener("message", msgHandler);
+    overlay._msgHandler = msgHandler;
+
+    mapEditor = { overlay, iframe };
+    document.querySelector(".bottom-nav").style.zIndex = "50";
+}
+
+function closeMapEditor() {
+    if (!mapEditor) return;
+
+    const overlay = mapEditor.overlay;
+    if (overlay && overlay._msgHandler) {
+        window.removeEventListener("message", overlay._msgHandler);
+    }
+    try { overlay.remove(); } catch(e) {}
+    document.querySelector(".bottom-nav").style.zIndex = "10";
+    mapEditor = null;
+}
+
+function refreshMapEditorDisplay() {
+    if (!mapEditor || !amapInstance) return;
+
+    const { waypoints } = mapEditor;
+
+    // Clear existing overlays
+    mapEditor.markers.forEach(m => { try { amapInstance.remove(m); } catch(e) {} });
+    mapEditor.markers = [];
+    mapEditor.polylines.forEach(p => { try { amapInstance.remove(p); } catch(e) {} });
+    mapEditor.polylines = [];
+
+    // Update bottom point list
+    const pointsList = document.getElementById("map-editor-points-list");
+    const saveBtn = document.getElementById("map-editor-save");
+    const undoBtn = document.getElementById("map-editor-undo");
+    const clearBtn = document.getElementById("map-editor-clear");
+    const hint = document.getElementById("map-editor-hint");
+
+    if (!waypoints.length) {
+        pointsList.innerHTML = '<span class="no-points-hint">👆 选择模式，然后点击地图添加标记…</span>';
+        saveBtn.disabled = true; undoBtn.disabled = true; clearBtn.disabled = true;
+        if (hint) hint.textContent = "先点「添加起点」→ 再添加途经点 → 最后点「添加终点」";
+        return;
+    }
+
+    const hasStart = waypoints.some(w => w.type === "start");
+    const hasEnd = waypoints.some(w => w.type === "end");
+    saveBtn.disabled = !(hasStart && hasEnd && waypoints.length >= 2);
+    undoBtn.disabled = false;
+    clearBtn.disabled = false;
+
+    // Update hint
+    if (!hasStart) {
+        if (hint) hint.textContent = "请先点击「🏁 添加起点」，再点击地图标记起点";
+    } else if (!hasEnd) {
+        if (hint) hint.textContent = "请点击「🎯 添加终点」，再点击地图标记终点";
+    } else {
+        if (hint) hint.textContent = "起点 ✓ · 途经点 ✓ · 终点 ✓ — 点击「💾 保存路线」";
+    }
+
+    // Render point chips
+    pointsList.innerHTML = waypoints.map((wp, i) => {
+        let label, chipColor;
+        if (wp.type === "start") { label = "🏁 起点"; chipColor = "#2E8B57"; }
+        else if (wp.type === "end") { label = "🎯 终点"; chipColor = "#B64236"; }
+        else { label = "📍 途经点"; chipColor = "#E07A5F"; }
+        return `<span class="map-editor-point-chip" data-index="${i}" style="border-color:${chipColor}30;background:${chipColor}10;color:${chipColor};">
+            ${label}
+            <span class="map-editor-point-coord">${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)}</span>
+            <button class="map-editor-point-del" data-index="${i}" title="删除此点">✕</button>
+        </span>`;
+    }).join("");
+
+    // Bind delete buttons & chip clicks
+    pointsList.querySelectorAll(".map-editor-point-del").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.index);
+            if (!isNaN(idx) && mapEditor && mapEditor.waypoints.length > idx) {
+                mapEditor.waypoints.splice(idx, 1);
+                refreshMapEditorDisplay();
+            }
+        });
+    });
+    pointsList.querySelectorAll(".map-editor-point-chip").forEach(chip => {
+        chip.addEventListener("click", (e) => {
+            if (e.target.tagName === "BUTTON") return;
+            const idx = parseInt(chip.dataset.index);
+            if (!isNaN(idx) && mapEditor && mapEditor.waypoints[idx]) {
+                const wp = mapEditor.waypoints[idx];
+                amapInstance.setZoomAndCenter(16, [wp.lng, wp.lat]);
+            }
+        });
+    });
+
+    // Draw polylines connecting all waypoints
+    if (waypoints.length >= 2) {
+        const path = waypoints.map(wp => [wp.lng, wp.lat]);
+        // Segmented: start→waypoint green, waypoint→waypoint orange, waypoint→end red
+        const polyline = new AMap.Polyline({
+            path,
+            strokeColor: "#E07A5F",
+            strokeOpacity: 0.85, strokeWeight: 5,
+            strokeStyle: "solid", lineJoin: "round", lineCap: "round",
+            zIndex: 50,
+        });
+        amapInstance.add(polyline);
+        mapEditor.polylines.push(polyline);
+
+        const glowLine = new AMap.Polyline({
+            path,
+            strokeColor: "#E07A5F", strokeOpacity: 0.15, strokeWeight: 14,
+            strokeStyle: "solid", lineJoin: "round", zIndex: 49,
+        });
+        amapInstance.add(glowLine);
+        mapEditor.polylines.push(glowLine);
+    }
+
+    // Draw markers
+    waypoints.forEach((wp, i) => {
+        const colors = { start: "#2E8B57", end: "#B64236", waypoint: "#E07A5F" };
+        const labels = { start: "起", end: "终", waypoint: String(waypoints.filter((w, j) => w.type === "waypoint" && j <= i).length || i) };
+        const bgColor = colors[wp.type] || "#E07A5F";
+        const label = labels[wp.type] || String(i);
+
+        const contentEl = document.createElement("div");
+        contentEl.className = "map-editor-marker";
+        contentEl.innerHTML = `<span class="map-editor-marker-dot" style="background:${bgColor}">${label}</span>`;
+
+        const marker = new AMap.Marker({
+            position: [wp.lng, wp.lat],
+            content: contentEl,
+            offset: new AMap.Pixel(-16, -16),
+            zIndex: 60 + i,
+        });
+        amapInstance.add(marker);
+        mapEditor.markers.push(marker);
+    });
+}
+
+function openMapEditorSaveDialog() {
+    if (!mapEditor || mapEditor.waypoints.length < 2) return;
+
+    // Remove any existing save dialog
+    document.querySelector(".map-editor-save-dialog")?.remove();
+
+    const dialog = document.createElement("div");
+    dialog.className = "map-editor-save-dialog";
+    dialog.style.cssText = "position:fixed;inset:0;z-index:120;background:rgba(26,28,27,0.40);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;";
+    dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.remove(); });
+
+    dialog.innerHTML = `
+        <div class="invite-sheet" style="background:var(--stone);max-width:420px;width:90%;" onclick="event.stopPropagation()">
+            <p class="title">💾 保存路线</p>
+            <p class="subtitle">共 ${mapEditor.waypoints.length} 个标记点</p>
+            <div class="invite-form">
+                <label>路线名称 <span style="color:#E07A5F;">*</span></label>
+                <input type="text" id="editor-route-title" placeholder="如：我的梧桐漫步路线" />
+
+                <label>路线描述</label>
+                <input type="text" id="editor-route-desc" placeholder="一句话描述…" />
+
+                <div class="form-row">
+                    <div>
+                        <label>预计时长（分钟）</label>
+                        <input type="number" id="editor-route-duration" value="120" />
+                    </div>
+                    <div>
+                        <label>预估花费</label>
+                        <input type="text" id="editor-route-budget" value="自由预算" />
+                    </div>
+                </div>
+
+                <label>路线站点名称 <span style="color:#8B939E;font-size:11px;">（每行对应一个标记点，顺序与地图一致）</span></label>
+                <textarea id="editor-route-stops" rows="4" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--rule);background:var(--surface);font-size:13px;font-family:inherit;outline:none;resize:vertical;line-height:1.6;">${mapEditor.waypoints.map((wp, i) => {
+                    const label = i === 0 ? "起点" : i === mapEditor.waypoints.length - 1 ? "终点" : `途经点${i}`;
+                    return `${label} - 点击选择的位置`;
+                }).join("\n")}</textarea>
+
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="saveMapRouteFromEditor()">✨ 保存路线</button>
+                    <button class="btn-cancel" onclick="this.closest('.map-editor-save-dialog').remove()">取消</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(dialog);
+}
+
+function saveMapRouteFromEditor() {
+    if (!mapEditor || mapEditor.waypoints.length < 2) return;
+
+    const title = document.getElementById("editor-route-title").value.trim();
+    const desc = document.getElementById("editor-route-desc").value.trim();
+    const duration = parseInt(document.getElementById("editor-route-duration").value) || 120;
+    const budget = document.getElementById("editor-route-budget").value.trim() || "自由预算";
+    const stopsRaw = document.getElementById("editor-route-stops").value.trim();
+
+    if (!title) { showToast("请填写路线名称"); return; }
+
+    // Parse stop names
+    const stopLines = stopsRaw ? stopsRaw.split("\n").filter(l => l.trim()) : [];
+    const stops = mapEditor.waypoints.map((wp, i) => {
+        const line = stopLines[i] || "";
+        const parts = line.split(/[-–—]/);
+        const name = parts.length >= 2 ? parts[0].trim() : (line || `站点${i + 1}`);
+        const detail = parts.length >= 2 ? parts.slice(1).join("-").trim() : "";
+        return {
+            name,
+            detail,
+            lat: wp.lat,
+            lng: wp.lng
+        };
+    });
+
+    // Calculate approximate distance between waypoints
+    let totalDist = 0;
+    for (let i = 1; i < mapEditor.waypoints.length; i++) {
+        const prev = mapEditor.waypoints[i - 1];
+        const curr = mapEditor.waypoints[i];
+        totalDist += Math.round(getDistance(prev.lat, prev.lng, curr.lat, curr.lng));
+    }
+
+    // Build AMap coordinate strings
+    const origin = mapEditor.waypoints[0].lng.toFixed(6) + "," + mapEditor.waypoints[0].lat.toFixed(6);
+    const dest = mapEditor.waypoints[mapEditor.waypoints.length - 1].lng.toFixed(6) + "," + mapEditor.waypoints[mapEditor.waypoints.length - 1].lat.toFixed(6);
+    const waypointsStr = mapEditor.waypoints.length > 2
+        ? mapEditor.waypoints.slice(1, -1).map(wp => wp.lng.toFixed(6) + "," + wp.lat.toFixed(6)).join(";")
+        : "";
+
+    // Save to custom routes (localStorage)
+    const routeId = ++CUSTOM_ROUTE_COUNTER;
+    const key = "custom_" + routeId;
+    const now = new Date().toISOString();
+
+    // Add to routes object
+    routes[key] = {
+        title: title,
+        desc: desc || "我的自定义路线",
+        meta: [duration + " 分钟", "自由探索", budget],
+        duration: duration,
+        stops: stops,
+        isCustom: true,
+        budget: budget,
+        hasMapData: true
+    };
+
+    // Save map data for route display
+    ROUTE_MAP_DATA[key] = {
+        coords: mapEditor.waypoints.map(wp => [wp.lat, wp.lng]),
+        stops: stops.map(s => s.name)
+    };
+
+    // Save to customRoutes
+    customRoutes[key] = {
+        id: routeId,
+        title: title,
+        desc: desc || "",
+        duration: duration,
+        budget: budget,
+        stops: stops,
+        coords: mapEditor.waypoints.map(wp => [wp.lat, wp.lng]),
+        createdAt: now
+    };
+    saveCustomRoutesToStorage();
+
+    // Also add to saved routes
+    try {
+        let saved = JSON.parse(localStorage.getItem("nj_saved_routes") || "[]");
+        saved.push({ key, title: title + "（自定义）", savedAt: now });
+        localStorage.setItem("nj_saved_routes", JSON.stringify(saved));
+    } catch(e) {}
+
+    // ── Backend API: persist to server ──
+    fetch("/api/custom-route/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            routeName: title,
+            origin: origin,
+            destination: dest,
+            waypoints: waypointsStr,
+            transportMode: "walking",
+            totalDistance: totalDist,
+            totalDuration: duration,
+            pointNames: stops.map(s => s.name),
+            coords: mapEditor.waypoints.map(wp => [wp.lat, wp.lng])
+        })
+    }).then(r => r.json()).then(data => {
+        if (data.code === 200) {
+            console.log("Route saved to server:", data.data);
+        }
+    }).catch(() => {
+        // Backend unavailable — already saved to localStorage
+    });
+
+    // Close editor and dialog
+    document.querySelector(".map-editor-save-dialog")?.remove();
+    closeMapEditor();
+
+    // Show toast
+    showToast("✅ 路线「" + title + "」已保存！可在路线列表查看");
+
+    // Unlock achievement
+    if (Object.keys(customRoutes).length >= 1) unlockAchievement("collector");
+
+    // Re-render grid & routes tab
+    renderRouteGrid();
+    const routesTab = document.querySelector("#tab-routes .tab-content-inner");
+    if (routesTab && routesTab.dataset.rendered) {
+        routesTab.dataset.rendered = "";
+        renderRoutesTab(routesTab);
+        routesTab.dataset.rendered = "1";
+    }
+}
+
+// Haversine distance between two lat/lng points (returns meters)
+function getDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function closeMapEditor() {
+    if (!mapEditor) return;
+
+    // Remove click handler
+    if (amapInstance && amapInstance._mapEditorClickHandler) {
+        amapInstance.off("click", amapInstance._mapEditorClickHandler);
+        amapInstance._mapEditorClickHandler = null;
+    }
+
+    // Clear editor overlays
+    if (amapInstance) {
+        if (mapEditor.markers) mapEditor.markers.forEach(m => { try { amapInstance.remove(m); } catch(e) {} });
+        if (mapEditor.polylines) mapEditor.polylines.forEach(p => { try { amapInstance.remove(p); } catch(e) {} });
+    }
+
+    // Remove overlay
+    try { mapEditor.overlay.remove(); } catch(e) {}
+
+    // Remove save dialog
+    document.querySelector(".map-editor-save-dialog")?.remove();
+
+    // Restore cursor & map container (back to home page look)
+    const mapContainer = document.getElementById("main-map-container");
+    if (mapContainer) {
+        mapContainer.style.cursor = "";
+        mapContainer.style.filter = "";              // Restore sepia
+        mapContainer.style.pointerEvents = "";        // Reset pointer events
+        mapContainer.classList.remove("amap-fullscreen");
+    }
+
+    // Restore map state
+    const snapScroll = document.getElementById("snap-scroll");
+    const header = document.querySelector(".main-header");
+    if (snapScroll) snapScroll.style.display = "";
+    if (header) header.style.display = "";
+
+    document.querySelector(".bottom-nav").style.zIndex = "10";
+
+    mapEditor = null;
+    switchTab("home");
 }
 
 // ── Meituan POI categories with icons ──
@@ -5026,13 +5608,13 @@ function showMyRoutes() {
                 <p style="font-size:12px;margin-top:4px;">探索路线后点击「存入我的路线」即可保存</p>
             </div>`;
         } else {
-            // API routes
+            // API routes (from database)
             apiRoutes.forEach(ur => {
-                html += renderMyRouteItem(ur.title || "我的路线", ur.description || "", ur.createdAt || "");
+                html += renderMyRouteItem(ur.userRouteId, ur.title || "我的路线", ur.description || "", ur.createdAt || "", false);
             });
-            // Local routes
+            // Local routes (from localStorage)
             localRoutes.forEach(lr => {
-                html += renderMyRouteItem(lr.title || "离线路线", "离线保存", lr.savedAt || "");
+                html += renderMyRouteItem(null, lr.title || "离线路线", "离线保存", lr.savedAt || "", true);
             });
         }
 
@@ -5044,16 +5626,91 @@ function showMyRoutes() {
     });
 }
 
-function renderMyRouteItem(title, desc, date) {
+function renderMyRouteItem(routeId, title, desc, date, isLocal) {
     const dateStr = date ? new Date(date).toLocaleDateString("zh-CN") : "";
-    return `<div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--rule);margin-bottom:8px;cursor:pointer;" onclick="showToast('🗺 路线详情')">
-        <span style="font-size:24px;">📍</span>
+    const idAttr = routeId ? `data-route-id="${routeId}"` : "";
+    const clickAction = routeId
+        ? `onclick="event.stopPropagation();fetchCustomRouteDetail(${routeId})"`
+        : `onclick="showToast('🗺 离线路线 - 仅本地保存')"`;
+    return `<div ${idAttr} ${clickAction} style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--rule);margin-bottom:8px;cursor:pointer;">
+        <span style="font-size:24px;">${isLocal ? '💾' : '📍'}</span>
         <div style="flex:1;min-width:0;">
             <div style="font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(title)}</div>
             <div style="font-size:11px;color:var(--faint);margin-top:2px;">${escapeHtml(desc)}${dateStr ? ' · ' + dateStr : ''}</div>
         </div>
         <span style="color:var(--faint);font-size:16px;">›</span>
     </div>`;
+}
+
+async function fetchCustomRouteDetail(routeId) {
+    try {
+        const resp = await fetch(`/api/user-routes/${routeId}/detail`);
+        const data = await resp.json();
+        if (data.code === 200) {
+            showCustomRouteDetail(data.data);
+        } else {
+            showToast("❌ 加载失败");
+        }
+    } catch(e) {
+        showToast("❌ 网络错误");
+    }
+}
+
+function showCustomRouteDetail(detail) {
+    // Close the my-routes overlay
+    document.querySelector(".my-routes-overlay")?.remove();
+
+    const sheetBody = document.getElementById("sheet-body");
+    const sheet = document.getElementById("route-sheet");
+
+    const stops = detail.stops || [];
+    const stopsHtml = stops.length > 0
+        ? stops.map((s, i) => `
+            <div class="stop" style="cursor:default;">
+                <span class="stop-num">${String(i + 1).padStart(2, "0")}</span>
+                <div class="stop-text">
+                    <h4>${escapeHtml(s.name || '站点' + (i+1))}</h4>
+                    <p>${escapeHtml(s.detail || '')}${s.latitude ? ' (' + s.latitude.toFixed(4) + ', ' + s.longitude.toFixed(4) + ')' : ''}</p>
+                </div>
+            </div>
+        `).join("")
+        : '<div style="text-align:center;color:var(--faint);padding:20px;">暂无站点信息</div>';
+
+    sheetBody.innerHTML = `
+        <p class="tag">我的路线</p>
+        <h3>${escapeHtml(detail.title || '自定义路线')}</h3>
+        <p class="desc">${escapeHtml(detail.description || '')}</p>
+        <div class="sheet-meta">
+            <span>${stops.length} 站</span>
+            <span>${detail.createdAt ? new Date(detail.createdAt).toLocaleDateString("zh-CN") : ''}</span>
+        </div>
+        <div class="stops">${stopsHtml}</div>
+        <div class="route-actions">
+            <button class="route-action-btn danger-action" onclick="deleteCustomRoute(${detail.userRouteId})">
+                <span class="icon">🗑️</span>
+                <span class="label">删除路线</span>
+            </button>
+        </div>
+        <button class="sheet-close">收起</button>
+    `;
+
+    sheet.classList.add("open");
+}
+
+async function deleteCustomRoute(userRouteId) {
+    if (!confirm("确定要删除这条路线吗？此操作不可撤销。")) return;
+    try {
+        const resp = await fetch(`/api/user-routes/${userRouteId}?userId=1`, { method: "DELETE" });
+        const data = await resp.json();
+        if (data.code === 200) {
+            showToast("🗑️ 路线已删除");
+            document.getElementById("route-sheet").classList.remove("open");
+        } else {
+            showToast("❌ 删除失败");
+        }
+    } catch(e) {
+        showToast("❌ 网络错误");
+    }
 }
 
 // ═══════════════════════════════════════
@@ -5152,8 +5809,154 @@ function submitCreateRoute() {
 }
 
 // ═══════════════════════════════════════
-//  Save Route / My Routes
+//  Custom Route Upload Form (自主上传路线)
 // ═══════════════════════════════════════
+
+function showUploadRouteForm() {
+    const existing = document.querySelector(".upload-route-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "upload-route-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:320;background:rgba(26,28,27,0.35);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;";
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.innerHTML = `
+    <div class="invite-sheet" style="background:var(--stone);" onclick="event.stopPropagation()">
+        <p class="title">🗺️ 自主上传路线</p>
+        <p class="subtitle">创建你自己的南京探索路线，分享给朋友</p>
+        <div class="invite-form">
+            <label>路线名称 <span style="color:#E07A5F;">*</span></label>
+            <input type="text" id="upload-route-title" placeholder="如：我的梧桐漫步路线" />
+
+            <label>路线描述</label>
+            <input type="text" id="upload-route-desc" placeholder="一句话描述这条路线..." />
+
+            <div class="form-row">
+                <div>
+                    <label>预计时长（分钟）</label>
+                    <input type="number" id="upload-route-duration" placeholder="如：120" value="120" />
+                </div>
+                <div>
+                    <label>预估花费 (¥)</label>
+                    <input type="text" id="upload-route-budget" placeholder="如：50-100" value="自由预算" />
+                </div>
+            </div>
+
+            <label>路线站点 <span style="color:#8B939E;font-size:11px;">（每行一个站点，格式：站点名 - 简短描述）</span></label>
+            <textarea id="upload-route-stops" rows="5" placeholder="街角咖啡馆 - 从一杯手冲开始&#10;独立书店 - 找一个靠窗的位置&#10;梧桐小径 - 阳光穿过树叶&#10;晚餐小馆 - 一顿刚好的晚饭"
+                style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--rule);background:var(--surface);font-size:13px;font-family:inherit;outline:none;resize:vertical;line-height:1.6;"></textarea>
+
+            <div class="form-actions">
+                <button class="btn-primary" onclick="submitUploadRoute()">✨ 上传路线</button>
+                <button class="btn-cancel" onclick="document.querySelector('.upload-route-overlay')?.remove()">取消</button>
+            </div>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+}
+
+function submitUploadRoute() {
+    const title = document.getElementById("upload-route-title").value.trim();
+    const desc = document.getElementById("upload-route-desc").value.trim();
+    const duration = parseInt(document.getElementById("upload-route-duration").value) || 120;
+    const budget = document.getElementById("upload-route-budget").value.trim() || "自由预算";
+    const stopsRaw = document.getElementById("upload-route-stops").value.trim();
+
+    if (!title) { showToast("请填写路线名称"); return; }
+
+    // Parse stops: each line → { name, detail }
+    const stops = stopsRaw ? stopsRaw.split("\n").filter(line => line.trim()).map(line => {
+        const parts = line.split(/[-–—]/);
+        if (parts.length >= 2) {
+            return { name: parts[0].trim(), detail: parts.slice(1).join("-").trim() };
+        }
+        return { name: line.trim(), detail: "" };
+    }) : [];
+
+    if (stops.length === 0) {
+        showToast("请至少填写一个路线站点"); return;
+    }
+
+    const routeId = ++CUSTOM_ROUTE_COUNTER;
+    const key = "custom_" + routeId;
+    const now = new Date().toISOString();
+
+    // Add to routes object
+    routes[key] = {
+        title: title,
+        desc: desc || "我的自定义路线",
+        meta: [duration + " 分钟", "自由探索", budget],
+        duration: duration,
+        stops: stops,
+        isCustom: true,
+        budget: budget
+    };
+
+    // Save to custom routes storage
+    customRoutes[key] = {
+        id: routeId,
+        title: title,
+        desc: desc || "",
+        duration: duration,
+        budget: budget,
+        stops: stops,
+        createdAt: now
+    };
+    saveCustomRoutesToStorage();
+
+    // Also save to nj_saved_routes for "我的路线" compatibility
+    try {
+        let saved = JSON.parse(localStorage.getItem("nj_saved_routes") || "[]");
+        saved.push({ key: key, title: title + "（自定义）", savedAt: now });
+        localStorage.setItem("nj_saved_routes", JSON.stringify(saved));
+    } catch(e) {}
+
+    // Close overlay
+    document.querySelectorAll(".upload-route-overlay").forEach(el => el.remove());
+
+    // Re-render grid
+    renderRouteGrid();
+
+    // Show toast
+    showToast("✅ 路线「" + title + "」已上传！在路线列表中查看");
+
+    // Unlock collector achievement if applicable
+    if (Object.keys(customRoutes).length >= 1) {
+        unlockAchievement("collector");
+    }
+}
+
+// ═══════════════════════════════════════
+//  Delete Custom Route
+// ═══════════════════════════════════════
+
+function handleDeleteCustomRoute(key) {
+    if (!customRoutes[key]) return;
+    const r = routes[key];
+    if (!r) return;
+
+    if (!confirm("确定要删除路线「" + r.title + "」吗？此操作不可撤销。")) return;
+
+    // Remove from routes object
+    delete routes[key];
+
+    // Remove from customRoutes
+    delete customRoutes[key];
+    saveCustomRoutesToStorage();
+
+    // Remove from nj_saved_routes
+    try {
+        let saved = JSON.parse(localStorage.getItem("nj_saved_routes") || "[]");
+        saved = saved.filter(s => s.key !== key);
+        localStorage.setItem("nj_saved_routes", JSON.stringify(saved));
+    } catch(e) {}
+
+    // Close sheet & re-render
+    closeSheet();
+    renderRouteGrid();
+    showToast("🗑️ 路线已删除");
+}
 
 function handleSaveRoute(routeKey) {
     const r = routes[routeKey];

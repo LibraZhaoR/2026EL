@@ -4,6 +4,9 @@ import com.nju.travel.common.exception.BusinessException;
 import com.nju.travel.common.result.PageResult;
 import com.nju.travel.module.route.dto.RouteRecommendRequest;
 import com.nju.travel.module.route.dto.UserRouteCreateRequest;
+import com.nju.travel.module.route.entity.CustomRoute;
+import com.nju.travel.module.route.entity.RouteStop;
+import com.nju.travel.module.route.repository.CustomRouteRepository;
 import com.nju.travel.module.route.vo.RouteDetailVO;
 import com.nju.travel.module.route.vo.RoutePointVO;
 import com.nju.travel.module.route.vo.RouteVO;
@@ -15,14 +18,18 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 public class RouteService {
 
-    private final AtomicLong userRouteIdGenerator = new AtomicLong(2000);
-    private final Map<Long, UserRouteVO> userRoutes = new ConcurrentHashMap<>();
+    private final CustomRouteRepository routeRepo;
+
+    public RouteService(CustomRouteRepository routeRepo) {
+        this.routeRepo = routeRepo;
+    }
+
+    // ── Built-in official routes (read-only, static) ──
 
     private final List<RouteVO> routes = List.of(
             new RouteVO(1L, "南大新生校史线：从三江师范到今天", "文化", 150, 0, 50,
@@ -59,6 +66,8 @@ public class RouteService {
             )
     );
 
+    // ── Built-in route queries ──
+
     public PageResult<RouteVO> listRoutes(String category, Integer durationMinutes, Integer budgetMax, String tag, Integer page, Integer size) {
         List<RouteVO> filtered = routes.stream()
                 .filter(route -> category == null || route.category().equals(category))
@@ -71,7 +80,9 @@ public class RouteService {
 
     public RouteDetailVO getRouteDetail(Long routeId) {
         RouteVO route = findRoute(routeId);
-        return new RouteDetailVO(route, route.routeId() == 1L ? "从 1902 到 2026 的南大历史线" : "城市剧情体验", routePoints.getOrDefault(routeId, List.of()));
+        return new RouteDetailVO(route,
+                route.routeId() == 1L ? "从 1902 到 2026 的南大历史线" : "城市剧情体验",
+                routePoints.getOrDefault(routeId, List.of()));
     }
 
     public List<RouteVO> recommend(RouteRecommendRequest request) {
@@ -80,79 +91,109 @@ public class RouteService {
                 .toList();
     }
 
-    public UserRouteVO createUserRoute(UserRouteCreateRequest request) {
-        UserRouteVO userRoute = new UserRouteVO(
-                userRouteIdGenerator.incrementAndGet(),
-                request.userId(),
-                request.sourceRouteId(),
-                request.title(),
-                request.description(),
-                Boolean.TRUE.equals(request.isPublic()),
-                request.pointIds() == null ? new ArrayList<>() : request.pointIds(),
-                LocalDateTime.now()
-        );
-        userRoutes.put(userRoute.userRouteId(), userRoute);
-        return userRoute;
-    }
-
-    public UserRouteVO copyRoute(Long routeId, Long userId) {
-        RouteVO route = findRoute(routeId);
-        UserRouteCreateRequest request = new UserRouteCreateRequest(
-                userId,
-                routeId,
-                route.title() + "（我的复刻版）",
-                "基于公开路线复刻，可继续编辑点位和备注。",
-                false,
-                routePoints.getOrDefault(routeId, List.of()).stream().map(RoutePointVO::pointId).toList()
-        );
-        return createUserRoute(request);
-    }
-
     public List<RouteVO> popularCopies() {
         return routes.stream().filter(RouteVO::official).toList();
     }
 
-    public List<UserRouteVO> listUserRoutes(Long userId) {
-        return userRoutes.values().stream()
-                .filter(ur -> ur.userId().equals(userId))
-                .toList();
-    }
-
-    public void deleteUserRoute(Long userRouteId, Long userId) {
-        UserRouteVO route = userRoutes.get(userRouteId);
-        if (route == null) throw new BusinessException(404, "路线不存在");
-        if (!route.userId().equals(userId)) throw new BusinessException(403, "无权删除");
-        userRoutes.remove(userRouteId);
-    }
-
     private RouteVO findRoute(Long routeId) {
-        return routes.stream()
-                .filter(route -> route.routeId().equals(routeId))
-                .findFirst()
+        return routes.stream().filter(r -> r.routeId().equals(routeId)).findFirst()
                 .orElseThrow(() -> new BusinessException(404, "路线不存在"));
     }
 
     private int score(RouteVO route, RouteRecommendRequest request) {
         int score = 0;
-        if (request.durationMinutes() != null && route.durationMinutes() <= request.durationMinutes()) {
-            score += 30;
-        }
-        if (request.budgetMax() != null && route.budgetMax() <= request.budgetMax()) {
-            score += 20;
-        }
-        if (request.crowdType() != null && route.crowdTags().contains(request.crowdType())) {
-            score += 20;
-        }
+        if (request.durationMinutes() != null && route.durationMinutes() <= request.durationMinutes()) score += 30;
+        if (request.budgetMax() != null && route.budgetMax() <= request.budgetMax()) score += 20;
+        if (request.crowdType() != null && route.crowdTags().contains(request.crowdType())) score += 20;
         if (request.interestTags() != null) {
-            for (String tag : request.interestTags()) {
-                if (route.tags().contains(tag)) {
-                    score += 10;
-                }
-            }
+            for (String tag : request.interestTags()) if (route.tags().contains(tag)) score += 10;
         }
-        if (request.mood() != null && route.title().contains("午后")) {
-            score += 5;
-        }
+        if (request.mood() != null && route.title().contains("午后")) score += 5;
         return score;
+    }
+
+    // ── Custom route CRUD (backed by H2 database) ──
+
+    public UserRouteVO createUserRoute(UserRouteCreateRequest request) {
+        CustomRoute entity = new CustomRoute(
+                request.userId(), request.sourceRouteId(),
+                request.title(), request.description(),
+                Boolean.TRUE.equals(request.isPublic()));
+        entity = routeRepo.save(entity);
+        return toUserRouteVO(entity);
+    }
+
+    public UserRouteVO saveCustomRoute(Long userId, String title, String description, String coverUrl) {
+        CustomRoute entity = new CustomRoute(userId, null, title, description, false);
+        entity = routeRepo.save(entity);
+        return toUserRouteVO(entity);
+    }
+
+    public UserRouteVO copyRoute(Long routeId, Long userId) {
+        RouteVO route = findRoute(routeId);
+        CustomRoute entity = new CustomRoute(userId, routeId, route.title() + "（我的复刻版）",
+                "基于公开路线复刻", false);
+        // Copy route points as stops
+        List<RoutePointVO> pts = routePoints.getOrDefault(routeId, List.of());
+        List<RouteStop> stops = new ArrayList<>();
+        for (RoutePointVO p : pts) {
+            stops.add(new RouteStop(entity, p.name(), p.sortOrder(), p.intro(), p.latitude(), p.longitude()));
+        }
+        entity.setStops(stops);
+        entity = routeRepo.save(entity);
+        return toUserRouteVO(entity);
+    }
+
+    public List<UserRouteVO> listUserRoutes(Long userId) {
+        return routeRepo.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(this::toUserRouteVO).collect(Collectors.toList());
+    }
+
+    public UserRouteVO getUserRoute(Long userRouteId) {
+        CustomRoute entity = routeRepo.findById(userRouteId)
+                .orElseThrow(() -> new BusinessException(404, "路线不存在"));
+        return toUserRouteVO(entity);
+    }
+
+    public com.nju.travel.module.route.vo.UserRouteDetailVO getUserRouteDetail(Long userRouteId) {
+        CustomRoute entity = routeRepo.findById(userRouteId)
+                .orElseThrow(() -> new BusinessException(404, "路线不存在"));
+        List<com.nju.travel.module.route.vo.UserRouteDetailVO.RouteStopInfo> stops =
+                entity.getStops().stream()
+                        .map(s -> new com.nju.travel.module.route.vo.UserRouteDetailVO.RouteStopInfo(
+                                s.getId(), s.getName(), s.getSortOrder(), s.getDetail(),
+                                s.getLatitude(), s.getLongitude()))
+                        .toList();
+        return new com.nju.travel.module.route.vo.UserRouteDetailVO(
+                entity.getId(), entity.getUserId(), entity.getTitle(),
+                entity.getDescription(), stops, entity.getCreatedAt());
+    }
+
+    public void deleteUserRoute(Long userRouteId, Long userId) {
+        CustomRoute entity = routeRepo.findById(userRouteId)
+                .orElseThrow(() -> new BusinessException(404, "路线不存在"));
+        if (!entity.getUserId().equals(userId)) throw new BusinessException(403, "无权删除");
+        routeRepo.delete(entity);
+    }
+
+    // ── Save with stops (for map editor) ──
+
+    public UserRouteVO saveCustomRouteWithStops(Long userId, String title, String description,
+                                                 List<RouteStop> stops) {
+        CustomRoute route = new CustomRoute(userId, null, title, description, false);
+        for (RouteStop s : stops) s.setRoute(route);
+        route.setStops(stops);
+        route = routeRepo.save(route);
+        return toUserRouteVO(route);
+    }
+
+    // ── DTO conversion ──
+
+    private UserRouteVO toUserRouteVO(CustomRoute entity) {
+        List<Long> pointIds = entity.getStops().stream()
+                .map(RouteStop::getId).collect(Collectors.toList());
+        return new UserRouteVO(entity.getId(), entity.getUserId(), entity.getSourceRouteId(),
+                entity.getTitle(), entity.getDescription(), entity.getIsPublic(),
+                pointIds, entity.getCreatedAt());
     }
 }

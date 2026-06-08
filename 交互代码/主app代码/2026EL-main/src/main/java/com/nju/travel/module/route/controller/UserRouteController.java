@@ -34,6 +34,12 @@ public class UserRouteController {
         return ApiResult.success(routeService.listUserRoutes(userId));
     }
 
+    @GetMapping("/{userRouteId}/detail")
+    public ApiResult<com.nju.travel.module.route.vo.UserRouteDetailVO> getUserRouteDetail(
+            @PathVariable Long userRouteId) {
+        return ApiResult.success(routeService.getUserRouteDetail(userRouteId));
+    }
+
     @DeleteMapping("/{userRouteId}")
     public ApiResult<Void> deleteUserRoute(@PathVariable Long userRouteId, @RequestParam Long userId) {
         routeService.deleteUserRoute(userRouteId, userId);
