@@ -303,7 +303,7 @@ function renderRoute(coords, dist, dur, steps) {
 async function handleSave() {
     const origin=state.points.find(p=>p.type==='origin'), dest=state.points.find(p=>p.type==='destination');
     const wps=state.points.filter(p=>p.type==='waypoint');
-    // Build stops array for map display
+    if(!origin||!dest) return alert('请先完成路径规划');
     const allStops = [origin, ...wps, dest].filter(Boolean).map(p => ({
         name: p.name, lnglat: p.lnglat
     }));
@@ -315,17 +315,39 @@ async function handleSave() {
         transportMode:document.getElementById('transport-mode').value,
         totalDistance:state.lastResult.distance,
         totalDuration:state.lastResult.duration,
-        // Include path coords and stops for map display
         pathCoords: state.pathCoords || [],
         stops: allStops
     };
     const btn=document.getElementById('save-btn'); btn.innerText='正在同步...';
+    let savedToLegacy = false, savedToRouteDb = false;
+    // 1. 保存到原有系统 (H2)
     try {
         const res=await fetch('/api/custom-route/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
-        if(res.code===200){ btn.innerText='✅ 已同步至灵动金陵'; btn.style.background='#2E8B57';
-        if(parent!==window) parent.postMessage({type:'route-saved',data:payload},'*'); }
-    } catch(e) { alert('离线模式: 数据已就绪'); btn.innerText='✅ 已同步 (离线)';
-        if(parent!==window) parent.postMessage({type:'route-saved',data:payload},'*'); }
+        if(res.code===200) savedToLegacy = true;
+    } catch(e) { console.warn('原有存储失败:', e.message); }
+    // 2. 同步到路线数据库 (带起点/终点/途径点经纬度)
+    try {
+        const allPts = [origin, ...wps, dest].filter(Boolean);
+        const routeDbPoints = allPts.map((p, i) => {
+            const [lng, lat] = p.lnglat.split(',').map(Number);
+            return { name: p.name, address: '', latitude: lat, longitude: lng, sort_order: i,
+                point_type: i === 0 ? 'start' : (i === allPts.length - 1 ? 'end' : 'waypoint'),
+                description: '', stay_minutes: 30 };
+        });
+        const dbPayload = { title: document.getElementById('route-name').value,
+            description: state.lastResult ? (state.lastResult.distance/1000).toFixed(1)+'km - '+Math.ceil(state.lastResult.duration/60)+'min' : '',
+            category: '自定义', duration_min: state.lastResult ? Math.ceil(state.lastResult.duration/60) : 0,
+            budget_min: 0, budget_max: 0, crowd_tags: [], interest_tags: [],
+            user_id: 'local-user', is_public: false, points: routeDbPoints };
+        const dbRes = await fetch('/api/route-db/routes',
+            {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dbPayload)}).then(r=>r.json());
+        if(dbRes.id) savedToRouteDb = true;
+    } catch(e) { console.warn('路线数据库同步失败:', e.message); }
+    // 反馈结果
+    if (savedToRouteDb) { btn.innerText='已同步至路线数据库'; btn.style.background='#2E8B57'; }
+    else if (savedToLegacy) { btn.innerText='已同步(原有系统)'; btn.style.background='#F0AD4E'; }
+    else { btn.innerText='同步失败，请检查网络'; btn.style.background='#D70015'; }
+    if(parent!==window) parent.postMessage({type:'route-saved',data:payload},'*');
 }
 
 window.onload = init;

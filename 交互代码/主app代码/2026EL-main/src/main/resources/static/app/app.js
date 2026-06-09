@@ -1798,7 +1798,6 @@ function loadCustomRoutes() {
                 hasMapData: !!(cr.coords && cr.coords.length)
             };
             customRoutes[key] = cr;
-            // Restore map data for routes created via map editor
             if (cr.coords && cr.coords.length) {
                 ROUTE_MAP_DATA[key] = {
                     coords: cr.coords,
@@ -1808,6 +1807,54 @@ function loadCustomRoutes() {
         });
         CUSTOM_ROUTE_COUNTER = saved.length;
     } catch(e) { customRoutes = {}; }
+
+    // 异步同步路线数据库中的用户路线
+    syncRoutesFromRouteDb();
+}
+
+// ── 从路线数据库拉取用户路线并合并 ──
+async function syncRoutesFromRouteDb() {
+    try {
+        const res = await fetch('/api/route-db/routes?is_official=0&user_id=local-user&size=50');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.items || !data.items.length) return;
+
+        for (const rt of data.items) {
+            // 转换为 app 内部格式
+            const points = rt.points || [];
+            const stops = points.map(p => ({
+                name: p.name,
+                detail: p.description || p.address || '',
+                story: p.description || ''
+            }));
+            const key = "rdb_" + rt.id;
+            const duration = rt.duration_min || 120;
+            const budget = rt.budget_max > 0 ? (rt.budget_min + ' - ' + rt.budget_max + ' 元') : '自由预算';
+
+            routes[key] = {
+                title: rt.title,
+                desc: rt.description || '来自路线数据库',
+                meta: [duration + ' 分钟', rt.category || '自定义', budget],
+                duration: duration,
+                stops: stops,
+                isCustom: true,
+                fromRouteDb: true,
+                routeDbId: rt.id,
+                budget: budget,
+                hasMapData: points.length > 0
+            };
+            // 地图数据
+            if (points.length > 0) {
+                ROUTE_MAP_DATA[key] = {
+                    coords: points.map(p => [p.latitude, p.longitude]),
+                    stops: points.map(p => p.name)
+                };
+            }
+        }
+    } catch(e) {
+        console.warn('路线数据库同步失败:', e.message);
+    }
 }
 
 function saveCustomRoutesToStorage() {
@@ -1888,6 +1935,65 @@ function saveCustomRouteFromEditor(d) {
 
     saveCustomRoutesToStorage();
     CUSTOM_ROUTE_COUNTER++;
+
+    // 异步同步到路线数据库
+    syncToRouteDb(d, mapCoords, stopNames, duration);
+}
+
+// ── 将路线编辑器的数据同步到路线数据库 ──
+async function syncToRouteDb(d, mapCoords, stopNames, duration) {
+    try {
+        const points = [];
+        const allPts = d.stops && d.stops.length ? d.stops : [];
+        allPts.forEach((stop, i) => {
+            let lat, lng;
+            if (stop.lnglat) {
+                const parts = stop.lnglat.split(',');
+                lng = parseFloat(parts[0]);
+                lat = parseFloat(parts[1]);
+            } else if (mapCoords[i]) {
+                lat = mapCoords[i][0];
+                lng = mapCoords[i][1];
+            }
+            if (!isNaN(lat) && !isNaN(lng)) {
+                points.push({
+                    name: stop.name || ('点位'+(i+1)),
+                    address: '',
+                    latitude: lat,
+                    longitude: lng,
+                    sort_order: i,
+                    point_type: i === 0 ? 'start' : (i === allPts.length - 1 ? 'end' : 'waypoint'),
+                    description: stop.detail || '',
+                    stay_minutes: 30
+                });
+            }
+        });
+
+        if (points.length < 2) return;
+
+        const body = {
+            title: d.routeName || '自定义路线',
+            description: (d.transportMode === 'walking' ? '步行' : '驾车') + ' · ' +
+                (d.totalDistance ? (d.totalDistance/1000).toFixed(1)+'km' : '') + ' · ' + stopNames.length + '站',
+            category: '自定义',
+            duration_min: duration,
+            budget_min: 0,
+            budget_max: 0,
+            crowd_tags: [],
+            interest_tags: [],
+            user_id: 'local-user',
+            is_public: false,
+            points: points
+        };
+
+        await fetch('/api/route-db/routes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    } catch(e) {
+        console.warn('路线数据库后台同步失败:', e.message);
+    }
 }
 
 function getAllDisplayRouteKeys() {

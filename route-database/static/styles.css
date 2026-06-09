@@ -1,0 +1,491 @@
+/* ══════════════════════════════════════════════════════
+   灵动金陵 · 路线规划 — 样式
+   ══════════════════════════════════════════════════════ */
+
+:root {
+  --surface: #fdfae7;
+  --primary: #9a442d;
+  --primary-light: #e07a5f;
+  --secondary: #3d405b;
+  --sage: #81b29a;
+  --gold: #d4af37;
+  --border: #e6e3d0;
+  --text: #1c1c11;
+  --text-dim: #88726d;
+  --radius: 0.75rem;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  display: flex;
+  height: 100vh;
+  font-family: "Source Sans 3", "Source Han Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* ── 侧边栏 ────────────────────────────────────────── */
+
+#sidebar {
+  width: 420px;
+  min-width: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  z-index: 1000;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+#sidebar-header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--surface), #f7f4e1);
+}
+
+#sidebar-header h1 {
+  font-family: "Epilogue", "PingFang SC", sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+/* ── 标签页 ────────────────────────────────────────── */
+
+#sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.tab.active {
+  color: var(--primary);
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+}
+
+.tab:hover { color: var(--primary); }
+
+/* ── 面板共用 ──────────────────────────────────────── */
+
+.panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* ── 筛选 ──────────────────────────────────────────── */
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-row input,
+.filter-row select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  background: white;
+  color: var(--text);
+  outline: none;
+  transition: border 0.2s;
+}
+
+.filter-row input:focus,
+.filter-row select:focus {
+  border-color: var(--primary-light);
+}
+
+.filter-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* ── 路线卡片 ──────────────────────────────────────── */
+
+.route-card {
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.route-card:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 2px 8px rgba(154, 68, 45, 0.1);
+  transform: translateY(-1px);
+}
+
+.route-card.selected {
+  border-color: var(--primary);
+  background: #fef9f7;
+}
+
+.route-card .title {
+  font-family: "Epilogue", "PingFang SC", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--secondary);
+}
+
+.route-card .meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.route-card .meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.route-card .badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.badge-official {
+  background: var(--gold);
+  color: white;
+}
+
+.badge-user {
+  background: var(--sage);
+  color: white;
+}
+
+/* ── 表单 ──────────────────────────────────────────── */
+
+#create-form label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+#create-form input[type="text"],
+#create-form input[type="number"],
+#create-form textarea,
+#create-form select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: inherit;
+  background: white;
+  outline: none;
+  transition: border 0.2s;
+}
+
+#create-form input:focus,
+#create-form textarea:focus,
+#create-form select:focus {
+  border-color: var(--primary-light);
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-col {
+  flex: 1;
+}
+
+.map-tip {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f7f4e1;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--secondary);
+  border-left: 3px solid var(--gold);
+}
+
+#point-list {
+  margin-top: 12px;
+}
+
+.point-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.point-item .order {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.point-item .order.start { background: var(--sage); }
+.point-item .order.waypoint { background: var(--primary-light); }
+.point-item .order.end { background: var(--secondary); }
+
+.point-item .info { flex: 1; min-width: 0; }
+.point-item .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.point-item .coords { font-size: 11px; color: var(--text-dim); }
+
+.point-item .remove {
+  width: 24px; height: 24px;
+  border: none; background: #ffdad6;
+  color: var(--primary);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.point-item .remove:hover { background: #ffb4ab; }
+
+.btn-primary {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover { background: var(--primary-light); }
+
+.switch-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+
+/* ── 详情面板 ──────────────────────────────────────── */
+
+#detail-content {
+  font-size: 14px;
+}
+
+#detail-content h3 {
+  font-family: "Epilogue", "PingFang SC", sans-serif;
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--secondary);
+}
+
+#detail-content .desc {
+  color: var(--text-dim);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+#detail-content .stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+#detail-content .stat {
+  padding: 6px 12px;
+  background: #f7f4e1;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#detail-content .points-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--secondary);
+}
+
+.detail-point {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+}
+
+.detail-point:last-child { border-bottom: none; }
+
+.detail-point .dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.detail-point .dot.start { background: var(--sage); }
+.detail-point .dot.waypoint { background: var(--primary-light); }
+.detail-point .dot.end { background: var(--secondary); }
+
+.detail-point .info { flex: 1; }
+.detail-point .pname { font-weight: 600; }
+.detail-point .paddr { font-size: 12px; color: var(--text-dim); }
+.detail-point .pdesc { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.detail-point .pstay { font-size: 11px; color: var(--sage); margin-top: 2px; }
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.btn-secondary, .btn-danger {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-secondary:hover { background: #d5d2c0; }
+.btn-danger { background: #ffdad6; color: var(--primary); }
+.btn-danger:hover { background: #ffb4ab; }
+
+/* ── 地图 ──────────────────────────────────────────── */
+
+#map {
+  flex: 1;
+  height: 100vh;
+  z-index: 0;
+}
+
+/* Leaflet 标记弹出层美化 */
+.leaflet-popup-content {
+  font-family: "Source Sans 3", "PingFang SC", "Microsoft YaHei", sans-serif !important;
+  font-size: 13px !important;
+}
+
+.leaflet-popup-content strong {
+  font-family: "Epilogue", "PingFang SC", sans-serif;
+}
+
+/* ── 模式指示器 ────────────────────────────────────── */
+
+#mode-indicator {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: var(--primary);
+  color: white;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(154, 68, 45, 0.4);
+}
+
+#mode-cancel {
+  padding: 4px 12px;
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 15px;
+  background: transparent;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#mode-cancel:hover { background: rgba(255,255,255,0.2); }
+
+/* ── 响应式 ────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  body { flex-direction: column; }
+  #sidebar { width: 100%; min-width: 100%; max-height: 45vh; }
+  #map { height: 55vh; }
+}
