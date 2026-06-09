@@ -25,6 +25,11 @@
         .waypoint-item { display:flex; align-items:center; gap:8px; margin-top:6px; animation:slideIn 0.3s; }
         @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .waypoint-item input { flex:1; }
+        .waypoint-item.sorting { opacity:0.4; }
+        .waypoint-item.drag-over { border-top:2px solid var(--primary); }
+        .waypoint-item .drag-handle { cursor:grab; font-size:16px; color:#AEAEB2; padding:0 2px; user-select:none; }
+        .waypoint-item .drag-handle:active { cursor:grabbing; }
+        .waypoint-sort-hint { font-size:11px; color:#AEAEB2; text-align:center; padding:2px 0 6px; }
         .btn-row { display:flex; gap:6px; }
         .btn-row button { flex:1; }
         .btn-group { padding:16px 20px; background:#fff; border-top:1px solid rgba(0,0,0,0.05); display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -80,6 +85,20 @@
                 border:1px solid #EBEBEB;
             }
         }
+        .re-loading { position:absolute; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#F5F5F7; gap:12px; }
+        .re-loading.hide { display:none; }
+        .re-loading-spinner { width:32px; height:32px; border-radius:50%; border:3px solid rgba(0,102,204,0.15); border-top-color:var(--primary); animation:reSpin 0.8s linear infinite; }
+        @keyframes reSpin { to { transform:rotate(360deg); } }
+        .re-loading-text { font-size:13px; color:#6E6E73; font-weight:500; }
+        /* ── 规划完成后折叠输入卡片 ── */
+        .sidebar-content.planned .input-card { display:none; }
+        .sidebar-content.planned .route-planned-summary { display:flex; }
+        .route-planned-summary { display:none; align-items:center; gap:8px; padding:10px 16px; background:#F5F5F7; border-radius:10px; margin-bottom:10px; flex-wrap:wrap; font-size:13px; }
+        .route-planned-summary .badge { padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; color:#fff; }
+        .route-planned-summary .badge.green { background:var(--success); }
+        .route-planned-summary .badge.yellow { background:var(--warning); }
+        .route-planned-summary .badge.red { background:var(--danger); }
+        .route-planned-summary .btn-edit { margin-left:auto; font-size:11px; padding:4px 10px; border-radius:8px; border:1px solid #ddd; background:#fff; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -123,6 +142,10 @@
 </div>
 <div class="map-container">
     <div class="map-tip" id="mode-tip">📍 请点击地图设置【起点】</div>
+    <div class="re-loading" id="re-loading">
+        <div class="re-loading-spinner"></div>
+        <div class="re-loading-text">地图加载中…</div>
+    </div>
     <div id="map"></div>
 </div>
 <script>
@@ -136,6 +159,14 @@ const state = { map:null, editMode:'origin', points:[], polyline:null, lastResul
 function init() {
     state.map = new AMap.Map('map', { zoom:14, center:[118.796,32.060], mapStyle:'amap://styles/normal' });
     state.map.on('click', handleMapClick);
+    // Hide loading overlay once map renders
+    var loadingEl = document.getElementById('re-loading');
+    var hideLoading = function() {
+        if (loadingEl) loadingEl.classList.add('hide');
+        state.map.off('complete', hideLoading);
+    };
+    state.map.on('complete', hideLoading);
+    setTimeout(hideLoading, 5000); // safety timeout
     setEditMode('origin');
 }
 
@@ -181,23 +212,98 @@ function syncUI() {
     const wps = state.points.filter(p=>p.type==='waypoint');
     const c = document.getElementById('waypoints-container');
     if (!wps.length) { c.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:8px;">点击地图添加</div>'; }
-    else { c.innerHTML = wps.map((p,i)=>'<div class="waypoint-item"><div class="point-badge" style="background:var(--warning)">'+(i+1)+'</div><input value="'+p.name+'" onchange="handleWPName('+i+',this.value)"><button class="btn-danger" onclick="event.stopPropagation();removeWP('+i+')">✕</button></div>').join(''); }
+    else {
+        c.innerHTML = '<div class="waypoint-sort-hint">≡ 拖动 ↔ 调整顺序</div>'
+            + wps.map((p,i)=>'<div class="waypoint-item" draggable="true" data-wp-index="'+i+'"><span class="drag-handle">≡</span><div class="point-badge" style="background:var(--warning)">'+(i+1)+'</div><input value="'+p.name+'" onchange="handleWPName('+i+',this.value)"><button class="btn-danger" onclick="event.stopPropagation();removeWP('+i+')">✕</button></div>').join('');
+        // Attach drag events via delegation
+        setupWaypointDrag(c);
+    }
 }
 
 function handleNameChange(type) { const p = state.points.find(p=>p.type===type); if(p){ p.name=document.getElementById(type+'-name').value; p.customNamed=true; } }
 function handleWPName(i,v) { const w=state.points.filter(p=>p.type==='waypoint'); if(w[i]){ w[i].name=v; w[i].customNamed=true; } }
 function removeExistingPoint(type) { const i=state.points.findIndex(p=>p.type===type); if(i>-1){ state.points[i].marker.setMap(null); state.points.splice(i,1); } }
 function removeWP(i) { const w=state.points.filter(p=>p.type==='waypoint'); w[i].marker.setMap(null); state.points=state.points.filter(p=>p!==w[i]); syncUI(); clearRoute(); }
+
+// ── Drag-to-reorder waypoints ──
+var _dragWpIdx = null;
+function setupWaypointDrag(container) {
+    // Use event delegation instead of per-item listeners
+    container.ondragstart = function(e) {
+        var item = e.target.closest('.waypoint-item');
+        if (!item) return;
+        _dragWpIdx = parseInt(item.dataset.wpIndex);
+        item.classList.add('sorting');
+        e.dataTransfer.effectAllowed = 'move';
+    };
+    container.ondragend = function(e) {
+        var item = e.target.closest('.waypoint-item');
+        if (item) item.classList.remove('sorting');
+        container.querySelectorAll('.waypoint-item').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+        _dragWpIdx = null;
+    };
+    container.ondragover = function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var target = e.target.closest('.waypoint-item');
+        if (!target) return;
+        container.querySelectorAll('.waypoint-item').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+        target.classList.add('drag-over');
+    };
+    container.ondrop = function(e) {
+        e.preventDefault();
+        container.querySelectorAll('.waypoint-item').forEach(function(el) {
+            el.classList.remove('drag-over', 'sorting');
+        });
+        if (_dragWpIdx === null) return;
+        var target = e.target.closest('.waypoint-item');
+        if (!target) return;
+        var toIdx = parseInt(target.dataset.wpIndex);
+        if (_dragWpIdx === toIdx) return;
+        // Get current waypoints in order
+        var wps = state.points.filter(function(p) { return p.type === 'waypoint'; });
+        if (_dragWpIdx >= wps.length || toIdx >= wps.length) return;
+        // Remove dragged waypoint from array, re-insert at new position
+        var moved = wps.splice(_dragWpIdx, 1)[0];
+        wps.splice(toIdx, 0, moved);
+        // Rebuild state.points: origin + reordered waypoints + destination
+        var origin = state.points.find(function(p) { return p.type === 'origin'; });
+        var dest = state.points.find(function(p) { return p.type === 'destination'; });
+        state.points = [origin].concat(wps).concat(dest ? [dest] : []);
+        // Re-number markers to reflect new order
+        var colors = { origin:'#2ecc71', waypoint:'#f1c40f', destination:'#e74c3c' };
+        wps.forEach(function(p, i) {
+            p.marker.setContent('<div style="background:'+colors.waypoint+';color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:12px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.2);font-weight:bold;">'+(i+1)+'</div>');
+        });
+        syncUI();
+        clearRoute();
+    };
+}
 function resetPoints(type) { state.points.filter(p=>p.type===type).forEach(p=>p.marker.setMap(null)); state.points=state.points.filter(p=>p.type!==type); syncUI(); clearRoute(); }
 function undoLast() { if(!state.points.length) return; state.points.pop().marker.setMap(null); syncUI(); clearRoute(); }
 function clearAll() { state.points.forEach(p=>p.marker.setMap(null)); state.points=[]; clearRoute(); syncUI(); setEditMode('origin'); }
-function clearRoute() { if(state.polyline){ state.polyline.setMap(null); state.polyline=null; } state.lastResult=null; document.getElementById('result-area').innerHTML=''; document.getElementById('save-btn').style.display='none'; }
+function expandRouteCards() { document.querySelector('.sidebar-content')?.classList.remove('planned'); }
+function clearRoute() { if(state.polyline){ state.polyline.setMap(null); state.polyline=null; } state.lastResult=null; document.getElementById('result-area').innerHTML=''; document.getElementById('save-btn').style.display='none'; document.querySelector('.sidebar-content')?.classList.remove('planned'); }
 
 async function executePlanning() {
     const origin = state.points.find(p=>p.type==='origin');
-    const dest = state.points.find(p=>p.type==='destination');
-    const wps = state.points.filter(p=>p.type==='waypoint');
-    if(!origin||!dest) return alert('请至少设置起点和终点！');
+    let dest = state.points.find(p=>p.type==='destination');
+    let wps = state.points.filter(p=>p.type==='waypoint');
+    // Auto-promote last waypoint to destination if none set
+    if (!dest && wps.length > 0) {
+        const last = wps[wps.length - 1];
+        last.type = 'destination';
+        last.marker._editType = 'destination';
+        dest = last;
+        wps = state.points.filter(p=>p.type==='waypoint');
+        syncUI();
+    }
+    if(!origin) return alert('请先设置起点！');
+    if(!dest) return alert('请设置终点，或添加途经点后自动识别最后一个为终点');
 
     const btn = document.getElementById('plan-btn');
     btn.disabled = true; btn.innerText = '正在计算最佳路径...';
@@ -298,6 +404,23 @@ function renderRoute(coords, dist, dur, steps) {
     state.pathCoords = coords.map(c => [c.getLng(), c.getLat()]);
     state.pathStops = state.points.map(p => ({name: p.name, lnglat: p.lnglat}));
     document.getElementById('result-area').innerHTML='<div class="results"><div class="route-stat"><div><b>'+(dist/1000).toFixed(1)+'</b><span>公里</span></div><div><b>'+Math.ceil(dur/60)+'</b><span>预计分钟</span></div><div><b>'+steps.length+'</b><span>段路程</span></div></div><div class="step-list">'+steps.map((s,i)=>'<div class="step-item">'+(i+1)+'. '+s.instruction+'</div>').join('')+'</div></div>';
+    // Collapse origin/waypoint/destination cards into a compact summary
+    var sidebar = document.querySelector('.sidebar-content');
+    if (sidebar) sidebar.classList.add('planned');
+    var summary = sidebar ? sidebar.querySelector('.route-planned-summary') : null;
+    if (!summary) {
+        summary = document.createElement('div');
+        summary.className = 'route-planned-summary';
+        sidebar.insertBefore(summary, document.getElementById('result-area'));
+    }
+    var origin = state.points.find(function(p) { return p.type === 'origin'; });
+    var dest = state.points.find(function(p) { return p.type === 'destination'; });
+    var wpCount = state.points.filter(function(p) { return p.type === 'waypoint'; }).length;
+    summary.innerHTML = '<span class="badge green">起:'+(origin?origin.name:'?')+'</span>'
+        + (wpCount ? '<span class="badge yellow">'+wpCount+'途经</span>' : '')
+        + '<span class="badge red">终:'+(dest?dest.name:'?')+'</span>'
+        + '<span style="color:var(--text2);font-size:11px;">'+(dist/1000).toFixed(1)+'km · '+Math.ceil(dur/60)+'min</span>'
+        + '<button class="btn-edit" onclick="expandRouteCards()">✎ 修改</button>';
 }
 
 async function handleSave() {

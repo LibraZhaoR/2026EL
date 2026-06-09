@@ -175,6 +175,21 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     line-height: 1.6;
     max-width: 24ch;
 }
+.opening-tap-hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: 0.15em;
+    opacity: 0.45;
+    animation: hintPulse 2s ease-in-out infinite;
+}
+@keyframes hintPulse {
+    0%, 100% { opacity: 0.25; transform: translateX(-50%) translateY(0); }
+    50%      { opacity: 0.65; transform: translateX(-50%) translateY(-3px); }
+}
 
 @keyframes fadein {
     from { opacity: 0; transform: translateY(20px); }
@@ -478,7 +493,13 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .poem {
     position: absolute;
-    max-width: 220px;
+    width: auto;
+    max-width: none;
+    padding: 16px 24px;
+    border-radius: 6px;
+    background: rgba(252,251,248,0.35);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 12px rgba(100,85,60,0.06);
     opacity: 0;
     transform: translateY(20px);
     transition: opacity 0.55s ease, transform 0.55s ease;
@@ -506,13 +527,14 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .poem-center-bottom.on { transform: translate(-50%, 0); }
 
 .poem h2 {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
+    font-family: "Noto Serif SC", "KaiTi", "STKaiti", "SimSun", serif;
     font-size: 18px;
-    line-height: 1.6;
-    font-weight: 400;
-    color: var(--ink);
+    line-height: 1.7;
+    font-weight: 380;
+    color: #2C2418;
     margin-bottom: 16px;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 1px rgba(44,36,24,0.1);
 }
 
 .enter {
@@ -2698,6 +2720,21 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     font-size: 11px;
     color: var(--soft);
     margin-top: 2px;
+}
+.route-float-card .float-card-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--soft);
+}
+.route-float-card .float-card-time {
+    font-weight: 600;
+    color: var(--vermillion);
+}
+.route-float-card .float-card-stops-count {
+    color: var(--accent);
 }
 .route-float-card .float-card-stops {
     display: flex;
@@ -7105,3 +7142,208 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .guide-block-card {
     background: linear-gradient(135deg, #FFE0D0 0%, #FFF8E0 40%, #E0F0FF 70%, #F0E0FF 100%);
 }
+
+/* ═══ 地图加载进度条 ═══ */
+.map-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.map-loading-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(24,33,43,0.5);
+    backdrop-filter: blur(8px);
+}
+.map-loading-box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 40px;
+    border-radius: 20px;
+    background: rgba(252,252,251,0.95);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+.map-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid rgba(201,168,76,0.2);
+    border-top-color: var(--vermillion);
+    animation: ml-spin 0.8s linear infinite;
+}
+@keyframes ml-spin {
+    to { transform: rotate(360deg); }
+}
+.map-loading-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+}
+.map-loading-bar {
+    width: 200px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(201,168,76,0.15);
+    overflow: hidden;
+}
+.map-loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--vermillion), #D8A94A);
+    transition: width 0.4s ease;
+}
+.map-loading-pct {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--soft);
+}
+
+/* ═══ 地图恢复路线面板按钮 ═══ */
+.map-restore-btn {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    z-index: 100;
+    padding: 8px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(201,168,76,0.2);
+    background: rgba(252,252,251,0.92);
+    backdrop-filter: blur(12px);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    opacity: 0;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: auto;
+}
+.map-restore-btn.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.map-restore-btn span {
+    display: inline-block;
+    margin-right: 4px;
+    animation: restoreBounce 1.2s ease-in-out infinite;
+}
+@keyframes restoreBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+.map-restore-btn:active {
+    transform: translateX(-50%) scale(0.95);
+}
+
+/* ═══ 路线信息弹窗 ═══ */
+#route-info-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+#route-info-popup.show { opacity: 1; }
+#route-info-popup .rip-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(24,33,43,0.3);
+    backdrop-filter: blur(4px);
+}
+#route-info-popup .rip-box {
+    position: relative;
+    max-width: 320px;
+    width: 85vw;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 24px;
+    border-radius: 20px;
+    background: rgba(252,252,251,0.97);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+    animation: ripIn 0.35s cubic-bezier(0.22,0.61,0.36,1);
+}
+@keyframes ripIn {
+    from { transform: translateY(30px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+#route-info-popup .rip-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 18px;
+    color: var(--faint);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+#route-info-popup .rip-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 12px;
+    padding-right: 30px;
+    line-height: 1.4;
+}
+#route-info-popup .rip-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+#route-info-popup .rip-tag {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(78,126,122,0.1);
+    color: var(--accent);
+    font-weight: 500;
+}
+#route-info-popup .rip-desc {
+    font-size: 12px;
+    color: var(--soft);
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+#route-info-popup .rip-stops {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+#route-info-popup .rip-stops li {
+    position: relative;
+    padding: 8px 12px 8px 28px;
+    font-size: 12px;
+    color: var(--ink);
+    background: rgba(224,225,221,0.25);
+    border-radius: 8px;
+    line-height: 1.4;
+}
+#route-info-popup .rip-stops li::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--vermillion);
+    transform: translateY(-50%);
+}
+#route-info-popup .rip-stops li:first-child::before { background: var(--success); width: 8px; height: 8px; }
+#route-info-popup .rip-stops li:last-child::before { background: var(--danger); width: 8px; height: 8px; }

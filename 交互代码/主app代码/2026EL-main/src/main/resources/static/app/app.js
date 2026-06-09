@@ -2095,7 +2095,18 @@ function showStopStory(routeKey, stopIndex) {
 document.querySelectorAll(".enter").forEach(btn => {
     btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        openRoute(btn.dataset.route);
+        var routeKey = btn.dataset.route;
+        // Also show the route on the home page map when clicked from ink-wash scene
+        openRoute(routeKey);
+        if (!mainPageShown) {
+            // Transition to main page first, then show route on map
+            var po = document.getElementById("opening");
+            if (po) po.classList.add("dismissed");
+            showMainPage();
+            setTimeout(function() { showRouteOnMap(routeKey); }, 600);
+        } else {
+            setTimeout(function() { showRouteOnMap(routeKey); }, 300);
+        }
     });
 });
 sheet.addEventListener("click", (e) => {
@@ -2529,6 +2540,25 @@ function proceedToMain() {
         personaSwiper.style.display = "none";
         personaSwiper.classList.remove("entering", "leaving");
         showMainPage();
+        // Re-render carousel with persona-matched ordering
+        setTimeout(function() {
+            renderCarouselCards();
+            // Scroll to matched card
+            var matchedKey = (personaCards.find(function(p) { return p.id === selectedPersonaId; }) || {}).routeKey;
+            if (matchedKey) {
+                var cards = document.querySelectorAll("#carousel-track .route-launch-card");
+                for (var ci = 0; ci < cards.length; ci++) {
+                    if (cards[ci].dataset.route === matchedKey) {
+                        var carousel = document.getElementById("route-carousel");
+                        if (carousel) {
+                            var cardW = carousel.clientWidth * 0.38 + 12;
+                            carousel.scrollTo({ left: ci * cardW, behavior: "smooth" });
+                        }
+                        break;
+                    }
+                }
+            }
+        }, 100);
     }, 350);
 }
 
@@ -2700,6 +2730,21 @@ function showMainPage() {
         if (e.target === e.currentTarget) closeInviteResult();
     });
 
+    // Map restore button — reveal route cards panel
+    var restoreBtn = document.getElementById("map-restore-btn");
+    if (restoreBtn) {
+        restoreBtn.addEventListener("click", function() {
+            var snapScroll = document.getElementById("snap-scroll");
+            if (snapScroll) {
+                snapScroll.classList.remove("hidden-by-map");
+                snapScroll.style.transform = "";
+                snapScroll.style.transition = "";
+            }
+            restoreBtn.classList.remove("show");
+            restoreBtn.style.display = "none";
+        });
+    }
+
     // ── Setup scroll-triggered animations ──
     setupScrollAnimations();
 
@@ -2713,6 +2758,43 @@ function showMainPage() {
         document.addEventListener(evt, resetPetIdleTimer, { passive: true });
     });
     resetPetIdleTimer();
+
+    // ── Two-finger gesture → hide cards, passthrough to map ──
+    var _snapTouchCount = 0;
+    var _snapScroll = document.getElementById("snap-scroll");
+    if (_snapScroll) {
+        _snapScroll.addEventListener("touchstart", function(e) {
+            _snapTouchCount = e.touches.length;
+        }, { passive: true });
+        _snapScroll.addEventListener("touchmove", function(e) {
+            if (e.touches.length >= 2 && currentTab === "home") {
+                // Two-finger → hide cards, let map handle zoom/pan
+                _snapScroll.style.pointerEvents = "none";
+                _snapScroll.style.transform = "translateY(calc(100% + 60px))";
+                _snapScroll.style.transition = "transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1)";
+                // Show restore btn
+                var rBtn = document.getElementById("map-restore-btn");
+                if (rBtn && rBtn.style.display !== "block") {
+                    rBtn.style.display = "block";
+                    setTimeout(function() { rBtn.classList.add("show"); }, 10);
+                }
+            }
+        }, { passive: true });
+    }
+    // Restore handler for the restore button
+    var rBtn = document.getElementById("map-restore-btn");
+    if (rBtn && !rBtn._bound) {
+        rBtn._bound = true;
+        rBtn.addEventListener("click", function() {
+            if (_snapScroll) {
+                _snapScroll.style.pointerEvents = "";
+                _snapScroll.style.transform = "";
+                _snapScroll.style.transition = "";
+            }
+            rBtn.classList.remove("show");
+            rBtn.style.display = "none";
+        });
+    }
 }
 
 // ═══ Swiss Layout Renderers ═══
@@ -2752,7 +2834,11 @@ function renderRouteLaunchCard(key, route, options = {}) {
         .slice(0, options.compact ? 2 : 3)
         .map(m => `<span>${m}</span>`)
         .join("");
-    const badge = isCustom ? `<span class="route-launch-badge">自定义</span>` : "";
+    const badge = isCustom
+        ? `<span class="route-launch-badge">自定义</span>`
+        : options.recommended
+            ? `<span class="route-launch-badge" style="background:var(--vermillion);color:#fff;">✨ 推荐</span>`
+            : "";
     const action = isCustom ? "查看我的路线" : "查看路线";
 
     return `<div class="route-launch-card${options.carousel ? " carousel-card route-launch-carousel" : ""}${isCustom ? " route-launch-custom" : ""}"
@@ -2999,20 +3085,20 @@ function toggleScrollDrawer() {
 // ── Route marker map data for AMap ──
 const ROUTE_MAP_DATA = {
     nju: {
-        coords: [[32.056, 118.779], [32.057, 118.779]],
-        stops: ["三江师范旧址", "北大楼"]
+        coords: [[32.056, 118.779], [32.057, 118.779], [32.0585, 118.780], [32.060, 118.779]],
+        stops: ["三江师范学堂旧址", "北大楼", "校史馆", "梧桐大道"]
     },
     night: {
         coords: [[32.020, 118.788], [32.021, 118.789], [32.012, 118.791]],
-        stops: ["秦淮河", "夫子庙", "老门东"]
+        stops: ["秦淮河畔", "夫子庙", "老门东"]
     },
     food: {
-        coords: [[32.045, 118.790], [32.046, 118.791]],
-        stops: ["小吃街", "咖啡店"]
+        coords: [[32.045, 118.790], [32.046, 118.791], [32.044, 118.785], [32.048, 118.788]],
+        stops: ["街角咖啡馆", "独立书店", "梧桐小径", "晚餐小馆"]
     },
     expo: {
-        coords: [[32.040, 118.830], [32.039, 118.817]],
-        stops: ["南京博物院", "明故宫遗址"]
+        coords: [[32.040, 118.830], [32.039, 118.817], [32.041, 118.822]],
+        stops: ["南京博物院", "明故宫遗址", "展览特厅"]
     }
 };
 
@@ -3028,6 +3114,8 @@ function initAMap() {
     if (!container) return;
 
     amapInitializing = true;
+    // Show loading bar immediately — hide only after tiles fully render
+    showMapLoading("正在加载地图…");
     let loaderRetryCount = 0;
 
     function tryInit() {
@@ -3035,6 +3123,7 @@ function initAMap() {
             loaderRetryCount += 1;
             if (loaderRetryCount > 30) {
                 console.warn("AMap loader unavailable, using canvas fallback.");
+                hideMapLoading();
                 startCanvasMapFallback();
                 amapInitializing = false;
                 return;
@@ -3065,12 +3154,25 @@ function initAMap() {
                 offset: new AMap.Pixel(10, 60),
             }));
 
-            // ── Map interaction → fade header, restore on idle ──
+            // ── Map interaction → fade header & hide route panel, restore on idle ──
             let mapInteractTimer = null;
             const mainHeader = document.querySelector(".main-header");
+            const snapScroll = document.getElementById("snap-scroll");
+            const mapRestoreBtn = document.getElementById("map-restore-btn");
             const fadeMapUI = () => {
                 if (currentTab !== "home") return;
                 if (mainHeader) mainHeader.style.opacity = "0";
+                // Hide route cards panel on map interaction
+                if (snapScroll && !snapScroll.classList.contains("hidden-by-map")) {
+                    snapScroll.classList.add("hidden-by-map");
+                    snapScroll.style.transform = "translateY(calc(100% + 60px))";
+                    snapScroll.style.transition = "transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1)";
+                }
+                // Show restore hint
+                if (mapRestoreBtn && mapRestoreBtn.style.display !== "block") {
+                    mapRestoreBtn.style.display = "block";
+                    setTimeout(() => mapRestoreBtn.classList.add("show"), 10);
+                }
                 clearTimeout(mapInteractTimer);
                 mapInteractTimer = setTimeout(() => {
                     if (currentTab !== "home") return;
@@ -3088,9 +3190,24 @@ function initAMap() {
 
             // Trigger resize after a frame
             setTimeout(() => amapInstance.resize(), 100);
+            // Wait for map tiles to fully render before hiding loading bar
+            var mapTilesDone = function() {
+                // Let the map settle for a moment after tiles render
+                setTimeout(function() {
+                    hideMapLoading();
+                }, 400);
+                amapInstance.off("complete", mapTilesDone);
+            };
+            amapInstance.on("complete", mapTilesDone);
+            // Safety: hide after 8s even if complete never fires
+            setTimeout(function() {
+                hideMapLoading();
+                amapInstance.off("complete", mapTilesDone);
+            }, 8000);
         }).catch((e) => {
             console.warn("AMap init failed, using canvas fallback:", e);
             // Fallback to canvas map
+            hideMapLoading();
             startCanvasMapFallback();
             amapInitializing = false;
         });
@@ -3151,6 +3268,14 @@ function addAllRouteOverlays(AMap) {
     });
 }
 
+/**
+ * Get the bottom navigation element, falling back to wheel-nav.
+ * Prevents null access errors when .bottom-nav doesn't exist in DOM.
+ */
+function getNavEl() {
+    return document.querySelector(".bottom-nav") || document.querySelector(".wheel-nav");
+}
+
 function toggleMapFullscreen() {
     const container = document.getElementById("main-map-container");
     if (!container) return;
@@ -3166,7 +3291,8 @@ function toggleMapFullscreen() {
             el.style.display = "";
         }
     });
-    document.querySelector(".bottom-nav").style.zIndex = amapFullscreen ? "60" : "10";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = amapFullscreen ? "60" : "10";
 
     if (amapInstance) {
         setTimeout(() => amapInstance.resize(), 50);
@@ -3629,94 +3755,272 @@ let activeRouteOnMap = null;
 let currentRouteKey = null;
 
 function showRouteOnMap(routeKey) {
-    const r = routes[routeKey];
+    var r = routes[routeKey];
     if (!r) return;
 
-    closeSheet();
-
-    // Lazy-init map if not yet loaded
+    // If map not ready, load it first
     if (!amapInstance || !amapReady) {
-        showToast("⏳ 地图加载中，请稍候…");
+        showMapLoading("正在连接地图服务…");
         initAMap();
-        // Retry once after init
-        let retries = 0;
-        const retryInterval = setInterval(() => {
+        var retries = 0;
+        var retryInterval = setInterval(function() {
             if (amapInstance && amapReady) {
                 clearInterval(retryInterval);
+                hideMapLoading();
                 showRouteOnMap(routeKey);
             }
             retries++;
             if (retries > 20) {
                 clearInterval(retryInterval);
-                showToast("地图加载失败，请检查网络");
+                hideMapLoading();
+                showToast("地图加载失败");
             }
         }, 500);
         return;
     }
 
-    // Show map as temporary overlay (map is no longer a main tab)
-    const mapStage = document.getElementById("map-stage");
-    const mapContainer = document.getElementById("main-map-container");
-    const dimOverlay = document.getElementById("map-dim-overlay");
-    const snapScroll = document.getElementById("snap-scroll");
-    const header = document.querySelector(".main-header");
-
-    // Hide all tab content
-    hideAllTabContent();
-
-    // Show map fullscreen
-    if (mapStage) mapStage.style.display = "";
-    if (mapContainer) {
-        mapContainer.style.display = "block";
-        mapContainer.classList.add("amap-fullscreen");
+    // Close sheet if open
+    if (sheet && sheet.classList.contains("open")) {
+        sheet.classList.remove("open");
+        sheetBody.classList.remove("no-scroll");
+        currentRouteKey = null;
     }
-    if (dimOverlay) dimOverlay.style.display = "none";
-    if (snapScroll) snapScroll.style.display = "none";
-    if (header) header.style.display = "none";
 
-    amapFullscreen = true;
-    document.querySelector(".bottom-nav").style.zIndex = "60";
+    // Switch to home tab so the map is visible
+    if (currentTab !== "home") switchTab("home");
 
+    // Remove home page map filter, enable interaction on map
+    var mc = document.getElementById("main-map-container");
+    if (mc) {
+        mc.style.filter = "";
+        mc.style.pointerEvents = "auto";
+    }
+
+    // Draw the route first (may be straight line if not yet planned)
+    clearRouteOverlays();
+    drawRouteOnMap(routeKey);
     activeRouteOnMap = routeKey;
 
-    // Let map settle after resize, then draw
-    setTimeout(() => {
-        clearRouteOverlays();
-        drawRouteOnMap(routeKey);
-        showFloatCard(routeKey);
-    }, 350);
+    // Show route info popup (time, stops, close)
+    showRouteInfoPopup(routeKey);
 
-    // Add map close button if not exists
+    // Ensure close button overlay
     ensureMapCloseBtn();
+
+    // Then asynchronously plan real walking path and redraw
+    if (r && !r.isCustom && !r.fromRouteDb) {
+        var mapData = ROUTE_MAP_DATA[routeKey];
+        if (mapData && mapData.coords && mapData.coords.length >= 2 && !mapData.plannedPath) {
+            setTimeout(function() {
+                showMapLoading("正在规划步行路线…");
+                planBuiltInRoute(routeKey).then(function() {
+                    hideMapLoading();
+                    // Redraw with real path
+                    if (activeRouteOnMap === routeKey && amapInstance) {
+                        clearRouteOverlays();
+                        drawRouteOnMap(routeKey);
+                        showRouteInfoPopup(routeKey);
+                    }
+                }).catch(function() {
+                    hideMapLoading();
+                });
+            }, 100);
+        }
+    }
+}
+
+/* ═══════════════════════════════════
+   Map loading progress bar
+   ═══════════════════════════════════ */
+let _loadingProgress = 0;
+let _loadingTimer = null;
+
+function showMapLoading(text) {
+    var overlay = document.getElementById("map-loading-overlay");
+    if (!overlay) return;
+    overlay.style.display = "flex";
+    _loadingProgress = 0;
+    updateLoadingBar(0, text || "地图加载中…");
+    // Animate fake progress while real loading ticks
+    if (_loadingTimer) clearInterval(_loadingTimer);
+    _loadingTimer = setInterval(function() {
+        if (_loadingProgress >= 90) { clearInterval(_loadingTimer); _loadingTimer = null; return; }
+        // Slow down as it approaches 90%
+        var step = Math.max(1, Math.floor((90 - _loadingProgress) / 10));
+        _loadingProgress = Math.min(90, _loadingProgress + step);
+        updateLoadingBar(_loadingProgress);
+    }, 600);
+}
+
+function updateLoadingBar(pct, text) {
+    var fill = document.getElementById("map-loading-bar-fill");
+    var pctEl = document.getElementById("map-loading-pct");
+    var txtEl = document.getElementById("map-loading-text");
+    if (fill) fill.style.width = pct + "%";
+    if (pctEl) pctEl.textContent = pct + "%";
+    if (txtEl && text) txtEl.textContent = text;
+}
+
+function hideMapLoading() {
+    if (_loadingTimer) { clearInterval(_loadingTimer); _loadingTimer = null; }
+    updateLoadingBar(100, "完成");
+    setTimeout(function() {
+        var overlay = document.getElementById("map-loading-overlay");
+        if (overlay) overlay.style.display = "none";
+    }, 300);
 }
 
 function ensureMapCloseBtn() {
     if (document.getElementById("map-close-btn")) return;
-    const btn = document.createElement("button");
+    var btn = document.createElement("button");
     btn.id = "map-close-btn";
-    btn.textContent = "✕ 返回";
+    btn.textContent = "✕ 返回首页";
     btn.style.cssText = "position:fixed;top:max(16px,env(safe-area-inset-top));left:16px;z-index:70;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border:1px solid rgba(0,0,0,0.08);font-size:13px;font-weight:600;color:#18212B;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.1);";
     btn.addEventListener("click", exitMapOverlay);
     document.body.appendChild(btn);
 }
 
+/**
+ * Show a route info popup with time, distance, and stop list.
+ */
+function showRouteInfoPopup(routeKey) {
+    var r = routes[routeKey];
+    if (!r) return;
+    var old = document.getElementById("route-info-popup");
+    if (old) { old.remove(); activeRouteOnMap = null; exitMapOverlay(); return; }
+
+    var mapData = ROUTE_MAP_DATA[routeKey];
+    var durText = "计算中…";
+    if (mapData && mapData.plannedDur) durText = Math.ceil(mapData.plannedDur / 60) + " 分钟";
+    else if (r.duration) durText = r.duration + " 分钟";
+
+    var stopHtml = (r.stops || []).map(function(s) {
+        return '<li>' + (s.name || "") + '</li>';
+    }).join("");
+
+    var popup = document.createElement("div");
+    popup.id = "route-info-popup";
+    popup.innerHTML = '<div class="rip-bg" onclick="var p=document.getElementById(\'route-info-popup\');if(p){p.remove();}if(typeof exitMapOverlay===\'function\')exitMapOverlay();"></div>'
+        + '<div class="rip-box">'
+        + '<button class="rip-close" onclick="var p=document.getElementById(\'route-info-popup\');if(p){p.remove();}if(typeof exitMapOverlay===\'function\')exitMapOverlay();">✕</button>'
+        + '<div class="rip-title">' + (r.title || "") + '</div>'
+        + '<div class="rip-meta">'
+        + '<span class="rip-tag">⏱ ' + durText + '</span>'
+        + '<span class="rip-tag">📍 ' + (r.stops ? r.stops.length : 0) + ' 站</span>'
+        + (mapData && mapData.plannedDist ? '<span class="rip-tag">📏 ' + (mapData.plannedDist / 1000).toFixed(1) + ' km</span>' : '')
+        + '</div>'
+        + '<div class="rip-desc">' + (r.desc || "") + '</div>'
+        + '<ol class="rip-stops">' + stopHtml + '</ol>'
+        + '</div>';
+    document.body.appendChild(popup);
+    // Animate in
+    setTimeout(function() { popup.classList.add("show"); }, 10);
+}
+
+/**
+ * Load AMap Walking plugin on demand, then plan a route between consecutive
+ * stops using the JS API Walking plugin (not REST — uses the same key as the map).
+ * Caches real walking path in ROUTE_MAP_DATA[routeKey].plannedPath.
+ * Falls back to direct-connection on failure.
+ */
+function planBuiltInRoute(routeKey) {
+    // Return a promise so callers can await it
+    return new Promise(function(resolve) {
+        var r = routes[routeKey];
+        if (!r || r.isCustom || r.fromRouteDb) { resolve(); return; }
+        var mapData = ROUTE_MAP_DATA[routeKey];
+        if (!mapData || !mapData.coords || mapData.coords.length < 2) { resolve(); return; }
+        if (mapData.plannedPath || mapData._planning) { resolve(); return; }
+
+        mapData._planning = true;
+        var stops = mapData.coords;
+
+        // Use AMap v5 Direction Walking REST API (same as route-editor.html)
+        var amapKey = "5427cfbccb2209b756af7fc782e8105b";
+        var fullPath = [];
+        var totalDist = 0, totalDur = 0;
+        var segIdx = 0;
+        var segTotal = stops.length - 1;
+
+        (function planNextSegment() {
+            if (segIdx >= segTotal) {
+                if (fullPath.length < 2) {
+                    console.warn("规划路径点太少");
+                    mapData._planning = false;
+                    resolve();
+                    return;
+                }
+                mapData.plannedPath = fullPath;
+                mapData.plannedDist = totalDist;
+                mapData.plannedDur = totalDur;
+                var durMin = Math.ceil(totalDur / 60);
+                if (durMin > 0 && r.duration !== durMin) {
+                    r.duration = durMin;
+                    r.meta[0] = durMin + " 分钟";
+                }
+                mapData._planning = false;
+                if (activeRouteOnMap === routeKey && amapInstance) {
+                    clearRouteOverlays();
+                    drawRouteOnMap(routeKey);
+                    showFloatCard(routeKey);
+                }
+                resolve();
+                return;
+            }
+
+            // "lng,lat" format for AMap v5 Direction API
+            var from = stops[segIdx][1] + "," + stops[segIdx][0];
+            var to = stops[segIdx + 1][1] + "," + stops[segIdx + 1][0];
+            var url = "https://restapi.amap.com/v5/direction/walking?key=" + amapKey
+                    + "&origin=" + from + "&destination=" + to + "&show_fields=polyline";
+
+            fetch(url).then(function(resp) { return resp.json(); }).then(function(data) {
+                try {
+                    if (data.status !== "1") throw new Error(data.info || "规划失败");
+                    var path = data.route.paths[0];
+                    if (!path) throw new Error("无可用路径");
+                    totalDist += parseInt(path.distance) || 0;
+                    totalDur += parseInt(path.duration) || 0;
+                    (path.steps || []).forEach(function(s) {
+                        (s.polyline || "").split(";").forEach(function(p) {
+                            if (!p) return;
+                            var parts = p.split(",");
+                            fullPath.push([parseFloat(parts[1]), parseFloat(parts[0])]);
+                        });
+                    });
+                    segIdx++;
+                    setTimeout(planNextSegment, 1500); // QPS limit
+                } catch(e) {
+                    console.warn("段" + segIdx + "规划失败:", e.message);
+                    segIdx++;
+                    setTimeout(planNextSegment, 300);
+                }
+            }).catch(function(e) {
+                console.warn("段" + segIdx + "网络失败:", e.message);
+                segIdx++;
+                setTimeout(planNextSegment, 300);
+            });
+        })();
+    });
+}
+
 function exitMapOverlay() {
-    amapFullscreen = false;
     activeRouteOnMap = null;
-    const mapContainer = document.getElementById("main-map-container");
-    if (mapContainer) mapContainer.classList.remove("amap-fullscreen");
-    document.querySelector(".bottom-nav").style.zIndex = "10";
-    const mapStage = document.getElementById("map-stage");
-    if (mapStage) mapStage.style.display = "none";
-    hideFloatCard();
-    const btn = document.getElementById("map-close-btn");
-    if (btn) btn.remove();
+    // Restore home page map style
+    var mc = document.getElementById("main-map-container");
+    if (mc) {
+        mc.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
+        mc.style.pointerEvents = "auto";
+    }
+    // Clear route overlays from the home page map
+    clearRouteOverlays();
     if (amapInstance) {
         restoreAllMapOverlays();
-        setTimeout(() => amapInstance.resize(), 50);
+        setTimeout(function() { amapInstance.resize(); }, 50);
     }
-    document.querySelector(".main-header").style.display = "";
-    switchTab("home");
+    // Remove close button
+    var btn = document.getElementById("map-close-btn");
+    if (btn) btn.remove();
 }
 
 function clearRouteOverlays() {
@@ -3738,28 +4042,32 @@ function drawRouteOnMap(routeKey) {
     if (!data || !data.coords.length) return;
 
     const persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#B64236" };
-    const lngLatCoords = data.coords.map(c => [c[1], c[0]]);
+    // Use planned path (walking polyline) if available, else direct stop-to-stop
+    const linePoints = (data.plannedPath && data.plannedPath.length >= 2) ? data.plannedPath : data.coords;
+    const lngLatCoords = linePoints.map(c => [c[1], c[0]]);
 
-    // Thick polyline
+    // Thick polyline with direction arrows (like route editor)
     const polyline = new AMap.Polyline({
         path: lngLatCoords,
         strokeColor: persona.color,
-        strokeOpacity: 0.9,
-        strokeWeight: 6,
+        strokeOpacity: 0.95,
+        strokeWeight: 7,
         strokeStyle: "solid",
         lineJoin: "round",
         lineCap: "round",
+        showDir: true,
+        dirColor: persona.color,
         zIndex: 50,
     });
     amapInstance.add(polyline);
     amapRouteLines.push(polyline);
 
-    // Glow line under
+    // Glow line under for visual depth
     const glowLine = new AMap.Polyline({
         path: lngLatCoords,
         strokeColor: persona.color,
-        strokeOpacity: 0.2,
-        strokeWeight: 16,
+        strokeOpacity: 0.18,
+        strokeWeight: 18,
         strokeStyle: "solid",
         lineJoin: "round",
         zIndex: 49,
@@ -3769,33 +4077,41 @@ function drawRouteOnMap(routeKey) {
 
     const markers = [];
 
-    // Markers for each stop
+    // Numbered station markers for each stop (clear like route editor)
+    var stopCount = data.stops.length || data.coords.length;
     data.coords.forEach((c, i) => {
-        const label = data.stops[i] || "途经点";
-        const mc = document.createElement("div");
+        var idx = i + 1;
+        var label = data.stops[i] || "途经点 " + idx;
+        var mc = document.createElement("div");
         mc.className = "route-marker";
-        mc.innerHTML = '<span class=\"dot\"></span><span>' + label + '</span>';
+        // First = start flag, last = destination, middle = number
+        var iconHtml = i === 0
+            ? '<span class="marker-num" style="background:' + persona.color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">始</span>'
+            : (i === data.coords.length - 1
+                ? '<span class="marker-num" style="background:' + persona.color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">终</span>'
+                : '<span class="marker-num" style="background:' + persona.color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + idx + '</span>');
+        mc.innerHTML = iconHtml + '<span style="font-size:12px;font-weight:600;">' + label + '</span>';
 
-        const marker = new AMap.Marker({
+        var marker = new AMap.Marker({
             position: [c[1], c[0]],
             content: mc,
-            offset: new AMap.Pixel(-30, -10),
+            offset: new AMap.Pixel(-30, -14),
             zIndex: 60,
         });
         marker._routeKey = routeKey;
-        marker.on("click", () => openRoute(routeKey));
+        marker.on("click", function() { openRoute(routeKey); });
         amapInstance.add(marker);
         amapMarkers.push(marker);
         markers.push(marker);
     });
 
-    // Zoom to fit route bounds
-    const overlays = [polyline, glowLine].concat(markers);
+    // Tighter zoom to fit route with clear padding
+    var overlays = [polyline, glowLine].concat(markers);
     try {
-        amapInstance.setFitView(overlays, false, 300);
+        amapInstance.setFitView(overlays, false, 80);
     } catch(e) {
-        // fallback: set zoom and center
-        amapInstance.setZoom(14);
+        // fallback
+        amapInstance.setZoom(15);
         amapInstance.setCenter([118.796, 32.060]);
     }
 }
@@ -3812,6 +4128,24 @@ function showFloatCard(routeKey) {
     document.getElementById("float-card-icon").textContent = persona.icon;
     document.getElementById("float-card-title").textContent = r.title;
     document.getElementById("float-card-sub").textContent = r.desc;
+
+    // Show estimated time and stop count
+    var timeEl = document.getElementById("float-card-time");
+    var countEl = document.getElementById("float-card-stops-count");
+    var mapData = ROUTE_MAP_DATA[routeKey];
+    if (timeEl) {
+        // prefer planned duration from API, fallback to route meta
+        var durText = r.meta && r.meta[0] ? r.meta[0] : "";
+        if (mapData && mapData.plannedDur) {
+            durText = Math.ceil(mapData.plannedDur / 60) + " 分钟";
+        } else if (r.duration) {
+            durText = r.duration + " 分钟";
+        }
+        timeEl.textContent = durText ? "⏱ " + durText : "⏱ 计算中…";
+    }
+    if (countEl && r.stops) {
+        countEl.textContent = "📍 " + r.stops.length + " 站";
+    }
 
     const stopsEl = document.getElementById("float-card-stops");
     stopsEl.innerHTML = r.stops.map(s => `<span class="float-card-stop">${s.name}</span>`).join("");
@@ -3931,7 +4265,8 @@ function switchTab(tab) {
     if (amapFullscreen) {
         amapFullscreen = false;
         document.getElementById("main-map-container").classList.remove("amap-fullscreen");
-        document.querySelector(".bottom-nav").style.zIndex = "10";
+        const navEl = getNavEl();
+        if (navEl) navEl.style.zIndex = "10";
         if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
     }
 
@@ -3955,7 +4290,7 @@ function switchTab(tab) {
             mapContainer.style.display = "block";
             mapContainer.classList.remove("amap-fullscreen");
             mapContainer.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
-            mapContainer.style.pointerEvents = "none";
+            mapContainer.style.pointerEvents = "auto";
         }
         const header = document.querySelector(".main-header");
         if (header) { header.style.display = ""; header.style.opacity = "1"; }
@@ -4112,7 +4447,8 @@ function showMapRouteEditor() {
     overlay._msgHandler = msgHandler;
 
     mapEditor = { overlay, iframe };
-    document.querySelector(".bottom-nav").style.zIndex = "50";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = "50";
 }
 
 function closeMapEditor() {
@@ -4123,7 +4459,8 @@ function closeMapEditor() {
         window.removeEventListener("message", overlay._msgHandler);
     }
     try { overlay.remove(); } catch(e) {}
-    document.querySelector(".bottom-nav").style.zIndex = "10";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = "10";
     mapEditor = null;
 }
 
@@ -4469,7 +4806,8 @@ function closeMapEditor() {
     if (snapScroll) snapScroll.style.display = "";
     if (header) header.style.display = "";
 
-    document.querySelector(".bottom-nav").style.zIndex = "10";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = "10";
 
     mapEditor = null;
     switchTab("home");
@@ -6611,6 +6949,12 @@ showRouteOnMap = function(routeKey) {
         expo: "安静地走进一座博物馆，和旧物说说话。记得提前预约哦。",
     };
     showGuideBubble(GUIDE_ROUTE_MSGS[routeKey] || "这条路线看起来不错！");
+
+    // Trigger route planning for built-in routes (async, improves polyline)
+    const r = routes[routeKey];
+    if (r && !r.isCustom && !r.fromRouteDb) {
+        setTimeout(function() { planBuiltInRoute(routeKey); }, 800);
+    }
 };
 
 // Start guide bubble scheduling after main page shows
@@ -6698,22 +7042,60 @@ openRoute = function(key) {
     }
 };
 
+// Hook closeSheet to restore home page map when route sheet closes
+var _origCloseSheet = closeSheet;
+closeSheet = function() {
+    _origCloseSheet();
+    // Restore home page map style when user closes sheet while route is shown
+    if (activeRouteOnMap && amapInstance) {
+        var mc = document.getElementById("main-map-container");
+        if (mc) {
+            mc.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
+            mc.style.pointerEvents = "auto";
+        }
+        clearRouteOverlays();
+        restoreAllMapOverlays();
+        activeRouteOnMap = null;
+        // Remove close button too
+        var cb = document.getElementById("map-close-btn");
+        if (cb) cb.remove();
+    }
+};
+
 /* ═══════════════════════════════════════
    AI 助手聊天面板 · AI Chat Panel
    ═══════════════════════════════════════ */
 
-// Final Apple route cards: built-in routes share the upload-route entry pattern.
+/**
+ * Get route keys ordered by persona match — matched route first, then others.
+ */
+function getPersonaRoutes(personaId) {
+    if (!personaId) return CAROUSEL_ROUTES;
+    const persona = personaCards.find(p => p.id === personaId);
+    if (!persona || !persona.routeKey) return CAROUSEL_ROUTES;
+    const matched = persona.routeKey;
+    const others = CAROUSEL_ROUTES.filter(k => k !== matched);
+    return [matched, ...others];
+}
+
+// Final Apple route cards with persona-based ordering
 renderCarouselCards = function() {
     const track = document.getElementById("carousel-track");
     const dots = document.getElementById("carousel-dots");
     if (!track) return;
 
-    track.innerHTML = CAROUSEL_ROUTES
-        .map(key => renderRouteLaunchCard(key, routes[key], { carousel: true, compact: true }))
+    const orderedKeys = getPersonaRoutes(selectedPersonaId);
+
+    track.innerHTML = orderedKeys
+        .map(key => renderRouteLaunchCard(key, routes[key], {
+            carousel: true,
+            compact: true,
+            recommended: selectedPersonaId && key === (personaCards.find(p => p.id === selectedPersonaId) || {}).routeKey
+        }))
         .join("");
 
     if (dots) {
-        dots.innerHTML = CAROUSEL_ROUTES
+        dots.innerHTML = orderedKeys
             .map((_, i) => `<span class="carousel-dot${i === 0 ? " active" : ""}"></span>`)
             .join("");
     }
@@ -6728,6 +7110,9 @@ renderCarouselCards = function() {
             if (routeKey) openRoute(routeKey);
         });
     });
+
+    // Also update feature section to match persona
+    renderFeatureSection(orderedKeys[0]);
 };
 
 renderRouteGrid = function() {
