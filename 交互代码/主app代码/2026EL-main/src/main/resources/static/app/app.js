@@ -66,7 +66,7 @@ gsap.registerPlugin(ScrollTrigger);
 const personaCards = [
     {
         id: "foodie",
-        title: "美食家",
+        title: "citywalker",
         subtitle: "南京特色美食，热气腾腾的烟火路线",
         tags: ["小吃", "老字号", "夜宵", "烟火气"],
         unlockText: "地道美食路线、隐藏小店、早点夜宵地图",
@@ -83,7 +83,7 @@ const personaCards = [
             { emoji: "🍡", x: 22, y: 65, size: 26, floatY: 11, dur: 3.7 }
         ],
         routeKey: "food",
-        bgImage: "assets/persona/8.png"
+        bgImage: "assets/persona/1.png"
     },
     {
         id: "reader",
@@ -125,7 +125,7 @@ const personaCards = [
             { emoji: "💦", x: 20, y: 66, size: 24, floatY: 12, dur: 3.8 }
         ],
         routeKey: "nju",
-        bgImage: "assets/persona/5.png"
+        bgImage: "assets/persona/3.png"
     },
     {
         id: "coffee",
@@ -167,7 +167,7 @@ const personaCards = [
             { emoji: "🗝️", x: 24, y: 66, size: 26, floatY: 11, dur: 3.6 }
         ],
         routeKey: "expo",
-        bgImage: "assets/persona/3.png"
+        bgImage: "assets/persona/5.png"
     },
     {
         id: "photo",
@@ -230,7 +230,7 @@ const personaCards = [
             { emoji: "📍", x: 22, y: 62, size: 28, floatY: 11, dur: 3.7 }
         ],
         routeKey: "nju",
-        bgImage: "assets/persona/1.png"
+        bgImage: "assets/persona/8.png"
     }
 ];
 
@@ -2437,8 +2437,6 @@ function buildSwiperCards() {
             </div>
         `).join("");
 
-        const tagsHtml = card.tags.map(t => `<span class="swiper-card-tag">${t}</span>`).join("");
-
         const bgImgTag = card.bgImage
             ? `<img class="swiper-card-img" src="${card.bgImage}" alt="${card.title}" />`
             : "";
@@ -2475,11 +2473,22 @@ function buildSwiperCards() {
             <div class="swiper-card-veil"></div>
             <div class="swiper-card-content">
                 <h1 class="swiper-card-title">${card.title}</h1>
-                <p class="swiper-card-subtitle" style="color:${card.textColor};opacity:0.85">${card.subtitle}</p>
-                <div class="swiper-card-tags">${tagsHtml}</div>
             </div>
         </div>`;
     }).join("");
+
+    document.querySelectorAll(".swiper-card").forEach(cardEl => {
+        cardEl.addEventListener("click", () => {
+            const idx = parseInt(cardEl.dataset.index, 10);
+            if (Number.isInteger(idx)) {
+                activeCardIndex = idx;
+                updateProgressDots(idx);
+                updateGlassCard(idx);
+                updateSelectButton(idx);
+            }
+            onSelectClick();
+        });
+    });
 
     // Start floating animations on all cards
     setTimeout(startAllFloatAnimations, 100);
@@ -2616,11 +2625,47 @@ const ROUTE_ICON = {
     expo: "🏺",
 };
 const ROUTE_IMAGE = {
-    night: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1A2A3A"/><stop offset="100%" stop-color="#2E5A6E"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><circle cx="140" cy="40" r="20" fill="#F5E6A3" opacity="0.9"/><text x="15" y="30" font-size="48">🏮</text></svg>'),
-    nju: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1B3A2A"/><stop offset="100%" stop-color="#2E8B57"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><text x="15" y="32" font-size="48">🎓</text></svg>'),
-    food: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#4A2020"/><stop offset="100%" stop-color="#C06830"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><text x="15" y="32" font-size="48">🍜</text></svg>'),
-    expo: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2A3040"/><stop offset="100%" stop-color="#5B7BA0"/></linearGradient></defs><rect fill="url(#g)" width="200" height="200"/><text x="15" y="32" font-size="48">🏺</text></svg>'),
+    night: "assets/persona/8.png",
+    nju: "assets/persona/5.png",
+    food: "assets/persona/2.png",
+    expo: "assets/persona/3.png",
 };
+
+function getRouteDisplayTitle(route) {
+    const raw = String(route?.title || "");
+    return raw.split(/[，,:：]/)[0] || raw;
+}
+
+function renderRouteLaunchCard(key, route, options = {}) {
+    const accent = ROUTE_ACCENT[key] || "#0066CC";
+    const icon = ROUTE_ICON[key] || "📍";
+    const img = ROUTE_IMAGE[key] || ROUTE_IMAGE.food;
+    const isCustom = key.startsWith("custom_");
+    const title = getRouteDisplayTitle(route);
+    const meta = (route.meta || [])
+        .slice(0, options.compact ? 2 : 3)
+        .map(m => `<span>${m}</span>`)
+        .join("");
+    const badge = isCustom ? `<span class="route-launch-badge">自定义</span>` : "";
+    const action = isCustom ? "查看我的路线" : "查看路线";
+
+    return `<div class="route-launch-card${options.carousel ? " carousel-card route-launch-carousel" : ""}${isCustom ? " route-launch-custom" : ""}"
+        data-route="${key}"
+        style="--route-accent:${accent};--route-img:url(${img});">
+        <div class="route-launch-thumb">
+            <span class="route-launch-icon">${icon}</span>
+        </div>
+        <div class="route-launch-copy">
+            <div class="route-launch-title-row">
+                <span class="route-launch-title">${title}</span>
+                ${badge}
+            </div>
+            <span class="route-launch-desc">${route.desc}</span>
+            <div class="route-launch-meta">${meta}</div>
+        </div>
+        <button class="route-launch-btn" type="button">${action}</button>
+    </div>`;
+}
 
 function renderCarouselCards() {
     const track = document.getElementById("carousel-track");
@@ -6550,6 +6595,106 @@ openRoute = function(key) {
 /* ═══════════════════════════════════════
    AI 助手聊天面板 · AI Chat Panel
    ═══════════════════════════════════════ */
+
+// Final Apple route cards: built-in routes share the upload-route entry pattern.
+renderCarouselCards = function() {
+    const track = document.getElementById("carousel-track");
+    const dots = document.getElementById("carousel-dots");
+    if (!track) return;
+
+    track.innerHTML = CAROUSEL_ROUTES
+        .map(key => renderRouteLaunchCard(key, routes[key], { carousel: true, compact: true }))
+        .join("");
+
+    if (dots) {
+        dots.innerHTML = CAROUSEL_ROUTES
+            .map((_, i) => `<span class="carousel-dot${i === 0 ? " active" : ""}"></span>`)
+            .join("");
+    }
+
+    track.querySelectorAll(".route-launch-card").forEach(card => {
+        card.addEventListener("click", () => openRoute(card.dataset.route));
+    });
+    track.querySelectorAll(".route-launch-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const routeKey = btn.closest(".route-launch-card")?.dataset.route;
+            if (routeKey) openRoute(routeKey);
+        });
+    });
+};
+
+renderRouteGrid = function() {
+    const grid = document.getElementById("route-grid");
+    if (!grid) return;
+
+    const builtinKeys = ["night", "nju", "food", "expo"];
+    const customKeys = Object.keys(customRoutes);
+    const allKeys = [...builtinKeys, ...customKeys];
+
+    grid.innerHTML = allKeys
+        .map(key => renderRouteLaunchCard(key, routes[key], { compact: true }))
+        .join("") +
+        `<div class="route-launch-card route-launch-upload" id="custom-route-upload-btn">
+            <div class="route-launch-thumb">
+                <span class="route-launch-icon">＋</span>
+            </div>
+            <div class="route-launch-copy">
+                <span class="route-launch-title">上传我的路线</span>
+                <span class="route-launch-desc">在地图上标记起点、途经点和终点</span>
+            </div>
+            <button class="route-launch-btn" type="button">开始标记</button>
+        </div>`;
+
+    grid.querySelectorAll(".route-launch-card").forEach(card => {
+        card.addEventListener("click", () => {
+            const routeKey = card.dataset.route;
+            if (!routeKey) showMapRouteEditor();
+            else openRoute(routeKey);
+        });
+    });
+    grid.querySelectorAll(".route-launch-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const routeKey = btn.closest(".route-launch-card")?.dataset.route;
+            if (!routeKey) showMapRouteEditor();
+            else openRoute(routeKey);
+        });
+    });
+};
+
+renderRoutesTab = function(container) {
+    container.innerHTML =
+        `<div class="tab-page-header">
+            <div class="tab-page-title">全部路线</div>
+            <div class="tab-page-subtitle">${Object.keys(routes).length} 条路线，等你出发</div>
+        </div>
+        <div class="upload-route-hero" id="upload-route-hero">
+            <div class="upload-route-hero-icon">＋</div>
+            <div class="upload-route-hero-text">
+                <span class="upload-route-hero-title">上传我的路线</span>
+                <span class="upload-route-hero-sub">在地图上标记起点、途经点和终点，创建你自己的南京路线</span>
+            </div>
+            <button class="upload-route-hero-btn" id="upload-route-hero-btn">开始标记</button>
+        </div>`;
+
+    container.querySelector("#upload-route-hero-btn").addEventListener("click", showMapRouteEditor);
+    container.querySelector("#upload-route-hero").addEventListener("click", (e) => {
+        if (e.target.tagName !== "BUTTON") showMapRouteEditor();
+    });
+
+    Object.entries(routes).forEach(([key, route]) => {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = renderRouteLaunchCard(key, route);
+        const card = wrap.firstElementChild;
+        card.addEventListener("click", () => openRoute(key));
+        card.querySelector(".route-launch-btn")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openRoute(key);
+        });
+        container.appendChild(card);
+    });
+};
 
 let aiChatOpen = false;
 
