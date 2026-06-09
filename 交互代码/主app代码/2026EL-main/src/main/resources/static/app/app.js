@@ -3083,22 +3083,39 @@ function toggleScrollDrawer() {
 }
 
 // ── Route marker map data for AMap ──
+/* ── Pre-computed walking paths for built-in routes ── */
 const ROUTE_MAP_DATA = {
     nju: {
-        coords: [[32.056, 118.779], [32.057, 118.779], [32.0585, 118.780], [32.060, 118.779]],
-        stops: ["三江师范学堂旧址", "北大楼", "校史馆", "梧桐大道"]
+        coords: [[32.053187, 118.767680], [32.061477, 118.781801], [32.054677, 118.781320], [32.057998, 118.776580]],
+        stops: ["三江师范学堂旧址", "北大楼", "校史馆", "梧桐大道"],
+        plannedPath: [
+[32.05599,118.779],[32.056098,118.779761],[32.056098,118.779761],[32.056536,118.779696],[32.056536,118.779696],[32.057053,118.779605],[32.057053,118.779601],[32.057053,118.779601],[32.057322,118.779562],[32.057322,118.779562],[32.057687,118.779505],[32.057739,118.779479],[32.057739,118.779475],[32.057769,118.779418],[32.057795,118.779002],[32.057799,118.778997],[32.058025,118.779002],[32.058025,118.779002],[32.058021,118.779002],[32.058103,118.779002],[32.058442,118.779006],[32.058516,118.778989],[32.058563,118.778924],[32.058581,118.778872],[32.058589,118.778707],[32.058589,118.778707],[32.058589,118.778598],[32.058589,118.778594],[32.058694,118.778594],[32.058733,118.778672],[32.058733,118.778672],[32.058763,118.778741],[32.058763,118.778741],[32.058824,118.778741],[32.058824,118.778741],[32.058872,118.778741],[32.058872,118.778741],[32.058893,118.779089],[32.058893,118.779089],[32.058919,118.779479],[32.058919,118.779479],[32.058941,118.77974],[32.058941,118.77974],[32.058898,118.779748],[32.058941,118.779744],[32.058941,118.779744],[32.058924,118.779484],[32.058924,118.779484],[32.058898,118.779093],[32.058898,118.779093],[32.058876,118.778746],[32.058872,118.778741],[32.058924,118.778741],[32.058924,118.778741],[32.058997,118.778741],[32.058997,118.778741],[32.059054,118.778741],[32.059054,118.778741],[32.059852,118.778854],[32.059852,118.778854],[32.059996,118.778854]
+        ],
+        plannedDist: 777, plannedDur: 600
     },
     night: {
-        coords: [[32.020, 118.788], [32.021, 118.789], [32.012, 118.791]],
-        stops: ["秦淮河畔", "夫子庙", "老门东"]
+        coords: [[32.021196, 118.792026], [32.020660, 118.788899], [32.011604, 118.787645]],
+        stops: ["秦淮河畔", "夫子庙", "老门东"],
+        plannedPath: [
+[32.02013,118.787591],[32.020139,118.787509],[32.020139,118.787504],[32.020208,118.787483],[32.020291,118.787426],[32.020291,118.787426],[32.020382,118.787374],[32.02046,118.787348],[32.020516,118.787348],[32.020668,118.787391],[32.020668,118.787391],[32.020903,118.787491],[32.020903,118.787491],[32.021029,118.787548],[32.021029,118.787548],[32.021141,118.787595],[32.021141,118.787595],[32.021393,118.787691],[32.021398,118.787695],[32.021345,118.787817],[32.021341,118.787817],[32.021237,118.788021],[32.021189,118.788121],[32.021085,118.788234],[32.021085,118.788234],[32.021076,118.788234],[32.020964,118.788329],[32.020959,118.788329],[32.021098,118.788468],[32.021098,118.788468],[32.021133,118.788568],[32.021159,118.788602],[32.021159,118.788602],[32.021267,118.788776],[32.021267,118.788776],[32.021189,118.788845],[32.021189,118.788845],[32.021007,118.789006],[32.02099,118.789023],[32.02099,118.789023],[32.020872,118.789123],[32.020872,118.789123],[32.02076,118.789206],[32.02046,118.789484],[32.02046,118.789484],[32.020391,118.789531],[32.020391,118.789531],[32.020117,118.789709],[32.020113,118.789709],[32.019978,118.78951],[32.019978,118.78951],[32.019779,118.78921],[32.019779,118.78921],[32.019714,118.78908],[32.019714,118.78908],[32.01967,118.789006],[32.01967,118.789006],[32.019523,118.788741],[32.019523,118.788741],[32.019227,118.788212],[32.019171,118.787982],[32.019171,118.787982],[32.019093,118.787969],[32.019089,118.787964],[32.01908,118.788129],[32.018963,118.788242],[32.018963,118.788242],[32.018802,118.788325],[32.018802,118.788325],[32.018255,118.788594],[32.018255,118.788594],[32.017917,118.78885],[32.017917,118.78885],[32.017565,118.789106],[32.017561,118.789106],[32.017439,118.789084],[32.017439,118.789084],[32.016727,118.788872],[32.016723,118.788867],[32.016645,118.788867],[32.016645,118.788867],[32.01658,118.788867],[32.01658,118.788867],[32.016519,118.788859],[32.016519,118.788859],[32.01566,118.788681],[32.01566,118.788681],[32.015373,118.788641],[32.015373,118.788641],[32.014588,118.78852],[32.014588,118.78852],[32.014162,118.788451],[32.01408,118.788438],[32.013919,118.788394],[32.013919,118.788394],[32.013845,118.788372],[32.013845,118.788372],[32.01326,118.788212],[32.01326,118.788212],[32.01303,118.788134],[32.01296,118.788138],[32.012956,118.788138],[32.012908,118.788212],[32.012847,118.788494],[32.012847,118.788494],[32.012778,118.78895],[32.012778,118.78895],[32.012756,118.78908],[32.012756,118.78908],[32.012734,118.789188],[32.012734,118.789188],[32.012713,118.789319],[32.012713,118.789319],[32.0127,118.789414],[32.0127,118.789414],[32.012656,118.789661],[32.012656,118.789661],[32.012595,118.790117],[32.012595,118.790117],[32.012565,118.790347],[32.012457,118.790803],[32.012457,118.790803],[32.012279,118.791584],[32.012274,118.791584],[32.011905,118.791471],[32.011905,118.791471],[32.011671,118.791363],[32.011667,118.791359],[32.011688,118.791289],[32.011688,118.791289],[32.011771,118.79102],[32.011771,118.79102],[32.011771,118.79102]
+        ],
+        plannedDist: 1795, plannedDur: 1500
     },
     food: {
         coords: [[32.045, 118.790], [32.046, 118.791], [32.044, 118.785], [32.048, 118.788]],
-        stops: ["街角咖啡馆", "独立书店", "梧桐小径", "晚餐小馆"]
+        stops: ["街角咖啡馆", "独立书店", "梧桐小径", "晚餐小馆"],
+        plannedPath: [
+[32.04503,118.790004],[32.044926,118.790647],[32.044922,118.790647],[32.044983,118.790664],[32.044983,118.790664],[32.045347,118.790755],[32.045347,118.790755],[32.045599,118.790825],[32.045699,118.790877],[32.045699,118.790877],[32.045938,118.790942],[32.045938,118.790942],[32.046003,118.790959],[32.045942,118.790946],[32.045942,118.790946],[32.045703,118.790881],[32.045703,118.790881],[32.045603,118.790829],[32.045352,118.79076],[32.045352,118.79076],[32.044987,118.790668],[32.044987,118.790668],[32.044926,118.790651],[32.044926,118.790651],[32.044874,118.790642],[32.044874,118.790642],[32.044761,118.790599],[32.044761,118.790599],[32.044679,118.790573],[32.044679,118.790573],[32.044371,118.790486],[32.044371,118.790486],[32.044314,118.790469],[32.044314,118.790469],[32.044219,118.790443],[32.044219,118.790443],[32.044128,118.790404],[32.044128,118.790404],[32.043941,118.790308],[32.043737,118.790165],[32.043737,118.790165],[32.043312,118.789931],[32.043312,118.789931],[32.043034,118.789848],[32.043034,118.789848],[32.042778,118.78977],[32.042778,118.78977],[32.042635,118.789701],[32.04263,118.789696],[32.042674,118.789488],[32.042674,118.789488],[32.04276,118.789106],[32.04276,118.789106],[32.042782,118.789032],[32.042782,118.789032],[32.042808,118.788898],[32.042808,118.788898],[32.042865,118.788602],[32.042865,118.788602],[32.042899,118.788372],[32.042899,118.788372],[32.042912,118.78829],[32.042912,118.78829],[32.042934,118.78819],[32.042934,118.78819],[32.043038,118.787778],[32.043038,118.787778],[32.04309,118.7876],[32.04309,118.7876],[32.043177,118.78727],[32.043177,118.78727],[32.043312,118.786736],[32.043312,118.786736],[32.043381,118.786476],[32.043381,118.786476],[32.043507,118.786128],[32.043507,118.786128],[32.043594,118.785898],[32.043594,118.785898],[32.043641,118.785755],[32.043641,118.785755],[32.043659,118.785642],[32.043811,118.785256],[32.043845,118.785208],[32.043845,118.785208],[32.043824,118.785165],[32.043845,118.785204],[32.043845,118.785204],[32.043815,118.785252],[32.043663,118.785638],[32.043646,118.785751],[32.043646,118.785751],[32.043598,118.785894],[32.043598,118.785894],[32.043511,118.786124],[32.043511,118.786124],[32.043385,118.786471],[32.043385,118.786471],[32.043316,118.786732],[32.043316,118.786732],[32.043181,118.787266],[32.043181,118.787266],[32.04309,118.787595],[32.04309,118.787595],[32.043043,118.787773],[32.043043,118.787773],[32.042938,118.788186],[32.042934,118.788186],[32.043459,118.78826],[32.043459,118.78826],[32.04355,118.788203],[32.043937,118.788255],[32.043937,118.788255],[32.044492,118.788351],[32.044622,118.788381],[32.044622,118.788381],[32.044705,118.788403],[32.044705,118.788403],[32.044779,118.788424],[32.044779,118.788424],[32.044848,118.788442],[32.044848,118.788442],[32.045265,118.788524],[32.045764,118.788646],[32.045764,118.788646],[32.046081,118.788728],[32.04615,118.788798],[32.04615,118.788798],[32.046354,118.788837],[32.046354,118.788837],[32.046753,118.788911],[32.046753,118.788911],[32.046888,118.788885],[32.047118,118.788915],[32.047791,118.789023],[32.047791,118.789023],[32.047973,118.788429],[32.047973,118.788429],[32.048077,118.78819],[32.048121,118.788129]
+        ],
+        plannedDist: 1943, plannedDur: 1800
     },
     expo: {
-        coords: [[32.040, 118.830], [32.039, 118.817], [32.041, 118.822]],
-        stops: ["南京博物院", "明故宫遗址", "展览特厅"]
+        coords: [[32.040802, 118.825064], [32.041450, 118.817968], [32.041, 118.822]],
+        stops: ["南京博物院", "明故宫遗址", "展览特厅"],
+        plannedPath: [
+[32.040009,118.83],[32.040022,118.82987],[32.040039,118.829444],[32.040039,118.829371],[32.040039,118.829371],[32.04003,118.829253],[32.039922,118.828915],[32.039822,118.828702],[32.039579,118.828464],[32.039575,118.828459],[32.038576,118.828181],[32.038442,118.828125],[32.038372,118.828099],[32.038368,118.828095],[32.038368,118.827752],[32.038385,118.827526],[32.038446,118.82714],[32.038446,118.82714],[32.038602,118.826298],[32.038659,118.826124],[32.038659,118.826124],[32.038672,118.82605],[32.038672,118.82605],[32.038741,118.825755],[32.038785,118.825703],[32.038785,118.825703],[32.038806,118.825438],[32.038806,118.825438],[32.038819,118.825282],[32.038819,118.825282],[32.038767,118.825065],[32.038798,118.824657],[32.038798,118.824657],[32.038832,118.824154],[32.038832,118.824154],[32.038932,118.822865],[32.038932,118.822865],[32.038954,118.822595],[32.039006,118.822483],[32.039006,118.822483],[32.039006,118.822439],[32.039006,118.822439],[32.038984,118.822296],[32.039002,118.821888],[32.039002,118.821888],[32.039015,118.821584],[32.039015,118.821584],[32.039106,118.820265],[32.039106,118.820265],[32.039167,118.81931],[32.039167,118.81931],[32.039227,118.818451],[32.039227,118.818451],[32.03928,118.81773],[32.03928,118.817726],[32.039188,118.817713],[32.039188,118.817713],[32.039071,118.8177],[32.039067,118.817695],[32.039102,118.817114],[32.039102,118.817092],[32.039089,118.81707],[32.038997,118.817062],[32.039084,118.817066],[32.039102,118.817088],[32.039102,118.817109],[32.039071,118.817695],[32.039067,118.817695],[32.039184,118.817708],[32.039184,118.817708],[32.03928,118.817726],[32.03928,118.817726],[32.039232,118.818446],[32.039227,118.818446],[32.039306,118.818455],[32.039306,118.818455],[32.03934,118.818455],[32.03934,118.818455],[32.039371,118.818464],[32.039371,118.818464],[32.03944,118.818468],[32.03944,118.818468],[32.039692,118.818494],[32.039692,118.818494],[32.040399,118.818572],[32.040399,118.818572],[32.040937,118.818637],[32.040937,118.818637],[32.04122,118.818672],[32.04122,118.818672],[32.041875,118.818741],[32.041875,118.818741],[32.041858,118.819184],[32.041858,118.819184],[32.041719,118.820573],[32.041719,118.820573],[32.041688,118.820777],[32.041688,118.820777],[32.041671,118.820864],[32.041671,118.820864],[32.041662,118.820929],[32.041658,118.820929],[32.041393,118.820872],[32.041393,118.820872],[32.041306,118.820877],[32.041141,118.820977],[32.041137,118.820977],[32.041107,118.821632],[32.041107,118.821632],[32.041081,118.822005]
+        ],
+        plannedDist: 2191, plannedDur: 1800
     }
 };
 
@@ -3796,9 +3813,51 @@ function showRouteOnMap(routeKey) {
         mc.style.pointerEvents = "auto";
     }
 
-    // Draw the route first (may be straight line if not yet planned)
-    clearRouteOverlays();
-    drawRouteOnMap(routeKey);
+    // Aggressively clear ALL overlays (one-by-one to ensure removal)
+    if (amapInstance) {
+        while (amapMarkers.length) { try { amapInstance.remove(amapMarkers[0]); } catch(e) {} amapMarkers.shift(); }
+        while (amapRouteLines.length) { try { amapInstance.remove(amapRouteLines[0]); } catch(e) {} amapRouteLines.shift(); }
+    }
+    try {
+        var rData = ROUTE_MAP_DATA[routeKey];
+        var persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#F06D5E" };
+        if (rData && rData.coords && rData.coords.length && amapInstance && window.AMap) {
+            // 1. Route line — same style as route editor (thick + direction arrows)
+            var pts = (rData.plannedPath && rData.plannedPath.length >= 2) ? rData.plannedPath : rData.coords;
+            var lnglats = pts.map(function(c) { return [c[1], c[0]]; });
+            var poly = new AMap.Polyline({
+                path: lnglats,
+                strokeColor: persona.color,
+                strokeOpacity: 0.95,
+                strokeWeight: 7,
+                strokeStyle: "solid",
+                lineJoin: "round",
+                showDir: true
+            });
+            amapInstance.add(poly);
+            amapRouteLines.push(poly);
+            // 2. Markers at each stop
+            rData.coords.forEach(function(c, i) {
+                var label = rData.stops[i] || "途经点";
+                var mc = document.createElement("div");
+                mc.className = "route-marker";
+                mc.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
+                var marker = new AMap.Marker({
+                    position: [c[1], c[0]],
+                    content: mc,
+                    offset: new AMap.Pixel(-30, -10),
+                    zIndex: 60
+                });
+                marker.on("click", function() { openRoute(routeKey); });
+                amapInstance.add(marker);
+                amapMarkers.push(marker);
+            });
+            // 3. Zoom to route start
+            var firstPos = [rData.coords[0][1], rData.coords[0][0]];
+            amapInstance.setZoom(16);
+            amapInstance.setCenter(firstPos);
+        }
+    } catch(e) { console.warn("route draw error:", e); }
     activeRouteOnMap = routeKey;
 
     // Show route info popup (time, stops, close)
@@ -3807,26 +3866,6 @@ function showRouteOnMap(routeKey) {
     // Ensure close button overlay
     ensureMapCloseBtn();
 
-    // Then asynchronously plan real walking path and redraw
-    if (r && !r.isCustom && !r.fromRouteDb) {
-        var mapData = ROUTE_MAP_DATA[routeKey];
-        if (mapData && mapData.coords && mapData.coords.length >= 2 && !mapData.plannedPath) {
-            setTimeout(function() {
-                showMapLoading("正在规划步行路线…");
-                planBuiltInRoute(routeKey).then(function() {
-                    hideMapLoading();
-                    // Redraw with real path
-                    if (activeRouteOnMap === routeKey && amapInstance) {
-                        clearRouteOverlays();
-                        drawRouteOnMap(routeKey);
-                        showRouteInfoPopup(routeKey);
-                    }
-                }).catch(function() {
-                    hideMapLoading();
-                });
-            }, 100);
-        }
-    }
 }
 
 /* ═══════════════════════════════════
@@ -3881,12 +3920,12 @@ function ensureMapCloseBtn() {
 }
 
 /**
- * Show a route info popup with time, distance, and stop list.
+ * Show a side panel with route info + edit waypoint prompt.
  */
 function showRouteInfoPopup(routeKey) {
     var r = routes[routeKey];
     if (!r) return;
-    var old = document.getElementById("route-info-popup");
+    var old = document.getElementById("route-side-panel");
     if (old) { old.remove(); activeRouteOnMap = null; exitMapOverlay(); return; }
 
     var mapData = ROUTE_MAP_DATA[routeKey];
@@ -3894,114 +3933,21 @@ function showRouteInfoPopup(routeKey) {
     if (mapData && mapData.plannedDur) durText = Math.ceil(mapData.plannedDur / 60) + " 分钟";
     else if (r.duration) durText = r.duration + " 分钟";
 
-    var stopHtml = (r.stops || []).map(function(s) {
-        return '<li>' + (s.name || "") + '</li>';
-    }).join("");
-
-    var popup = document.createElement("div");
-    popup.id = "route-info-popup";
-    popup.innerHTML = '<div class="rip-bg" onclick="var p=document.getElementById(\'route-info-popup\');if(p){p.remove();}if(typeof exitMapOverlay===\'function\')exitMapOverlay();"></div>'
-        + '<div class="rip-box">'
-        + '<button class="rip-close" onclick="var p=document.getElementById(\'route-info-popup\');if(p){p.remove();}if(typeof exitMapOverlay===\'function\')exitMapOverlay();">✕</button>'
-        + '<div class="rip-title">' + (r.title || "") + '</div>'
-        + '<div class="rip-meta">'
-        + '<span class="rip-tag">⏱ ' + durText + '</span>'
-        + '<span class="rip-tag">📍 ' + (r.stops ? r.stops.length : 0) + ' 站</span>'
-        + (mapData && mapData.plannedDist ? '<span class="rip-tag">📏 ' + (mapData.plannedDist / 1000).toFixed(1) + ' km</span>' : '')
+    var panel = document.createElement("div");
+    panel.id = "route-side-panel";
+    panel.innerHTML =
+        '<button class="rsp-close" onclick="this.parentElement.remove();activeRouteOnMap=null;exitMapOverlay();">✕</button>'
+        + '<div class="rsp-title">' + (r.title || "") + '</div>'
+        + '<div class="rsp-meta">'
+        + '<span>⏱ ' + durText + '</span>'
+        + '<span>📍 ' + (r.stops ? r.stops.length : 0) + ' 站</span>'
+        + (mapData && mapData.plannedDist ? '<span>📏 ' + (mapData.plannedDist / 1000).toFixed(1) + ' km</span>' : '')
         + '</div>'
-        + '<div class="rip-desc">' + (r.desc || "") + '</div>'
-        + '<ol class="rip-stops">' + stopHtml + '</ol>'
-        + '</div>';
-    document.body.appendChild(popup);
-    // Animate in
-    setTimeout(function() { popup.classList.add("show"); }, 10);
-}
-
-/**
- * Load AMap Walking plugin on demand, then plan a route between consecutive
- * stops using the JS API Walking plugin (not REST — uses the same key as the map).
- * Caches real walking path in ROUTE_MAP_DATA[routeKey].plannedPath.
- * Falls back to direct-connection on failure.
- */
-function planBuiltInRoute(routeKey) {
-    // Return a promise so callers can await it
-    return new Promise(function(resolve) {
-        var r = routes[routeKey];
-        if (!r || r.isCustom || r.fromRouteDb) { resolve(); return; }
-        var mapData = ROUTE_MAP_DATA[routeKey];
-        if (!mapData || !mapData.coords || mapData.coords.length < 2) { resolve(); return; }
-        if (mapData.plannedPath || mapData._planning) { resolve(); return; }
-
-        mapData._planning = true;
-        var stops = mapData.coords;
-
-        // Use AMap v5 Direction Walking REST API (same as route-editor.html)
-        var amapKey = "5427cfbccb2209b756af7fc782e8105b";
-        var fullPath = [];
-        var totalDist = 0, totalDur = 0;
-        var segIdx = 0;
-        var segTotal = stops.length - 1;
-
-        (function planNextSegment() {
-            if (segIdx >= segTotal) {
-                if (fullPath.length < 2) {
-                    console.warn("规划路径点太少");
-                    mapData._planning = false;
-                    resolve();
-                    return;
-                }
-                mapData.plannedPath = fullPath;
-                mapData.plannedDist = totalDist;
-                mapData.plannedDur = totalDur;
-                var durMin = Math.ceil(totalDur / 60);
-                if (durMin > 0 && r.duration !== durMin) {
-                    r.duration = durMin;
-                    r.meta[0] = durMin + " 分钟";
-                }
-                mapData._planning = false;
-                if (activeRouteOnMap === routeKey && amapInstance) {
-                    clearRouteOverlays();
-                    drawRouteOnMap(routeKey);
-                    showFloatCard(routeKey);
-                }
-                resolve();
-                return;
-            }
-
-            // "lng,lat" format for AMap v5 Direction API
-            var from = stops[segIdx][1] + "," + stops[segIdx][0];
-            var to = stops[segIdx + 1][1] + "," + stops[segIdx + 1][0];
-            var url = "https://restapi.amap.com/v5/direction/walking?key=" + amapKey
-                    + "&origin=" + from + "&destination=" + to + "&show_fields=polyline";
-
-            fetch(url).then(function(resp) { return resp.json(); }).then(function(data) {
-                try {
-                    if (data.status !== "1") throw new Error(data.info || "规划失败");
-                    var path = data.route.paths[0];
-                    if (!path) throw new Error("无可用路径");
-                    totalDist += parseInt(path.distance) || 0;
-                    totalDur += parseInt(path.duration) || 0;
-                    (path.steps || []).forEach(function(s) {
-                        (s.polyline || "").split(";").forEach(function(p) {
-                            if (!p) return;
-                            var parts = p.split(",");
-                            fullPath.push([parseFloat(parts[1]), parseFloat(parts[0])]);
-                        });
-                    });
-                    segIdx++;
-                    setTimeout(planNextSegment, 1500); // QPS limit
-                } catch(e) {
-                    console.warn("段" + segIdx + "规划失败:", e.message);
-                    segIdx++;
-                    setTimeout(planNextSegment, 300);
-                }
-            }).catch(function(e) {
-                console.warn("段" + segIdx + "网络失败:", e.message);
-                segIdx++;
-                setTimeout(planNextSegment, 300);
-            });
-        })();
-    });
+        + '<div class="rsp-stops">' + (r.stops || []).map(function(s) { return '<span>' + (s.name || "") + '</span>'; }).join('') + '</div>'
+        + '<div class="rsp-hint">💡 想自定义路线？在路线编辑器中自由添加或删除途经点</div>'
+        + '<button class="rsp-edit-btn" onclick="this.closest(\'#route-side-panel\').remove();if(typeof exitMapOverlay===\'function\')exitMapOverlay();setTimeout(function(){if(typeof showMapRouteEditor===\'function\')showMapRouteEditor();},300);">✎ 编辑途经点 →</button>';
+    document.body.appendChild(panel);
+    setTimeout(function() { panel.classList.add("show"); }, 10);
 }
 
 function exitMapOverlay() {
@@ -4038,79 +3984,60 @@ function clearRouteOverlays() {
 function drawRouteOnMap(routeKey) {
     if (!window.AMap || !amapInstance) return;
 
-    const data = ROUTE_MAP_DATA[routeKey];
-    if (!data || !data.coords.length) return;
+    var data = ROUTE_MAP_DATA[routeKey];
+    if (!data || !data.coords || !data.coords.length) return;
 
-    const persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#B64236" };
-    // Use planned path (walking polyline) if available, else direct stop-to-stop
-    const linePoints = (data.plannedPath && data.plannedPath.length >= 2) ? data.plannedPath : data.coords;
-    const lngLatCoords = linePoints.map(c => [c[1], c[0]]);
+    var persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#B64236" };
 
-    // Thick polyline with direction arrows (like route editor)
-    const polyline = new AMap.Polyline({
-        path: lngLatCoords,
+    // ── DEBUG: test marker at a fixed Nanjing location ──
+    var testMarker = new AMap.Marker({
+        position: [118.796, 32.060],
+        content: '<div style="background:red;color:#fff;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:16px;font-weight:bold;">?</div>',
+        offset: new AMap.Pixel(-15, -15),
+        zIndex: 99
+    });
+    amapInstance.add(testMarker);
+    amapMarkers.push(testMarker);
+
+    // Use planned path if available, else direct stop-to-stop
+    var linePoints = (data.plannedPath && data.plannedPath.length >= 2) ? data.plannedPath : data.coords;
+    // Convert [lat, lng] → [lng, lat] for AMap
+    var lnglats = linePoints.map(function(c) { return [c[1], c[0]]; });
+
+    // Simple solid polyline (same approach as addAllRouteOverlays which works)
+    var polyline = new AMap.Polyline({
+        path: lnglats,
         strokeColor: persona.color,
-        strokeOpacity: 0.95,
-        strokeWeight: 7,
+        strokeOpacity: 0.9,
+        strokeWeight: 6,
         strokeStyle: "solid",
         lineJoin: "round",
-        lineCap: "round",
-        showDir: true,
-        dirColor: persona.color,
-        zIndex: 50,
     });
     amapInstance.add(polyline);
     amapRouteLines.push(polyline);
 
-    // Glow line under for visual depth
-    const glowLine = new AMap.Polyline({
-        path: lngLatCoords,
-        strokeColor: persona.color,
-        strokeOpacity: 0.18,
-        strokeWeight: 18,
-        strokeStyle: "solid",
-        lineJoin: "round",
-        zIndex: 49,
-    });
-    amapInstance.add(glowLine);
-    amapRouteLines.push(glowLine);
-
-    const markers = [];
-
-    // Numbered station markers for each stop (clear like route editor)
-    var stopCount = data.stops.length || data.coords.length;
-    data.coords.forEach((c, i) => {
-        var idx = i + 1;
-        var label = data.stops[i] || "途经点 " + idx;
-        var mc = document.createElement("div");
-        mc.className = "route-marker";
-        // First = start flag, last = destination, middle = number
-        var iconHtml = i === 0
-            ? '<span class="marker-num" style="background:' + persona.color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">始</span>'
-            : (i === data.coords.length - 1
-                ? '<span class="marker-num" style="background:' + persona.color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">终</span>'
-                : '<span class="marker-num" style="background:' + persona.color + ';color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">' + idx + '</span>');
-        mc.innerHTML = iconHtml + '<span style="font-size:12px;font-weight:600;">' + label + '</span>';
-
+    // Stop markers using data.coords
+    data.coords.forEach(function(c, i) {
+        var label = data.stops[i] || "途经点";
+        var el = document.createElement("div");
+        el.className = "route-marker";
+        el.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
         var marker = new AMap.Marker({
             position: [c[1], c[0]],
-            content: mc,
-            offset: new AMap.Pixel(-30, -14),
+            content: el,
+            offset: new AMap.Pixel(-30, -10),
             zIndex: 60,
         });
         marker._routeKey = routeKey;
         marker.on("click", function() { openRoute(routeKey); });
         amapInstance.add(marker);
         amapMarkers.push(marker);
-        markers.push(marker);
     });
 
-    // Tighter zoom to fit route with clear padding
-    var overlays = [polyline, glowLine].concat(markers);
+    // Fit view
     try {
-        amapInstance.setFitView(overlays, false, 80);
+        amapInstance.setFitView(null, false, 80);
     } catch(e) {
-        // fallback
         amapInstance.setZoom(15);
         amapInstance.setCenter([118.796, 32.060]);
     }
@@ -6950,11 +6877,6 @@ showRouteOnMap = function(routeKey) {
     };
     showGuideBubble(GUIDE_ROUTE_MSGS[routeKey] || "这条路线看起来不错！");
 
-    // Trigger route planning for built-in routes (async, improves polyline)
-    const r = routes[routeKey];
-    if (r && !r.isCustom && !r.fromRouteDb) {
-        setTimeout(function() { planBuiltInRoute(routeKey); }, 800);
-    }
 };
 
 // Start guide bubble scheduling after main page shows
