@@ -2463,6 +2463,79 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 }
 .feature-btn-secondary:active { background: #E2E5ED; }
 
+.home-persona-reco {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(24,33,43,0.06);
+    box-shadow: 0 3px 12px rgba(24,33,43,0.04);
+}
+.home-persona-reco-head {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 9px;
+}
+.home-persona-reco-head span {
+    font-size: 13px;
+    font-weight: 700;
+    color: #18212B;
+}
+.home-persona-reco-head small {
+    font-size: 10px;
+    line-height: 1.35;
+    color: #6B7280;
+}
+.home-place-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.home-place-strip::-webkit-scrollbar { display: none; }
+.home-place-card {
+    min-width: 112px;
+    max-width: 132px;
+    border: 0;
+    border-radius: 8px;
+    background: #F7F8F6;
+    padding: 0;
+    overflow: hidden;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+}
+.home-place-card img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+    background: #E7ECE8;
+}
+.home-place-card span,
+.home-place-card small {
+    display: block;
+    padding: 0 8px;
+}
+.home-place-card span {
+    margin-top: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #18212B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.home-place-card small {
+    margin: 2px 0 8px;
+    font-size: 9px;
+    color: #7D8792;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ═══ More Section — 元气极简 ═══ */
 .more-section {
     justify-content: center;
@@ -2639,6 +2712,101 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     transition: transform 0.15s ease, opacity 0.2s ease;
 }
 .guide-block-btn:active { transform: scale(0.95); opacity: 0.8; }
+
+.home-merchant-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+.home-merchant-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 4px;
+}
+.home-merchant-head span {
+    font-size: 15px;
+    font-weight: 700;
+    color: #18212B;
+}
+.home-merchant-head small {
+    font-size: 10px;
+    color: #7D8792;
+    white-space: nowrap;
+}
+.home-merchant-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+}
+.home-merchant-scroll::-webkit-scrollbar { display: none; }
+.home-merchant-card {
+    min-width: 168px;
+    max-width: 190px;
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid rgba(24,33,43,0.06);
+    border-radius: 8px;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(24,33,43,0.04);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.home-merchant-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: #F3F6F0;
+    font-size: 17px;
+}
+.home-merchant-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.home-merchant-copy strong {
+    font-size: 11px;
+    color: #18212B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.home-merchant-copy small {
+    font-size: 9px;
+    color: #7D8792;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.home-merchant-tags {
+    display: flex;
+    gap: 4px;
+    overflow: hidden;
+}
+.home-merchant-tags span {
+    font-size: 8px;
+    color: #2E7D4F;
+    background: rgba(46,125,79,0.08);
+    border-radius: 999px;
+    padding: 2px 5px;
+    white-space: nowrap;
+}
+.home-merchant-price {
+    font-size: 12px;
+    font-weight: 800;
+    color: #D45E38;
+}
 
 /* ═══ Animations — scroll-triggered fades ═══ */
 .animate-in {
