@@ -235,6 +235,77 @@ const personaCards = [
 ];
 
 // ═══════════════════════════════════════════
+//  Persona → Merchant Preference Mapping
+//  人格选择后，系统据此推送相应路线商家
+// ═══════════════════════════════════════════
+const PERSONA_MERCHANT_PREF = {
+    foodie: {
+        label: "美食家专属推荐",
+        priorityCats: ["food", "coffee"],
+        priorityTags: ["老字号", "金陵菜", "火锅", "海鲜", "小吃", "南京味", "深夜食堂", "湘菜", "麻辣"],
+        prioritySubcats: ["汤包", "面馆", "烧腊", "牛排馆", "烤鱼", "私房菜", "本帮菜", "日料", "海鲜"],
+        excludeTags: [],
+        desc: "地道南京味，烟火气十足"
+    },
+    reader: {
+        label: "文学爱好者专属推荐",
+        priorityCats: ["coffee", "food"],
+        priorityTags: ["安静", "文艺", "书店", "精品", "手冲", "阅读", "下午茶", "甜点"],
+        prioritySubcats: ["书店咖啡", "精品咖啡", "烘焙咖啡", "连锁咖啡", "新式茶馆"],
+        excludeTags: ["火锅", "麻辣", "夜宵"],
+        desc: "适合安静发呆的角落"
+    },
+    sport: {
+        label: "运动达人专属推荐",
+        priorityCats: ["food", "coffee"],
+        priorityTags: ["健康", "养生", "素食", "轻食", "活力", "早餐", "高蛋白"],
+        prioritySubcats: ["素食馆", "轻食", "果汁吧", "沙拉", "烘焙咖啡"],
+        excludeTags: ["深夜食堂", "火锅", "麻辣"],
+        desc: "元气满满的能量补给站"
+    },
+    coffee: {
+        label: "咖啡漫游者专属推荐",
+        priorityCats: ["coffee", "food"],
+        priorityTags: ["咖啡", "下午茶", "甜点", "手冲", "烘焙", "安静", "文艺", "拍照"],
+        prioritySubcats: ["烘焙咖啡", "连锁咖啡", "精品咖啡", "新式茶馆", "创意茶饮", "书店咖啡"],
+        excludeTags: ["火锅", "麻辣", "夜宵"],
+        desc: "慢慢逛、慢慢喝的午后时光"
+    },
+    history: {
+        label: "历史探索者专属推荐",
+        priorityCats: ["food", "ticket", "coffee"],
+        priorityTags: ["老字号", "金陵菜", "传统", "南京味", "古法", "百年", "私房菜", "本帮菜"],
+        prioritySubcats: ["本帮菜", "私房菜", "素食馆", "汤包"],
+        excludeTags: ["快餐", "网红"],
+        desc: "老南京的味道，百年传承"
+    },
+    photo: {
+        label: "拍照打卡党专属推荐",
+        priorityCats: ["coffee", "food"],
+        priorityTags: ["网红", "出片", "拍照", "打卡", "氛围感", "创意", "ins", "高颜值"],
+        prioritySubcats: ["新式茶馆", "创意茶饮", "精品咖啡", "烘焙咖啡", "书店咖啡"],
+        excludeTags: [],
+        desc: "颜值与味道都在线的出片好店"
+    },
+    night: {
+        label: "夜游玩家专属推荐",
+        priorityCats: ["food", "coffee"],
+        priorityTags: ["夜宵", "深夜食堂", "居酒屋", "烤鱼", "火锅", "麻辣", "烧烤", "24小时"],
+        prioritySubcats: ["烤鱼", "麻辣烫", "汤包", "面馆", "居酒屋", "烧烤"],
+        excludeTags: ["早餐"],
+        desc: "入夜金陵，越夜越有味"
+    },
+    nju: {
+        label: "校园情怀派专属推荐",
+        priorityCats: ["food", "coffee"],
+        priorityTags: ["早餐", "小吃", "学生", "便宜", "实惠", "南京甜口", "糕团", "社区店"],
+        prioritySubcats: ["汤包", "面馆", "麻辣烫", "连锁咖啡", "烘焙咖啡"],
+        excludeTags: ["高端", "宴请", "预约制"],
+        desc: "梧桐树下的平价好味道"
+    }
+};
+
+// ═══════════════════════════════════════════
 //  Pet Companion System · 陪伴精灵系统
 // ═══════════════════════════════════════════
 
@@ -2008,6 +2079,14 @@ loadCustomRoutes();
 function openRoute(key) {
     const r = routes[key];
     if (!r) return;
+
+    // Exit pure map mode so the route sheet is visible
+    if (mapModePure && typeof window.citygoSetPureMapMode === "function") {
+        window.citygoSetPureMapMode(false);
+    }
+    // Ensure we're on home tab
+    if (currentTab !== "home") switchTab("home");
+
     currentRouteKey = key;
     const routeId = ROUTE_KEY_TO_ID[key] || 1;
     sheetBody.innerHTML =
@@ -2764,7 +2843,10 @@ function showMainPage() {
     const scrollHint = document.querySelector(".scroll-hint");
 
     function getMapPOIsForPureMode() {
-        const buildings = getCitygoBuildingPoints();
+        // Use merged landmarks (includes CITYGO_BUILDING_POINTS + NANJING_LANDMARKS)
+        const buildings = typeof window.getNanjingLandmarkPOIs === 'function'
+            ? window.getNanjingLandmarkPOIs()
+            : getCitygoBuildingPoints();
         const custom = Array.isArray(window.citygoMapPOIs) ? window.citygoMapPOIs : [];
         return custom.length ? buildings.concat(custom) : buildings;
     }
@@ -2775,6 +2857,7 @@ function showMainPage() {
         }
         window._citygoPoiMarkers = [];
         document.querySelector(".poi-info-card")?.remove();
+        document.querySelector(".poi-info-backdrop")?.remove();
     }
 
     function renderMapPOIs() {
@@ -2857,8 +2940,18 @@ function showMainPage() {
     };
 
     function showPOIInfoCard(poi) {
-        // Remove existing card
+        // Remove existing card and backdrop
         document.querySelector(".poi-info-card")?.remove();
+        document.querySelector(".poi-info-backdrop")?.remove();
+
+        // Create backdrop for click-outside-to-close
+        const backdrop = document.createElement("div");
+        backdrop.className = "poi-info-backdrop";
+        backdrop.addEventListener("click", function() {
+            backdrop.remove();
+            document.querySelector(".poi-info-card")?.remove();
+        });
+
         const card = document.createElement("div");
         card.className = "poi-info-card";
         const tags = Array.isArray(poi.tags) ? poi.tags.slice(0, 5) : [];
@@ -2867,7 +2960,7 @@ function showMainPage() {
             ? `定位标号${poi.markerLabel ? ` ${poi.markerLabel}` : ""}`
             : (poi.category || "地点");
         card.innerHTML = `
-            <button class="poi-info-close">✕</button>
+            <button class="poi-info-close" title="关闭">✕</button>
             ${poi.image ? `<img class="poi-info-image" src="${escapeHtml(poi.image)}" alt="${escapeHtml(poi.name || "点位图片")}" loading="lazy">` : ""}
             <div class="poi-info-category">${escapeHtml(categoryLabel)}</div>
             <h3 class="poi-info-name">${escapeHtml(poi.name)}</h3>
@@ -2875,8 +2968,18 @@ function showMainPage() {
             ${poi.address ? `<p class="poi-info-address">${escapeHtml(poi.address)}</p>` : ""}
             ${tags.length ? `<div class="poi-info-tags">${tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
         `;
-        card.querySelector(".poi-info-close").addEventListener("click", () => card.remove());
-        document.getElementById("map-stage")?.appendChild(card);
+        card.querySelector(".poi-info-close").addEventListener("click", function() {
+            card.remove();
+            backdrop.remove();
+        });
+        // Prevent card clicks from bubbling to backdrop
+        card.addEventListener("click", function(e) { e.stopPropagation(); });
+
+        const mapStage = document.getElementById("map-stage");
+        if (mapStage) {
+            mapStage.appendChild(backdrop);
+            mapStage.appendChild(card);
+        }
     }
 
     document.getElementById("community-open-btn")?.addEventListener("click", openCommunityOverlay);
@@ -2887,7 +2990,7 @@ function showMainPage() {
 
     // Sync initial tab state
     switchTab("home");
-    setTimeout(initAMap, 300);
+    setTimeout(initAMap, 100);
     initPet77Overlay();
 
     // ── Pet idle timer ──
@@ -3319,7 +3422,7 @@ const ROUTE_MAP_DATA = {
     },
     food: {
         coords: [[32.045, 118.790], [32.046, 118.791], [32.044, 118.785], [32.048, 118.788]],
-        stops: ["街角咖啡馆", "独立书店", "梧桐小径", "晚餐小馆"],
+        stops: [],
         plannedPath: [
 [32.04503,118.790004],[32.044926,118.790647],[32.044922,118.790647],[32.044983,118.790664],[32.044983,118.790664],[32.045347,118.790755],[32.045347,118.790755],[32.045599,118.790825],[32.045699,118.790877],[32.045699,118.790877],[32.045938,118.790942],[32.045938,118.790942],[32.046003,118.790959],[32.045942,118.790946],[32.045942,118.790946],[32.045703,118.790881],[32.045703,118.790881],[32.045603,118.790829],[32.045352,118.79076],[32.045352,118.79076],[32.044987,118.790668],[32.044987,118.790668],[32.044926,118.790651],[32.044926,118.790651],[32.044874,118.790642],[32.044874,118.790642],[32.044761,118.790599],[32.044761,118.790599],[32.044679,118.790573],[32.044679,118.790573],[32.044371,118.790486],[32.044371,118.790486],[32.044314,118.790469],[32.044314,118.790469],[32.044219,118.790443],[32.044219,118.790443],[32.044128,118.790404],[32.044128,118.790404],[32.043941,118.790308],[32.043737,118.790165],[32.043737,118.790165],[32.043312,118.789931],[32.043312,118.789931],[32.043034,118.789848],[32.043034,118.789848],[32.042778,118.78977],[32.042778,118.78977],[32.042635,118.789701],[32.04263,118.789696],[32.042674,118.789488],[32.042674,118.789488],[32.04276,118.789106],[32.04276,118.789106],[32.042782,118.789032],[32.042782,118.789032],[32.042808,118.788898],[32.042808,118.788898],[32.042865,118.788602],[32.042865,118.788602],[32.042899,118.788372],[32.042899,118.788372],[32.042912,118.78829],[32.042912,118.78829],[32.042934,118.78819],[32.042934,118.78819],[32.043038,118.787778],[32.043038,118.787778],[32.04309,118.7876],[32.04309,118.7876],[32.043177,118.78727],[32.043177,118.78727],[32.043312,118.786736],[32.043312,118.786736],[32.043381,118.786476],[32.043381,118.786476],[32.043507,118.786128],[32.043507,118.786128],[32.043594,118.785898],[32.043594,118.785898],[32.043641,118.785755],[32.043641,118.785755],[32.043659,118.785642],[32.043811,118.785256],[32.043845,118.785208],[32.043845,118.785208],[32.043824,118.785165],[32.043845,118.785204],[32.043845,118.785204],[32.043815,118.785252],[32.043663,118.785638],[32.043646,118.785751],[32.043646,118.785751],[32.043598,118.785894],[32.043598,118.785894],[32.043511,118.786124],[32.043511,118.786124],[32.043385,118.786471],[32.043385,118.786471],[32.043316,118.786732],[32.043316,118.786732],[32.043181,118.787266],[32.043181,118.787266],[32.04309,118.787595],[32.04309,118.787595],[32.043043,118.787773],[32.043043,118.787773],[32.042938,118.788186],[32.042934,118.788186],[32.043459,118.78826],[32.043459,118.78826],[32.04355,118.788203],[32.043937,118.788255],[32.043937,118.788255],[32.044492,118.788351],[32.044622,118.788381],[32.044622,118.788381],[32.044705,118.788403],[32.044705,118.788403],[32.044779,118.788424],[32.044779,118.788424],[32.044848,118.788442],[32.044848,118.788442],[32.045265,118.788524],[32.045764,118.788646],[32.045764,118.788646],[32.046081,118.788728],[32.04615,118.788798],[32.04615,118.788798],[32.046354,118.788837],[32.046354,118.788837],[32.046753,118.788911],[32.046753,118.788911],[32.046888,118.788885],[32.047118,118.788915],[32.047791,118.789023],[32.047791,118.789023],[32.047973,118.788429],[32.047973,118.788429],[32.048077,118.78819],[32.048121,118.788129]
         ],
@@ -3410,12 +3513,23 @@ function showBuildingPointDetail(point, fallbackTitle = "定位标号") {
 function initAMap() {
     if (amapInitializing) return;
     if (amapInstance) {
-        amapInstance.resize();
-        return;
+        // Check if map is still alive (not destroyed by external cause)
+        try { amapInstance.resize(); } catch(e) {
+            console.warn("Map instance dead, re-initializing...");
+            amapInstance = null;
+            amapReady = false;
+            amapInitializing = false;
+        }
+        if (amapInstance) return;
     }
 
     const container = document.getElementById("main-map-container");
     if (!container) return;
+    if (container.offsetParent === null || container.offsetWidth === 0) {
+        // Container not visible — defer init
+        setTimeout(initAMap, 500);
+        return;
+    }
 
     amapInitializing = true;
     // Show loading bar immediately — hide only after tiles fully render
@@ -3441,13 +3555,13 @@ function initAMap() {
         AMapLoader.load({
             key: "acbce3442afa6bf6251bc8014a1594b8",
             version: "2.0",
-            plugins: ["AMap.ToolBar", "AMap.Scale", "AMap.MapType"],
+            plugins: ["AMap.ToolBar", "AMap.Scale"],
         }).then((AMap) => {
             amapInstance = new AMap.Map(container, {
                 zoom: personaStyle.zoom,
-                center: [118.796, 32.060],  // Nanjing center
-                viewMode: "3D",
-                pitch: personaStyle.pitch,
+                center: [118.796, 32.060],
+                viewMode: "2D",
+                pitch: 0,
                 mapStyle: personaStyle.style,
                 showIndoorMap: false,
             });
@@ -3558,7 +3672,8 @@ function addAllRouteOverlays(AMap) {
             }
         }
 
-        // Add markers for each stop
+        // Add markers for each stop (skip if no stop names provided)
+        if (!stops.length) return;
         coords.forEach((c, i) => {
             const label = stops[i] || "途经点";
             const markerContent = document.createElement("div");
@@ -4325,6 +4440,11 @@ function showRouteOnMap(routeKey) {
     var r = routes[routeKey];
     if (!r) return;
 
+    // Exit pure map mode so route panel can appear
+    if (mapModePure && typeof window.citygoSetPureMapMode === "function") {
+        window.citygoSetPureMapMode(false);
+    }
+
     // If map not ready, load it first
     if (!amapInstance || !amapReady) {
         showMapLoading("正在连接地图服务…");
@@ -4776,13 +4896,13 @@ function switchTab(tab) {
     // Always clean up drawer-open state
     if (mainPage) mainPage.classList.remove("drawer-open");
 
-    // Hide map stage by default (map is no longer a primary tab)
-    if (mapStage) mapStage.style.display = "none";
+    // Hide map stage for non-home tabs — use visibility to avoid re-render
+    if (mapStage) { mapStage.style.visibility = "hidden"; mapStage.style.opacity = "0"; }
     if (dimOverlay) dimOverlay.style.display = "none";
 
     if (tab === "home") {
         // Home — map as visual backdrop, snap scroll on top
-        if (mapStage) mapStage.style.display = "";
+        if (mapStage) { mapStage.style.visibility = "visible"; mapStage.style.opacity = "1"; mapStage.style.display = ""; }
         if (dimOverlay) dimOverlay.style.display = "none";
         const mapContainer = document.getElementById("main-map-container");
         if (mapContainer) {
@@ -7719,24 +7839,71 @@ function escapeHtml(str) {
 function getHomeMerchantItems(routeKey = getHomeRecommendedRouteKey()) {
     const allData = (typeof SUPPLY_DATA !== "undefined") ? SUPPLY_DATA.getAll() : [];
     if (!allData.length) return [];
+
+    // Determine persona preference or fall back to route-based
+    const personaId = selectedPersonaId || (selectedPersonas[0] && selectedPersonas[0].id);
+    const pref = PERSONA_MERCHANT_PREF[personaId] || null;
+
+    // Fallback: route-based category priority (when no persona selected)
     const categoryPriority = {
         night: ["food", "coffee"],
         food: ["food", "coffee"],
         nju: ["coffee", "food"],
         expo: ["ticket", "coffee", "food"],
     }[routeKey] || ["food", "coffee", "ticket"];
+
     return allData
-        .filter(item => categoryPriority.includes(item.category))
-        .map(item => ({
-            item,
-            score:
-                (categoryPriority.indexOf(item.category) === 0 ? 6 : 3) +
-                (item.onRoute ? 4 : 0) +
-                (Number(item.rating || 0) * 1.5) -
-                Math.min(Number(item.distance || 3000), 3000) / 1000,
-        }))
+        .map(item => {
+            let score = 0;
+
+            if (pref) {
+                // ── Persona-based scoring ──
+                // Category match (highest weight)
+                const catIdx = pref.priorityCats.indexOf(item.category);
+                if (catIdx === 0) score += 8;
+                else if (catIdx > 0) score += 5;
+                else score -= 2; // Penalize non-priority categories
+
+                // Tag match — each matching tag boosts score
+                const itemTags = (item.tags || []).map(t => String(t).toLowerCase());
+                const prefTags = pref.priorityTags.map(t => t.toLowerCase());
+                const tagMatches = itemTags.filter(t => prefTags.some(pt => t.includes(pt) || pt.includes(t)));
+                score += tagMatches.length * 5;
+
+                // Subcategory match
+                const itemSub = String(item.subcategory || "").toLowerCase();
+                const subMatch = pref.prioritySubcats.some(s => itemSub.includes(s.toLowerCase()));
+                if (subMatch) score += 4;
+
+                // Excluded tags — heavy penalty
+                const excludeMatches = itemTags.filter(t =>
+                    pref.excludeTags.some(et => t.includes(et.toLowerCase()))
+                );
+                if (excludeMatches.length) score -= excludeMatches.length * 6;
+
+                // Rating bonus
+                score += (Number(item.rating || 0) - 3.5) * 3;
+
+                // On-route bonus (if route matches persona's recommended route)
+                if (item.onRoute) score += 4;
+
+                // Distance penalty (closer = better)
+                score -= Math.min(Number(item.distance || 3000), 3000) / 800;
+            } else {
+                // ── Fallback: route-based scoring (original logic) ──
+                if (!categoryPriority.includes(item.category)) return { item, score: -999 };
+                score =
+                    (categoryPriority.indexOf(item.category) === 0 ? 6 : 3) +
+                    (item.onRoute ? 4 : 0) +
+                    (Number(item.rating || 0) * 1.5) -
+                    Math.min(Number(item.distance || 3000), 3000) / 1000;
+            }
+
+            return { item, score };
+        })
+        .filter(entry => entry.score > -900)
         .sort((a, b) => b.score - a.score)
-        .slice(0, 6)
+        .slice(0, 8)
         .map(entry => entry.item);
 }
 
@@ -7764,6 +7931,11 @@ function renderHomeMerchantRecommendations(items) {
     const routeKey = getHomeRecommendedRouteKey();
     const route = routes[routeKey];
     const merchants = Array.isArray(items) && items.length ? items : getHomeMerchantItems(routeKey);
+
+    // Get persona info for personalized title
+    const personaId = selectedPersonaId || (selectedPersonas[0] && selectedPersonas[0].id);
+    const pref = PERSONA_MERCHANT_PREF[personaId] || null;
+
     let section = moreSection.querySelector(".home-merchant-section");
     if (!section) {
         section = document.createElement("div");
@@ -7783,8 +7955,8 @@ function renderHomeMerchantRecommendations(items) {
     }
     section.innerHTML = `
         <div class="home-merchant-head">
-            <span>商户推荐</span>
-            <small>${escapeHtml(getRouteDisplayTitle(route))}附近好店</small>
+            <span>${pref ? pref.label : "商户推荐"}</span>
+            <small>${escapeHtml(pref ? pref.desc : getRouteDisplayTitle(route) + "附近好店")}</small>
         </div>
         <div class="home-merchant-scroll">
             ${merchants.map(renderHomeMerchantCard).join("")}

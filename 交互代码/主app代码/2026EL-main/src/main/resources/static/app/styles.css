@@ -1273,6 +1273,13 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     font-weight: 800;
     line-height: 1;
 }
+.poi-info-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 55;
+    background: rgba(0,0,0,0.15);
+    animation: poiCardIn 0.25s ease-out;
+}
 .poi-info-card {
     position: absolute;
     left: 16px;
@@ -1298,19 +1305,22 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     position: absolute;
     top: 8px;
     right: 12px;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    border: none;
-    background: rgba(0,0,0,0.06);
-    color: #666;
-    font-size: 14px;
+    border: 2px solid rgba(255,255,255,0.9);
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 16px;
     cursor: pointer;
     display: grid;
     place-items: center;
     font-family: inherit;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
-.poi-info-close:active { background: rgba(0,0,0,0.12); }
+.poi-info-close:active { background: rgba(0,0,0,0.75); transform: scale(0.92); }
 .poi-info-image {
     display: block;
     width: calc(100% + 4px);
