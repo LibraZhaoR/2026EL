@@ -1374,8 +1374,8 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 5;
-    top: 0;
+    z-index: 35;
+    top: 74px;
     overflow-y: scroll;
     overflow-x: hidden;
     scroll-snap-type: y mandatory;
@@ -1388,7 +1388,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 /* ── Snap Section — each fills viewport minus bottom nav ── */
 .snap-section {
     scroll-snap-align: start;
-    min-height: calc(100vh - 64px);
+    min-height: calc(100vh - 138px);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -2825,7 +2825,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 10;
+    z-index: 70;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -8302,12 +8302,14 @@ body.community-tab-active .ai-float-btn {
     display: flex;
     align-items: center;
     justify-content: center;
+    pointer-events: none;
 }
 .map-loading-bg {
     position: absolute;
     inset: 0;
     background: rgba(24,33,43,0.5);
     backdrop-filter: blur(8px);
+    pointer-events: none;
 }
 .map-loading-box {
     position: relative;

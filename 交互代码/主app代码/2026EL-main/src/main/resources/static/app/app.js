@@ -4789,7 +4789,7 @@ function switchTab(tab) {
             mapContainer.style.display = "block";
             mapContainer.classList.remove("amap-fullscreen");
             mapContainer.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
-            mapContainer.style.pointerEvents = "auto";
+            mapContainer.style.pointerEvents = "none";
         }
         const header = document.querySelector(".main-header");
         if (header) { header.style.display = ""; header.style.opacity = "1"; }
@@ -7716,43 +7716,87 @@ function escapeHtml(str) {
    美团 API 美食数据 · Meituan Food Deals
    ═══════════════════════════════════════ */
 
-function loadMeituanDeals() {
-    // Insert Meituan section after inspiration section
-    const inspSection = document.querySelector(".inspiration-section");
-    if (!inspSection) return;
+function getHomeMerchantItems(routeKey = getHomeRecommendedRouteKey()) {
+    const allData = (typeof SUPPLY_DATA !== "undefined") ? SUPPLY_DATA.getAll() : [];
+    if (!allData.length) return [];
+    const categoryPriority = {
+        night: ["food", "coffee"],
+        food: ["food", "coffee"],
+        nju: ["coffee", "food"],
+        expo: ["ticket", "coffee", "food"],
+    }[routeKey] || ["food", "coffee", "ticket"];
+    return allData
+        .filter(item => categoryPriority.includes(item.category))
+        .map(item => ({
+            item,
+            score:
+                (categoryPriority.indexOf(item.category) === 0 ? 6 : 3) +
+                (item.onRoute ? 4 : 0) +
+                (Number(item.rating || 0) * 1.5) -
+                Math.min(Number(item.distance || 3000), 3000) / 1000,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6)
+        .map(entry => entry.item);
+}
 
-    // Check if already inserted
-    if (document.querySelector(".meituan-section")) return;
+function renderHomeMerchantCard(item) {
+    const dist = Number(item.distance || 0) >= 1000
+        ? `${(Number(item.distance) / 1000).toFixed(1)}km`
+        : `${item.distance || 500}m`;
+    const tags = (item.tags || []).slice(0, 2).map(tag => `<span>${escapeHtml(tag)}</span>`).join("");
+    return `
+        <button class="home-merchant-card" type="button" data-store-id="${escapeHtml(item.id)}">
+            <span class="home-merchant-icon">${categoryIcon(item.category)}</span>
+            <span class="home-merchant-copy">
+                <strong>${escapeHtml(item.name)}</strong>
+                <small>${escapeHtml(item.subcategory || "南京本地商户")} · ${dist} · ${Number(item.rating || 4).toFixed(1)}分</small>
+                <span class="home-merchant-tags">${tags}</span>
+            </span>
+            <span class="home-merchant-price">¥${item.avgPrice || "--"}</span>
+        </button>
+    `;
+}
 
-    const meituanSection = document.createElement("section");
-    meituanSection.className = "meituan-section";
-    meituanSection.innerHTML = `
-        <h2 class="section-title">周边美食</h2>
-        <div class="meituan-grid" id="meituan-grid">
-            <div class="meituan-loading">正在搜索附近美食...</div>
+function renderHomeMerchantRecommendations(items) {
+    const moreSection = document.getElementById("more-section");
+    if (!moreSection) return;
+    const routeKey = getHomeRecommendedRouteKey();
+    const route = routes[routeKey];
+    const merchants = Array.isArray(items) && items.length ? items : getHomeMerchantItems(routeKey);
+    let section = moreSection.querySelector(".home-merchant-section");
+    if (!section) {
+        section = document.createElement("div");
+        section.className = "home-merchant-section";
+        const guideBlock = document.getElementById("guide-block");
+        if (guideBlock) guideBlock.before(section);
+        else moreSection.appendChild(section);
+    }
+    if (!merchants.length) {
+        section.innerHTML = `
+            <div class="home-merchant-head">
+                <span>商户推荐</span>
+                <small>暂无可展示商户</small>
+            </div>
+        `;
+        return;
+    }
+    section.innerHTML = `
+        <div class="home-merchant-head">
+            <span>商户推荐</span>
+            <small>${escapeHtml(getRouteDisplayTitle(route))}附近好店</small>
+        </div>
+        <div class="home-merchant-scroll">
+            ${merchants.map(renderHomeMerchantCard).join("")}
         </div>
     `;
-    inspSection.after(meituanSection);
+    section.querySelectorAll(".home-merchant-card").forEach(card => {
+        card.addEventListener("click", () => showPoiDetailOverlayDianping(card.dataset.storeId));
+    });
+}
 
-    // Fetch deals from backend
-    fetch("/api/meituan/deals?lat=32.056&lng=118.779&category=food")
-        .then(res => res.json())
-        .then(data => {
-            const grid = document.getElementById("meituan-grid");
-            if (!grid) return;
-
-            const deals = data.data?.deals || data.data || data.deals || [];
-            if (!deals.length) {
-                // Show mock data if API returns empty
-                renderMockMeituanDeals(grid);
-                return;
-            }
-            renderMeituanDeals(grid, deals);
-        })
-        .catch(() => {
-            const grid = document.getElementById("meituan-grid");
-            if (grid) renderMockMeituanDeals(grid);
-        });
+function loadMeituanDeals() {
+    renderHomeMerchantRecommendations();
 }
 
 function renderMeituanDeals(grid, deals) {
