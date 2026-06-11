@@ -16,7 +16,9 @@
 <div class="app-root" id="app-root">
     <!-- Opening overlay — click to dismiss -->
     <section class="opening" id="opening">
-        <h1>南京<br>从这里开始</h1>
+        <h1>南京，<br>今天去哪儿？</h1>
+        <p>从一幅水墨开始。</p>
+        <span class="opening-tap-hint">点击进入</span>
     </section>
 
     <div class="stage" id="stage">
@@ -230,12 +232,34 @@
             <div class="float-card-sub" id="float-card-sub">路线描述</div>
         </div>
     </div>
+    <div class="float-card-info" id="float-card-info">
+        <span class="float-card-time" id="float-card-time">⏱ 计算中…</span>
+        <span class="float-card-stops-count" id="float-card-stops-count"></span>
+    </div>
     <div class="float-card-stops" id="float-card-stops"></div>
     <div class="float-card-actions">
         <button class="float-card-btn primary" id="float-card-start">开始路线</button>
         <button class="float-card-btn secondary" id="float-card-invite">邀朋友</button>
     </div>
 </div>
+
+<!-- ═══ 地图加载进度条 ═══ -->
+<div class="map-loading-overlay" id="map-loading-overlay" style="display:none;">
+    <div class="map-loading-bg"></div>
+    <div class="map-loading-box">
+        <div class="map-loading-spinner"></div>
+        <div class="map-loading-text" id="map-loading-text">地图加载中…</div>
+        <div class="map-loading-bar">
+            <div class="map-loading-bar-fill" id="map-loading-bar-fill"></div>
+        </div>
+        <div class="map-loading-pct" id="map-loading-pct">0%</div>
+    </div>
+</div>
+
+<!-- ═══ 地图恢复路线面板按钮 ═══ -->
+<button class="map-restore-btn" id="map-restore-btn" style="display:none;">
+    <span>↑</span> 查看路线
+</button>
 
 <!-- ═══ 路线详情弹窗 ═══ -->
 <div class="route-sheet" id="route-sheet">

@@ -1798,7 +1798,6 @@ function loadCustomRoutes() {
                 hasMapData: !!(cr.coords && cr.coords.length)
             };
             customRoutes[key] = cr;
-            // Restore map data for routes created via map editor
             if (cr.coords && cr.coords.length) {
                 ROUTE_MAP_DATA[key] = {
                     coords: cr.coords,
@@ -1808,6 +1807,54 @@ function loadCustomRoutes() {
         });
         CUSTOM_ROUTE_COUNTER = saved.length;
     } catch(e) { customRoutes = {}; }
+
+    // 异步同步路线数据库中的用户路线
+    syncRoutesFromRouteDb();
+}
+
+// ── 从路线数据库拉取用户路线并合并 ──
+async function syncRoutesFromRouteDb() {
+    try {
+        const res = await fetch('/api/route-db/routes?is_official=0&user_id=local-user&size=50');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.items || !data.items.length) return;
+
+        for (const rt of data.items) {
+            // 转换为 app 内部格式
+            const points = rt.points || [];
+            const stops = points.map(p => ({
+                name: p.name,
+                detail: p.description || p.address || '',
+                story: p.description || ''
+            }));
+            const key = "rdb_" + rt.id;
+            const duration = rt.duration_min || 120;
+            const budget = rt.budget_max > 0 ? (rt.budget_min + ' - ' + rt.budget_max + ' 元') : '自由预算';
+
+            routes[key] = {
+                title: rt.title,
+                desc: rt.description || '来自路线数据库',
+                meta: [duration + ' 分钟', rt.category || '自定义', budget],
+                duration: duration,
+                stops: stops,
+                isCustom: true,
+                fromRouteDb: true,
+                routeDbId: rt.id,
+                budget: budget,
+                hasMapData: points.length > 0
+            };
+            // 地图数据
+            if (points.length > 0) {
+                ROUTE_MAP_DATA[key] = {
+                    coords: points.map(p => [p.latitude, p.longitude]),
+                    stops: points.map(p => p.name)
+                };
+            }
+        }
+    } catch(e) {
+        console.warn('路线数据库同步失败:', e.message);
+    }
 }
 
 function saveCustomRoutesToStorage() {
@@ -1888,6 +1935,65 @@ function saveCustomRouteFromEditor(d) {
 
     saveCustomRoutesToStorage();
     CUSTOM_ROUTE_COUNTER++;
+
+    // 异步同步到路线数据库
+    syncToRouteDb(d, mapCoords, stopNames, duration);
+}
+
+// ── 将路线编辑器的数据同步到路线数据库 ──
+async function syncToRouteDb(d, mapCoords, stopNames, duration) {
+    try {
+        const points = [];
+        const allPts = d.stops && d.stops.length ? d.stops : [];
+        allPts.forEach((stop, i) => {
+            let lat, lng;
+            if (stop.lnglat) {
+                const parts = stop.lnglat.split(',');
+                lng = parseFloat(parts[0]);
+                lat = parseFloat(parts[1]);
+            } else if (mapCoords[i]) {
+                lat = mapCoords[i][0];
+                lng = mapCoords[i][1];
+            }
+            if (!isNaN(lat) && !isNaN(lng)) {
+                points.push({
+                    name: stop.name || ('点位'+(i+1)),
+                    address: '',
+                    latitude: lat,
+                    longitude: lng,
+                    sort_order: i,
+                    point_type: i === 0 ? 'start' : (i === allPts.length - 1 ? 'end' : 'waypoint'),
+                    description: stop.detail || '',
+                    stay_minutes: 30
+                });
+            }
+        });
+
+        if (points.length < 2) return;
+
+        const body = {
+            title: d.routeName || '自定义路线',
+            description: (d.transportMode === 'walking' ? '步行' : '驾车') + ' · ' +
+                (d.totalDistance ? (d.totalDistance/1000).toFixed(1)+'km' : '') + ' · ' + stopNames.length + '站',
+            category: '自定义',
+            duration_min: duration,
+            budget_min: 0,
+            budget_max: 0,
+            crowd_tags: [],
+            interest_tags: [],
+            user_id: 'local-user',
+            is_public: false,
+            points: points
+        };
+
+        await fetch('/api/route-db/routes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+    } catch(e) {
+        console.warn('路线数据库后台同步失败:', e.message);
+    }
 }
 
 function getAllDisplayRouteKeys() {
@@ -1994,7 +2100,18 @@ function showStopStory(routeKey, stopIndex) {
 document.querySelectorAll(".enter").forEach(btn => {
     btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        openRoute(btn.dataset.route);
+        var routeKey = btn.dataset.route;
+        // Also show the route on the home page map when clicked from ink-wash scene
+        openRoute(routeKey);
+        if (!mainPageShown) {
+            // Transition to main page first, then show route on map
+            var po = document.getElementById("opening");
+            if (po) po.classList.add("dismissed");
+            showMainPage();
+            setTimeout(function() { showRouteOnMap(routeKey); }, 600);
+        } else {
+            setTimeout(function() { showRouteOnMap(routeKey); }, 300);
+        }
     });
 });
 sheet.addEventListener("click", (e) => {
@@ -2428,6 +2545,25 @@ function proceedToMain() {
         personaSwiper.style.display = "none";
         personaSwiper.classList.remove("entering", "leaving");
         showMainPage();
+        // Re-render carousel with persona-matched ordering
+        setTimeout(function() {
+            renderCarouselCards();
+            // Scroll to matched card
+            var matchedKey = (personaCards.find(function(p) { return p.id === selectedPersonaId; }) || {}).routeKey;
+            if (matchedKey) {
+                var cards = document.querySelectorAll("#carousel-track .route-launch-card");
+                for (var ci = 0; ci < cards.length; ci++) {
+                    if (cards[ci].dataset.route === matchedKey) {
+                        var carousel = document.getElementById("route-carousel");
+                        if (carousel) {
+                            var cardW = carousel.clientWidth * 0.38 + 12;
+                            carousel.scrollTo({ left: ci * cardW, behavior: "smooth" });
+                        }
+                        break;
+                    }
+                }
+            }
+        }, 100);
     }, 350);
 }
 
@@ -2601,6 +2737,21 @@ function showMainPage() {
         if (e.target === e.currentTarget) closeInviteResult();
     });
 
+    // Map restore button — reveal route cards panel
+    var restoreBtn = document.getElementById("map-restore-btn");
+    if (restoreBtn) {
+        restoreBtn.addEventListener("click", function() {
+            var snapScroll = document.getElementById("snap-scroll");
+            if (snapScroll) {
+                snapScroll.classList.remove("hidden-by-map");
+                snapScroll.style.transform = "";
+                snapScroll.style.transition = "";
+            }
+            restoreBtn.classList.remove("show");
+            restoreBtn.style.display = "none";
+        });
+    }
+
     // ── Setup scroll-triggered animations ──
     setupScrollAnimations();
 
@@ -2744,6 +2895,43 @@ function showMainPage() {
         document.addEventListener(evt, resetPetIdleTimer, { passive: true });
     });
     resetPetIdleTimer();
+
+    // ── Two-finger gesture → hide cards, passthrough to map ──
+    var _snapTouchCount = 0;
+    var _snapScroll = document.getElementById("snap-scroll");
+    if (_snapScroll) {
+        _snapScroll.addEventListener("touchstart", function(e) {
+            _snapTouchCount = e.touches.length;
+        }, { passive: true });
+        _snapScroll.addEventListener("touchmove", function(e) {
+            if (e.touches.length >= 2 && currentTab === "home") {
+                // Two-finger → hide cards, let map handle zoom/pan
+                _snapScroll.style.pointerEvents = "none";
+                _snapScroll.style.transform = "translateY(calc(100% + 60px))";
+                _snapScroll.style.transition = "transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1)";
+                // Show restore btn
+                var rBtn = document.getElementById("map-restore-btn");
+                if (rBtn && rBtn.style.display !== "block") {
+                    rBtn.style.display = "block";
+                    setTimeout(function() { rBtn.classList.add("show"); }, 10);
+                }
+            }
+        }, { passive: true });
+    }
+    // Restore handler for the restore button
+    var rBtn = document.getElementById("map-restore-btn");
+    if (rBtn && !rBtn._bound) {
+        rBtn._bound = true;
+        rBtn.addEventListener("click", function() {
+            if (_snapScroll) {
+                _snapScroll.style.pointerEvents = "";
+                _snapScroll.style.transform = "";
+                _snapScroll.style.transition = "";
+            }
+            rBtn.classList.remove("show");
+            rBtn.style.display = "none";
+        });
+    }
 }
 
 // ═══ Swiss Layout Renderers ═══
@@ -2857,7 +3045,11 @@ function renderRouteLaunchCard(key, route, options = {}) {
         .slice(0, options.compact ? 2 : 3)
         .map(m => `<span>${m}</span>`)
         .join("");
-    const badge = isCustom ? `<span class="route-launch-badge">自定义</span>` : "";
+    const badge = isCustom
+        ? `<span class="route-launch-badge">自定义</span>`
+        : options.recommended
+            ? `<span class="route-launch-badge" style="background:var(--vermillion);color:#fff;">✨ 推荐</span>`
+            : "";
     const action = isCustom ? "查看我的路线" : "查看路线";
 
     return `<div class="route-launch-card${options.carousel ? " carousel-card route-launch-carousel" : ""}${isCustom ? " route-launch-custom" : ""}"
@@ -3107,22 +3299,39 @@ function toggleScrollDrawer() {
 }
 
 // ── Route marker map data for AMap ──
+/* ── Pre-computed walking paths for built-in routes ── */
 const ROUTE_MAP_DATA = {
     nju: {
-        coords: [[32.0574, 118.7926], [32.0562, 118.7812]],
-        stops: ["三江师范旧址", "北大楼"]
+        coords: [[32.053187, 118.767680], [32.061477, 118.781801], [32.054677, 118.781320], [32.057998, 118.776580]],
+        stops: ["三江师范学堂旧址", "北大楼", "校史馆", "梧桐大道"],
+        plannedPath: [
+[32.05599,118.779],[32.056098,118.779761],[32.056098,118.779761],[32.056536,118.779696],[32.056536,118.779696],[32.057053,118.779605],[32.057053,118.779601],[32.057053,118.779601],[32.057322,118.779562],[32.057322,118.779562],[32.057687,118.779505],[32.057739,118.779479],[32.057739,118.779475],[32.057769,118.779418],[32.057795,118.779002],[32.057799,118.778997],[32.058025,118.779002],[32.058025,118.779002],[32.058021,118.779002],[32.058103,118.779002],[32.058442,118.779006],[32.058516,118.778989],[32.058563,118.778924],[32.058581,118.778872],[32.058589,118.778707],[32.058589,118.778707],[32.058589,118.778598],[32.058589,118.778594],[32.058694,118.778594],[32.058733,118.778672],[32.058733,118.778672],[32.058763,118.778741],[32.058763,118.778741],[32.058824,118.778741],[32.058824,118.778741],[32.058872,118.778741],[32.058872,118.778741],[32.058893,118.779089],[32.058893,118.779089],[32.058919,118.779479],[32.058919,118.779479],[32.058941,118.77974],[32.058941,118.77974],[32.058898,118.779748],[32.058941,118.779744],[32.058941,118.779744],[32.058924,118.779484],[32.058924,118.779484],[32.058898,118.779093],[32.058898,118.779093],[32.058876,118.778746],[32.058872,118.778741],[32.058924,118.778741],[32.058924,118.778741],[32.058997,118.778741],[32.058997,118.778741],[32.059054,118.778741],[32.059054,118.778741],[32.059852,118.778854],[32.059852,118.778854],[32.059996,118.778854]
+        ],
+        plannedDist: 777, plannedDur: 600
     },
     night: {
-        coords: [[32.020, 118.788], [32.0204, 118.7891], [32.0135, 118.7823]],
-        stops: ["秦淮河", "夫子庙", "老门东"]
+        coords: [[32.021196, 118.792026], [32.020660, 118.788899], [32.011604, 118.787645]],
+        stops: ["秦淮河畔", "夫子庙", "老门东"],
+        plannedPath: [
+[32.02013,118.787591],[32.020139,118.787509],[32.020139,118.787504],[32.020208,118.787483],[32.020291,118.787426],[32.020291,118.787426],[32.020382,118.787374],[32.02046,118.787348],[32.020516,118.787348],[32.020668,118.787391],[32.020668,118.787391],[32.020903,118.787491],[32.020903,118.787491],[32.021029,118.787548],[32.021029,118.787548],[32.021141,118.787595],[32.021141,118.787595],[32.021393,118.787691],[32.021398,118.787695],[32.021345,118.787817],[32.021341,118.787817],[32.021237,118.788021],[32.021189,118.788121],[32.021085,118.788234],[32.021085,118.788234],[32.021076,118.788234],[32.020964,118.788329],[32.020959,118.788329],[32.021098,118.788468],[32.021098,118.788468],[32.021133,118.788568],[32.021159,118.788602],[32.021159,118.788602],[32.021267,118.788776],[32.021267,118.788776],[32.021189,118.788845],[32.021189,118.788845],[32.021007,118.789006],[32.02099,118.789023],[32.02099,118.789023],[32.020872,118.789123],[32.020872,118.789123],[32.02076,118.789206],[32.02046,118.789484],[32.02046,118.789484],[32.020391,118.789531],[32.020391,118.789531],[32.020117,118.789709],[32.020113,118.789709],[32.019978,118.78951],[32.019978,118.78951],[32.019779,118.78921],[32.019779,118.78921],[32.019714,118.78908],[32.019714,118.78908],[32.01967,118.789006],[32.01967,118.789006],[32.019523,118.788741],[32.019523,118.788741],[32.019227,118.788212],[32.019171,118.787982],[32.019171,118.787982],[32.019093,118.787969],[32.019089,118.787964],[32.01908,118.788129],[32.018963,118.788242],[32.018963,118.788242],[32.018802,118.788325],[32.018802,118.788325],[32.018255,118.788594],[32.018255,118.788594],[32.017917,118.78885],[32.017917,118.78885],[32.017565,118.789106],[32.017561,118.789106],[32.017439,118.789084],[32.017439,118.789084],[32.016727,118.788872],[32.016723,118.788867],[32.016645,118.788867],[32.016645,118.788867],[32.01658,118.788867],[32.01658,118.788867],[32.016519,118.788859],[32.016519,118.788859],[32.01566,118.788681],[32.01566,118.788681],[32.015373,118.788641],[32.015373,118.788641],[32.014588,118.78852],[32.014588,118.78852],[32.014162,118.788451],[32.01408,118.788438],[32.013919,118.788394],[32.013919,118.788394],[32.013845,118.788372],[32.013845,118.788372],[32.01326,118.788212],[32.01326,118.788212],[32.01303,118.788134],[32.01296,118.788138],[32.012956,118.788138],[32.012908,118.788212],[32.012847,118.788494],[32.012847,118.788494],[32.012778,118.78895],[32.012778,118.78895],[32.012756,118.78908],[32.012756,118.78908],[32.012734,118.789188],[32.012734,118.789188],[32.012713,118.789319],[32.012713,118.789319],[32.0127,118.789414],[32.0127,118.789414],[32.012656,118.789661],[32.012656,118.789661],[32.012595,118.790117],[32.012595,118.790117],[32.012565,118.790347],[32.012457,118.790803],[32.012457,118.790803],[32.012279,118.791584],[32.012274,118.791584],[32.011905,118.791471],[32.011905,118.791471],[32.011671,118.791363],[32.011667,118.791359],[32.011688,118.791289],[32.011688,118.791289],[32.011771,118.79102],[32.011771,118.79102],[32.011771,118.79102]
+        ],
+        plannedDist: 1795, plannedDur: 1500
     },
     food: {
-        coords: [[32.045, 118.790], [32.046, 118.791]],
-        stops: ["小吃街", "咖啡店"]
+        coords: [[32.045, 118.790], [32.046, 118.791], [32.044, 118.785], [32.048, 118.788]],
+        stops: ["街角咖啡馆", "独立书店", "梧桐小径", "晚餐小馆"],
+        plannedPath: [
+[32.04503,118.790004],[32.044926,118.790647],[32.044922,118.790647],[32.044983,118.790664],[32.044983,118.790664],[32.045347,118.790755],[32.045347,118.790755],[32.045599,118.790825],[32.045699,118.790877],[32.045699,118.790877],[32.045938,118.790942],[32.045938,118.790942],[32.046003,118.790959],[32.045942,118.790946],[32.045942,118.790946],[32.045703,118.790881],[32.045703,118.790881],[32.045603,118.790829],[32.045352,118.79076],[32.045352,118.79076],[32.044987,118.790668],[32.044987,118.790668],[32.044926,118.790651],[32.044926,118.790651],[32.044874,118.790642],[32.044874,118.790642],[32.044761,118.790599],[32.044761,118.790599],[32.044679,118.790573],[32.044679,118.790573],[32.044371,118.790486],[32.044371,118.790486],[32.044314,118.790469],[32.044314,118.790469],[32.044219,118.790443],[32.044219,118.790443],[32.044128,118.790404],[32.044128,118.790404],[32.043941,118.790308],[32.043737,118.790165],[32.043737,118.790165],[32.043312,118.789931],[32.043312,118.789931],[32.043034,118.789848],[32.043034,118.789848],[32.042778,118.78977],[32.042778,118.78977],[32.042635,118.789701],[32.04263,118.789696],[32.042674,118.789488],[32.042674,118.789488],[32.04276,118.789106],[32.04276,118.789106],[32.042782,118.789032],[32.042782,118.789032],[32.042808,118.788898],[32.042808,118.788898],[32.042865,118.788602],[32.042865,118.788602],[32.042899,118.788372],[32.042899,118.788372],[32.042912,118.78829],[32.042912,118.78829],[32.042934,118.78819],[32.042934,118.78819],[32.043038,118.787778],[32.043038,118.787778],[32.04309,118.7876],[32.04309,118.7876],[32.043177,118.78727],[32.043177,118.78727],[32.043312,118.786736],[32.043312,118.786736],[32.043381,118.786476],[32.043381,118.786476],[32.043507,118.786128],[32.043507,118.786128],[32.043594,118.785898],[32.043594,118.785898],[32.043641,118.785755],[32.043641,118.785755],[32.043659,118.785642],[32.043811,118.785256],[32.043845,118.785208],[32.043845,118.785208],[32.043824,118.785165],[32.043845,118.785204],[32.043845,118.785204],[32.043815,118.785252],[32.043663,118.785638],[32.043646,118.785751],[32.043646,118.785751],[32.043598,118.785894],[32.043598,118.785894],[32.043511,118.786124],[32.043511,118.786124],[32.043385,118.786471],[32.043385,118.786471],[32.043316,118.786732],[32.043316,118.786732],[32.043181,118.787266],[32.043181,118.787266],[32.04309,118.787595],[32.04309,118.787595],[32.043043,118.787773],[32.043043,118.787773],[32.042938,118.788186],[32.042934,118.788186],[32.043459,118.78826],[32.043459,118.78826],[32.04355,118.788203],[32.043937,118.788255],[32.043937,118.788255],[32.044492,118.788351],[32.044622,118.788381],[32.044622,118.788381],[32.044705,118.788403],[32.044705,118.788403],[32.044779,118.788424],[32.044779,118.788424],[32.044848,118.788442],[32.044848,118.788442],[32.045265,118.788524],[32.045764,118.788646],[32.045764,118.788646],[32.046081,118.788728],[32.04615,118.788798],[32.04615,118.788798],[32.046354,118.788837],[32.046354,118.788837],[32.046753,118.788911],[32.046753,118.788911],[32.046888,118.788885],[32.047118,118.788915],[32.047791,118.789023],[32.047791,118.789023],[32.047973,118.788429],[32.047973,118.788429],[32.048077,118.78819],[32.048121,118.788129]
+        ],
+        plannedDist: 1943, plannedDur: 1800
     },
     expo: {
-        coords: [[32.040, 118.830], [32.039, 118.817]],
-        stops: ["南京博物院", "明故宫遗址"]
+        coords: [[32.040802, 118.825064], [32.041450, 118.817968], [32.041, 118.822]],
+        stops: ["南京博物院", "明故宫遗址", "展览特厅"],
+        plannedPath: [
+[32.040009,118.83],[32.040022,118.82987],[32.040039,118.829444],[32.040039,118.829371],[32.040039,118.829371],[32.04003,118.829253],[32.039922,118.828915],[32.039822,118.828702],[32.039579,118.828464],[32.039575,118.828459],[32.038576,118.828181],[32.038442,118.828125],[32.038372,118.828099],[32.038368,118.828095],[32.038368,118.827752],[32.038385,118.827526],[32.038446,118.82714],[32.038446,118.82714],[32.038602,118.826298],[32.038659,118.826124],[32.038659,118.826124],[32.038672,118.82605],[32.038672,118.82605],[32.038741,118.825755],[32.038785,118.825703],[32.038785,118.825703],[32.038806,118.825438],[32.038806,118.825438],[32.038819,118.825282],[32.038819,118.825282],[32.038767,118.825065],[32.038798,118.824657],[32.038798,118.824657],[32.038832,118.824154],[32.038832,118.824154],[32.038932,118.822865],[32.038932,118.822865],[32.038954,118.822595],[32.039006,118.822483],[32.039006,118.822483],[32.039006,118.822439],[32.039006,118.822439],[32.038984,118.822296],[32.039002,118.821888],[32.039002,118.821888],[32.039015,118.821584],[32.039015,118.821584],[32.039106,118.820265],[32.039106,118.820265],[32.039167,118.81931],[32.039167,118.81931],[32.039227,118.818451],[32.039227,118.818451],[32.03928,118.81773],[32.03928,118.817726],[32.039188,118.817713],[32.039188,118.817713],[32.039071,118.8177],[32.039067,118.817695],[32.039102,118.817114],[32.039102,118.817092],[32.039089,118.81707],[32.038997,118.817062],[32.039084,118.817066],[32.039102,118.817088],[32.039102,118.817109],[32.039071,118.817695],[32.039067,118.817695],[32.039184,118.817708],[32.039184,118.817708],[32.03928,118.817726],[32.03928,118.817726],[32.039232,118.818446],[32.039227,118.818446],[32.039306,118.818455],[32.039306,118.818455],[32.03934,118.818455],[32.03934,118.818455],[32.039371,118.818464],[32.039371,118.818464],[32.03944,118.818468],[32.03944,118.818468],[32.039692,118.818494],[32.039692,118.818494],[32.040399,118.818572],[32.040399,118.818572],[32.040937,118.818637],[32.040937,118.818637],[32.04122,118.818672],[32.04122,118.818672],[32.041875,118.818741],[32.041875,118.818741],[32.041858,118.819184],[32.041858,118.819184],[32.041719,118.820573],[32.041719,118.820573],[32.041688,118.820777],[32.041688,118.820777],[32.041671,118.820864],[32.041671,118.820864],[32.041662,118.820929],[32.041658,118.820929],[32.041393,118.820872],[32.041393,118.820872],[32.041306,118.820877],[32.041141,118.820977],[32.041137,118.820977],[32.041107,118.821632],[32.041107,118.821632],[32.041081,118.822005]
+        ],
+        plannedDist: 2191, plannedDur: 1800
     }
 };
 
@@ -3209,6 +3418,8 @@ function initAMap() {
     if (!container) return;
 
     amapInitializing = true;
+    // Show loading bar immediately — hide only after tiles fully render
+    showMapLoading("正在加载地图…");
     let loaderRetryCount = 0;
 
     function tryInit() {
@@ -3216,6 +3427,7 @@ function initAMap() {
             loaderRetryCount += 1;
             if (loaderRetryCount > 30) {
                 console.warn("AMap loader unavailable, using canvas fallback.");
+                hideMapLoading();
                 startCanvasMapFallback();
                 amapInitializing = false;
                 return;
@@ -3246,12 +3458,25 @@ function initAMap() {
                 offset: new AMap.Pixel(10, 60),
             }));
 
-            // ── Map interaction → fade header, restore on idle ──
+            // ── Map interaction → fade header & hide route panel, restore on idle ──
             let mapInteractTimer = null;
             const mainHeader = document.querySelector(".main-header");
+            const snapScroll = document.getElementById("snap-scroll");
+            const mapRestoreBtn = document.getElementById("map-restore-btn");
             const fadeMapUI = () => {
                 if (currentTab !== "home") return;
                 if (mainHeader) mainHeader.style.opacity = "0";
+                // Hide route cards panel on map interaction
+                if (snapScroll && !snapScroll.classList.contains("hidden-by-map")) {
+                    snapScroll.classList.add("hidden-by-map");
+                    snapScroll.style.transform = "translateY(calc(100% + 60px))";
+                    snapScroll.style.transition = "transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1)";
+                }
+                // Show restore hint
+                if (mapRestoreBtn && mapRestoreBtn.style.display !== "block") {
+                    mapRestoreBtn.style.display = "block";
+                    setTimeout(() => mapRestoreBtn.classList.add("show"), 10);
+                }
                 clearTimeout(mapInteractTimer);
                 mapInteractTimer = setTimeout(() => {
                     if (currentTab !== "home") return;
@@ -3272,9 +3497,24 @@ function initAMap() {
 
             // Trigger resize after a frame
             setTimeout(() => amapInstance.resize(), 100);
+            // Wait for map tiles to fully render before hiding loading bar
+            var mapTilesDone = function() {
+                // Let the map settle for a moment after tiles render
+                setTimeout(function() {
+                    hideMapLoading();
+                }, 400);
+                amapInstance.off("complete", mapTilesDone);
+            };
+            amapInstance.on("complete", mapTilesDone);
+            // Safety: hide after 8s even if complete never fires
+            setTimeout(function() {
+                hideMapLoading();
+                amapInstance.off("complete", mapTilesDone);
+            }, 8000);
         }).catch((e) => {
             console.warn("AMap init failed, using canvas fallback:", e);
             // Fallback to canvas map
+            hideMapLoading();
             startCanvasMapFallback();
             amapInitializing = false;
         });
@@ -3350,6 +3590,14 @@ function addAllRouteOverlays(AMap) {
     });
 }
 
+/**
+ * Get the bottom navigation element, falling back to wheel-nav.
+ * Prevents null access errors when .bottom-nav doesn't exist in DOM.
+ */
+function getNavEl() {
+    return document.querySelector(".bottom-nav") || document.querySelector(".wheel-nav");
+}
+
 function toggleMapFullscreen() {
     const container = document.getElementById("main-map-container");
     if (!container) return;
@@ -3365,7 +3613,8 @@ function toggleMapFullscreen() {
             el.style.display = "";
         }
     });
-    document.querySelector(".bottom-nav").style.zIndex = amapFullscreen ? "60" : "10";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = amapFullscreen ? "60" : "10";
 
     if (amapInstance) {
         setTimeout(() => amapInstance.resize(), 50);
@@ -4073,94 +4322,201 @@ let activeRouteOnMap = null;
 let currentRouteKey = null;
 
 function showRouteOnMap(routeKey) {
-    const r = routes[routeKey];
+    var r = routes[routeKey];
     if (!r) return;
 
-    closeSheet();
-
-    // Lazy-init map if not yet loaded
+    // If map not ready, load it first
     if (!amapInstance || !amapReady) {
-        showToast("⏳ 地图加载中，请稍候…");
+        showMapLoading("正在连接地图服务…");
         initAMap();
-        // Retry once after init
-        let retries = 0;
-        const retryInterval = setInterval(() => {
+        var retries = 0;
+        var retryInterval = setInterval(function() {
             if (amapInstance && amapReady) {
                 clearInterval(retryInterval);
+                hideMapLoading();
                 showRouteOnMap(routeKey);
             }
             retries++;
             if (retries > 20) {
                 clearInterval(retryInterval);
-                showToast("地图加载失败，请检查网络");
+                hideMapLoading();
+                showToast("地图加载失败");
             }
         }, 500);
         return;
     }
 
-    // Show map as temporary overlay (map is no longer a main tab)
-    const mapStage = document.getElementById("map-stage");
-    const mapContainer = document.getElementById("main-map-container");
-    const dimOverlay = document.getElementById("map-dim-overlay");
-    const snapScroll = document.getElementById("snap-scroll");
-    const header = document.querySelector(".main-header");
-
-    // Hide all tab content
-    hideAllTabContent();
-
-    // Show map fullscreen
-    if (mapStage) mapStage.style.display = "";
-    if (mapContainer) {
-        mapContainer.style.display = "block";
-        mapContainer.classList.add("amap-fullscreen");
+    // Close sheet if open
+    if (sheet && sheet.classList.contains("open")) {
+        sheet.classList.remove("open");
+        sheetBody.classList.remove("no-scroll");
+        currentRouteKey = null;
     }
-    if (dimOverlay) dimOverlay.style.display = "none";
-    if (snapScroll) snapScroll.style.display = "none";
-    if (header) header.style.display = "none";
 
-    amapFullscreen = true;
-    document.querySelector(".bottom-nav").style.zIndex = "60";
+    // Switch to home tab so the map is visible
+    if (currentTab !== "home") switchTab("home");
 
+    // Remove home page map filter, enable interaction on map
+    var mc = document.getElementById("main-map-container");
+    if (mc) {
+        mc.style.filter = "";
+        mc.style.pointerEvents = "auto";
+    }
+
+    // Aggressively clear ALL overlays (one-by-one to ensure removal)
+    if (amapInstance) {
+        while (amapMarkers.length) { try { amapInstance.remove(amapMarkers[0]); } catch(e) {} amapMarkers.shift(); }
+        while (amapRouteLines.length) { try { amapInstance.remove(amapRouteLines[0]); } catch(e) {} amapRouteLines.shift(); }
+    }
+    try {
+        var rData = ROUTE_MAP_DATA[routeKey];
+        var persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#F06D5E" };
+        if (rData && rData.coords && rData.coords.length && amapInstance && window.AMap) {
+            // 1. Route line — same style as route editor (thick + direction arrows)
+            var pts = (rData.plannedPath && rData.plannedPath.length >= 2) ? rData.plannedPath : rData.coords;
+            var lnglats = pts.map(function(c) { return [c[1], c[0]]; });
+            var poly = new AMap.Polyline({
+                path: lnglats,
+                strokeColor: persona.color,
+                strokeOpacity: 0.95,
+                strokeWeight: 7,
+                strokeStyle: "solid",
+                lineJoin: "round",
+                showDir: true
+            });
+            amapInstance.add(poly);
+            amapRouteLines.push(poly);
+            // 2. Markers at each stop
+            rData.coords.forEach(function(c, i) {
+                var label = rData.stops[i] || "途经点";
+                var mc = document.createElement("div");
+                mc.className = "route-marker";
+                mc.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
+                var marker = new AMap.Marker({
+                    position: [c[1], c[0]],
+                    content: mc,
+                    offset: new AMap.Pixel(-30, -10),
+                    zIndex: 60
+                });
+                marker.on("click", function() { openRoute(routeKey); });
+                amapInstance.add(marker);
+                amapMarkers.push(marker);
+            });
+            // 3. Zoom to route start
+            var firstPos = [rData.coords[0][1], rData.coords[0][0]];
+            amapInstance.setZoom(16);
+            amapInstance.setCenter(firstPos);
+        }
+    } catch(e) { console.warn("route draw error:", e); }
     activeRouteOnMap = routeKey;
 
-    // Let map settle after resize, then draw
-    setTimeout(() => {
-        clearRouteOverlays();
-        drawRouteOnMap(routeKey);
-        showFloatCard(routeKey);
-    }, 350);
+    // Show route info popup (time, stops, close)
+    showRouteInfoPopup(routeKey);
 
-    // Add map close button if not exists
+    // Ensure close button overlay
     ensureMapCloseBtn();
+
+}
+
+/* ═══════════════════════════════════
+   Map loading progress bar
+   ═══════════════════════════════════ */
+let _loadingProgress = 0;
+let _loadingTimer = null;
+
+function showMapLoading(text) {
+    var overlay = document.getElementById("map-loading-overlay");
+    if (!overlay) return;
+    overlay.style.display = "flex";
+    _loadingProgress = 0;
+    updateLoadingBar(0, text || "地图加载中…");
+    // Animate fake progress while real loading ticks
+    if (_loadingTimer) clearInterval(_loadingTimer);
+    _loadingTimer = setInterval(function() {
+        if (_loadingProgress >= 90) { clearInterval(_loadingTimer); _loadingTimer = null; return; }
+        // Slow down as it approaches 90%
+        var step = Math.max(1, Math.floor((90 - _loadingProgress) / 10));
+        _loadingProgress = Math.min(90, _loadingProgress + step);
+        updateLoadingBar(_loadingProgress);
+    }, 600);
+}
+
+function updateLoadingBar(pct, text) {
+    var fill = document.getElementById("map-loading-bar-fill");
+    var pctEl = document.getElementById("map-loading-pct");
+    var txtEl = document.getElementById("map-loading-text");
+    if (fill) fill.style.width = pct + "%";
+    if (pctEl) pctEl.textContent = pct + "%";
+    if (txtEl && text) txtEl.textContent = text;
+}
+
+function hideMapLoading() {
+    if (_loadingTimer) { clearInterval(_loadingTimer); _loadingTimer = null; }
+    updateLoadingBar(100, "完成");
+    setTimeout(function() {
+        var overlay = document.getElementById("map-loading-overlay");
+        if (overlay) overlay.style.display = "none";
+    }, 300);
 }
 
 function ensureMapCloseBtn() {
     if (document.getElementById("map-close-btn")) return;
-    const btn = document.createElement("button");
+    var btn = document.createElement("button");
     btn.id = "map-close-btn";
-    btn.textContent = "✕ 返回";
+    btn.textContent = "✕ 返回首页";
     btn.style.cssText = "position:fixed;top:max(16px,env(safe-area-inset-top));left:16px;z-index:70;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border:1px solid rgba(0,0,0,0.08);font-size:13px;font-weight:600;color:#18212B;cursor:pointer;font-family:inherit;box-shadow:0 2px 12px rgba(0,0,0,0.1);";
     btn.addEventListener("click", exitMapOverlay);
     document.body.appendChild(btn);
 }
 
+/**
+ * Show a side panel with route info + edit waypoint prompt.
+ */
+function showRouteInfoPopup(routeKey) {
+    var r = routes[routeKey];
+    if (!r) return;
+    var old = document.getElementById("route-side-panel");
+    if (old) { old.remove(); activeRouteOnMap = null; exitMapOverlay(); return; }
+
+    var mapData = ROUTE_MAP_DATA[routeKey];
+    var durText = "计算中…";
+    if (mapData && mapData.plannedDur) durText = Math.ceil(mapData.plannedDur / 60) + " 分钟";
+    else if (r.duration) durText = r.duration + " 分钟";
+
+    var panel = document.createElement("div");
+    panel.id = "route-side-panel";
+    panel.innerHTML =
+        '<button class="rsp-close" onclick="this.parentElement.remove();activeRouteOnMap=null;exitMapOverlay();">✕</button>'
+        + '<div class="rsp-title">' + (r.title || "") + '</div>'
+        + '<div class="rsp-meta">'
+        + '<span>⏱ ' + durText + '</span>'
+        + '<span>📍 ' + (r.stops ? r.stops.length : 0) + ' 站</span>'
+        + (mapData && mapData.plannedDist ? '<span>📏 ' + (mapData.plannedDist / 1000).toFixed(1) + ' km</span>' : '')
+        + '</div>'
+        + '<div class="rsp-stops">' + (r.stops || []).map(function(s) { return '<span>' + (s.name || "") + '</span>'; }).join('') + '</div>'
+        + '<div class="rsp-hint">💡 想自定义路线？在路线编辑器中自由添加或删除途经点</div>'
+        + '<button class="rsp-edit-btn" onclick="this.closest(\'#route-side-panel\').remove();if(typeof exitMapOverlay===\'function\')exitMapOverlay();setTimeout(function(){if(typeof showMapRouteEditor===\'function\')showMapRouteEditor();},300);">✎ 编辑途经点 →</button>';
+    document.body.appendChild(panel);
+    setTimeout(function() { panel.classList.add("show"); }, 10);
+}
+
 function exitMapOverlay() {
-    amapFullscreen = false;
     activeRouteOnMap = null;
-    const mapContainer = document.getElementById("main-map-container");
-    if (mapContainer) mapContainer.classList.remove("amap-fullscreen");
-    document.querySelector(".bottom-nav").style.zIndex = "10";
-    const mapStage = document.getElementById("map-stage");
-    if (mapStage) mapStage.style.display = "none";
-    hideFloatCard();
-    const btn = document.getElementById("map-close-btn");
-    if (btn) btn.remove();
+    // Restore home page map style
+    var mc = document.getElementById("main-map-container");
+    if (mc) {
+        mc.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
+        mc.style.pointerEvents = "auto";
+    }
+    // Clear route overlays from the home page map
+    clearRouteOverlays();
     if (amapInstance) {
         restoreAllMapOverlays();
-        setTimeout(() => amapInstance.resize(), 50);
+        setTimeout(function() { amapInstance.resize(); }, 50);
     }
-    document.querySelector(".main-header").style.display = "";
-    switchTab("home");
+    // Remove close button
+    var btn = document.getElementById("map-close-btn");
+    if (btn) btn.remove();
 }
 
 function clearRouteOverlays() {
@@ -4187,51 +4543,47 @@ function setRouteOverlaysVisible(visible) {
 function drawRouteOnMap(routeKey) {
     if (!window.AMap || !amapInstance) return;
 
-    const data = ROUTE_MAP_DATA[routeKey];
-    if (!data || !data.coords.length) return;
+    var data = ROUTE_MAP_DATA[routeKey];
+    if (!data || !data.coords || !data.coords.length) return;
 
-    const persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#B64236" };
-    const lngLatCoords = data.coords.map(c => [c[1], c[0]]);
+    var persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#B64236" };
 
-    // Thick polyline
-    const polyline = new AMap.Polyline({
-        path: lngLatCoords,
+    // ── DEBUG: test marker at a fixed Nanjing location ──
+    var testMarker = new AMap.Marker({
+        position: [118.796, 32.060],
+        content: '<div style="background:red;color:#fff;width:30px;height:30px;border-radius:50%;text-align:center;line-height:30px;font-size:16px;font-weight:bold;">?</div>',
+        offset: new AMap.Pixel(-15, -15),
+        zIndex: 99
+    });
+    amapInstance.add(testMarker);
+    amapMarkers.push(testMarker);
+
+    // Use planned path if available, else direct stop-to-stop
+    var linePoints = (data.plannedPath && data.plannedPath.length >= 2) ? data.plannedPath : data.coords;
+    // Convert [lat, lng] → [lng, lat] for AMap
+    var lnglats = linePoints.map(function(c) { return [c[1], c[0]]; });
+
+    // Simple solid polyline (same approach as addAllRouteOverlays which works)
+    var polyline = new AMap.Polyline({
+        path: lnglats,
         strokeColor: persona.color,
         strokeOpacity: 0.9,
         strokeWeight: 6,
         strokeStyle: "solid",
         lineJoin: "round",
-        lineCap: "round",
-        zIndex: 50,
     });
     amapInstance.add(polyline);
     amapRouteLines.push(polyline);
 
-    // Glow line under
-    const glowLine = new AMap.Polyline({
-        path: lngLatCoords,
-        strokeColor: persona.color,
-        strokeOpacity: 0.2,
-        strokeWeight: 16,
-        strokeStyle: "solid",
-        lineJoin: "round",
-        zIndex: 49,
-    });
-    amapInstance.add(glowLine);
-    amapRouteLines.push(glowLine);
-
-    const markers = [];
-
-    // Markers for each stop
-    data.coords.forEach((c, i) => {
-        const label = data.stops[i] || "途经点";
-        const mc = document.createElement("div");
-        mc.className = "route-marker";
-        mc.innerHTML = '<span class=\"dot\"></span><span>' + label + '</span>';
-
-        const marker = new AMap.Marker({
+    // Stop markers using data.coords
+    data.coords.forEach(function(c, i) {
+        var label = data.stops[i] || "途经点";
+        var el = document.createElement("div");
+        el.className = "route-marker";
+        el.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
+        var marker = new AMap.Marker({
             position: [c[1], c[0]],
-            content: mc,
+            content: el,
             offset: new AMap.Pixel(-30, -10),
             zIndex: 60,
         });
@@ -4243,16 +4595,13 @@ function drawRouteOnMap(routeKey) {
         });
         amapInstance.add(marker);
         amapMarkers.push(marker);
-        markers.push(marker);
     });
 
-    // Zoom to fit route bounds
-    const overlays = [polyline, glowLine].concat(markers);
+    // Fit view
     try {
-        amapInstance.setFitView(overlays, false, 300);
+        amapInstance.setFitView(null, false, 80);
     } catch(e) {
-        // fallback: set zoom and center
-        amapInstance.setZoom(14);
+        amapInstance.setZoom(15);
         amapInstance.setCenter([118.796, 32.060]);
     }
 }
@@ -4269,6 +4618,24 @@ function showFloatCard(routeKey) {
     document.getElementById("float-card-icon").textContent = persona.icon;
     document.getElementById("float-card-title").textContent = r.title;
     document.getElementById("float-card-sub").textContent = r.desc;
+
+    // Show estimated time and stop count
+    var timeEl = document.getElementById("float-card-time");
+    var countEl = document.getElementById("float-card-stops-count");
+    var mapData = ROUTE_MAP_DATA[routeKey];
+    if (timeEl) {
+        // prefer planned duration from API, fallback to route meta
+        var durText = r.meta && r.meta[0] ? r.meta[0] : "";
+        if (mapData && mapData.plannedDur) {
+            durText = Math.ceil(mapData.plannedDur / 60) + " 分钟";
+        } else if (r.duration) {
+            durText = r.duration + " 分钟";
+        }
+        timeEl.textContent = durText ? "⏱ " + durText : "⏱ 计算中…";
+    }
+    if (countEl && r.stops) {
+        countEl.textContent = "📍 " + r.stops.length + " 站";
+    }
 
     const stopsEl = document.getElementById("float-card-stops");
     stopsEl.innerHTML = r.stops.map(s => `<span class="float-card-stop">${s.name}</span>`).join("");
@@ -4397,7 +4764,8 @@ function switchTab(tab) {
     if (amapFullscreen) {
         amapFullscreen = false;
         document.getElementById("main-map-container").classList.remove("amap-fullscreen");
-        document.querySelector(".bottom-nav").style.zIndex = "10";
+        const navEl = getNavEl();
+        if (navEl) navEl.style.zIndex = "10";
         if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
     }
 
@@ -4421,7 +4789,7 @@ function switchTab(tab) {
             mapContainer.style.display = "block";
             mapContainer.classList.remove("amap-fullscreen");
             mapContainer.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
-            mapContainer.style.pointerEvents = "none";
+            mapContainer.style.pointerEvents = "auto";
         }
         const header = document.querySelector(".main-header");
         if (header) { header.style.display = ""; header.style.opacity = "1"; }
@@ -4578,7 +4946,8 @@ function showMapRouteEditor() {
     overlay._msgHandler = msgHandler;
 
     mapEditor = { overlay, iframe };
-    document.querySelector(".bottom-nav").style.zIndex = "50";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = "50";
 }
 
 function closeMapEditor() {
@@ -4589,7 +4958,8 @@ function closeMapEditor() {
         window.removeEventListener("message", overlay._msgHandler);
     }
     try { overlay.remove(); } catch(e) {}
-    document.querySelector(".bottom-nav").style.zIndex = "10";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = "10";
     mapEditor = null;
 }
 
@@ -4935,7 +5305,8 @@ function closeMapEditor() {
     if (snapScroll) snapScroll.style.display = "";
     if (header) header.style.display = "";
 
-    document.querySelector(".bottom-nav").style.zIndex = "10";
+    const navEl = getNavEl();
+    if (navEl) navEl.style.zIndex = "10";
 
     mapEditor = null;
     switchTab("home");
@@ -7077,6 +7448,7 @@ showRouteOnMap = function(routeKey) {
         expo: "安静地走进一座博物馆，和旧物说说话。记得提前预约哦。",
     };
     showGuideBubble(GUIDE_ROUTE_MSGS[routeKey] || "这条路线看起来不错！");
+
 };
 
 // Start guide bubble scheduling after main page shows
@@ -7092,23 +7464,61 @@ showMainPage = function() {
 };
 
 
+// Hook closeSheet to restore home page map when route sheet closes
+var _origCloseSheet = closeSheet;
+closeSheet = function() {
+    _origCloseSheet();
+    // Restore home page map style when user closes sheet while route is shown
+    if (activeRouteOnMap && amapInstance) {
+        var mc = document.getElementById("main-map-container");
+        if (mc) {
+            mc.style.filter = "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
+            mc.style.pointerEvents = "auto";
+        }
+        clearRouteOverlays();
+        restoreAllMapOverlays();
+        activeRouteOnMap = null;
+        // Remove close button too
+        var cb = document.getElementById("map-close-btn");
+        if (cb) cb.remove();
+    }
+};
+
 /* ═══════════════════════════════════════
    AI 助手聊天面板 · AI Chat Panel
    ═══════════════════════════════════════ */
 
-// Final Apple route cards: built-in routes share the upload-route entry pattern.
+/**
+ * Get route keys ordered by persona match — matched route first, then others.
+ */
+function getPersonaRoutes(personaId) {
+    if (!personaId) return CAROUSEL_ROUTES;
+    const persona = personaCards.find(p => p.id === personaId);
+    if (!persona || !persona.routeKey) return CAROUSEL_ROUTES;
+    const matched = persona.routeKey;
+    const others = CAROUSEL_ROUTES.filter(k => k !== matched);
+    return [matched, ...others];
+}
+
+// Final Apple route cards with persona-based ordering
 renderCarouselCards = function() {
     const track = document.getElementById("carousel-track");
     const dots = document.getElementById("carousel-dots");
     if (!track) return;
     const routeOrder = getHomeRouteOrder();
 
-    track.innerHTML = routeOrder
-        .map(key => renderRouteLaunchCard(key, routes[key], { carousel: true, compact: true }))
+    const orderedKeys = getPersonaRoutes(selectedPersonaId);
+
+    track.innerHTML = orderedKeys
+        .map(key => renderRouteLaunchCard(key, routes[key], {
+            carousel: true,
+            compact: true,
+            recommended: selectedPersonaId && key === (personaCards.find(p => p.id === selectedPersonaId) || {}).routeKey
+        }))
         .join("");
 
     if (dots) {
-        dots.innerHTML = routeOrder
+        dots.innerHTML = orderedKeys
             .map((_, i) => `<span class="carousel-dot${i === 0 ? " active" : ""}"></span>`)
             .join("");
     }
@@ -7123,6 +7533,9 @@ renderCarouselCards = function() {
             if (routeKey) openRoute(routeKey);
         });
     });
+
+    // Also update feature section to match persona
+    renderFeatureSection(orderedKeys[0]);
 };
 
 renderRouteGrid = function() {

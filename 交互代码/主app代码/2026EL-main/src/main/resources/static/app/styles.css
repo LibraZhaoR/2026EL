@@ -175,6 +175,21 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     line-height: 1.6;
     max-width: 24ch;
 }
+.opening-tap-hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: 0.15em;
+    opacity: 0.45;
+    animation: hintPulse 2s ease-in-out infinite;
+}
+@keyframes hintPulse {
+    0%, 100% { opacity: 0.25; transform: translateX(-50%) translateY(0); }
+    50%      { opacity: 0.65; transform: translateX(-50%) translateY(-3px); }
+}
 
 @keyframes fadein {
     from { opacity: 0; transform: translateY(20px); }
@@ -478,7 +493,13 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 
 .poem {
     position: absolute;
-    max-width: 220px;
+    width: auto;
+    max-width: none;
+    padding: 16px 24px;
+    border-radius: 6px;
+    background: rgba(252,251,248,0.35);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 12px rgba(100,85,60,0.06);
     opacity: 0;
     transform: translateY(20px);
     transition: opacity 0.55s ease, transform 0.55s ease;
@@ -506,13 +527,14 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
 .poem-center-bottom.on { transform: translate(-50%, 0); }
 
 .poem h2 {
-    font-family: "Noto Serif SC", "STSong", "SimSun", serif;
+    font-family: "Noto Serif SC", "KaiTi", "STKaiti", "SimSun", serif;
     font-size: 18px;
-    line-height: 1.6;
-    font-weight: 400;
-    color: var(--ink);
+    line-height: 1.7;
+    font-weight: 380;
+    color: #2C2418;
     margin-bottom: 16px;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 1px rgba(44,36,24,0.1);
 }
 
 .enter {
@@ -2877,6 +2899,21 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     font-size: 11px;
     color: var(--soft);
     margin-top: 2px;
+}
+.route-float-card .float-card-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--soft);
+}
+.route-float-card .float-card-time {
+    font-weight: 600;
+    color: var(--vermillion);
+}
+.route-float-card .float-card-stops-count {
+    color: var(--accent);
 }
 .route-float-card .float-card-stops {
     display: flex;
@@ -8089,3 +8126,188 @@ body.community-tab-active .ai-float-btn {
         margin-right: -12px;
     }
 }
+/* ═══ 地图加载进度条 ═══ */
+.map-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.map-loading-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(24,33,43,0.5);
+    backdrop-filter: blur(8px);
+}
+.map-loading-box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 40px;
+    border-radius: 20px;
+    background: rgba(252,252,251,0.95);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+.map-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid rgba(201,168,76,0.2);
+    border-top-color: var(--vermillion);
+    animation: ml-spin 0.8s linear infinite;
+}
+@keyframes ml-spin {
+    to { transform: rotate(360deg); }
+}
+.map-loading-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+}
+.map-loading-bar {
+    width: 200px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(201,168,76,0.15);
+    overflow: hidden;
+}
+.map-loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--vermillion), #D8A94A);
+    transition: width 0.4s ease;
+}
+.map-loading-pct {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--soft);
+}
+
+/* ═══ 地图恢复路线面板按钮 ═══ */
+.map-restore-btn {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    z-index: 100;
+    padding: 8px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(201,168,76,0.2);
+    background: rgba(252,252,251,0.92);
+    backdrop-filter: blur(12px);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    opacity: 0;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: auto;
+}
+.map-restore-btn.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.map-restore-btn span {
+    display: inline-block;
+    margin-right: 4px;
+    animation: restoreBounce 1.2s ease-in-out infinite;
+}
+@keyframes restoreBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+.map-restore-btn:active {
+    transform: translateX(-50%) scale(0.95);
+}
+
+/* ═══ 路线侧边提示面板 ═══ */
+#route-side-panel {
+    position: fixed;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%) translateX(120%);
+    z-index: 250;
+    width: 220px;
+    padding: 18px 18px 14px;
+    border-radius: 16px;
+    background: rgba(252,252,251,0.96);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    transition: transform 0.4s cubic-bezier(0.22,0.61,0.36,1);
+    border: 1px solid rgba(201,168,76,0.12);
+}
+#route-side-panel.show { transform: translateY(-50%) translateX(0); }
+#route-side-panel .rsp-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 16px;
+    color: var(--faint);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 2px;
+}
+#route-side-panel .rsp-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 8px;
+    padding-right: 20px;
+    line-height: 1.3;
+}
+#route-side-panel .rsp-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: var(--soft);
+}
+#route-side-panel .rsp-meta span { white-space: nowrap; }
+#route-side-panel .rsp-stops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+#route-side-panel .rsp-stops span {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(78,126,122,0.1);
+    color: var(--accent);
+}
+#route-side-panel .rsp-hint {
+    font-size: 11px;
+    color: var(--faint);
+    line-height: 1.5;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(201,168,76,0.06);
+    border-left: 2px solid rgba(201,168,76,0.3);
+}
+#route-side-panel .rsp-edit-btn {
+    width: 100%;
+    padding: 9px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, var(--vermillion), #c44a3e);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.2s;
+    letter-spacing: 0.02em;
+}
+#route-side-panel .rsp-edit-btn:active { transform: scale(0.96); }
