@@ -16,30 +16,29 @@
 <div class="app-root" id="app-root">
     <!-- Opening overlay — click to dismiss -->
     <section class="opening" id="opening">
-        <h1>南京，<br>今天去哪儿？</h1>
-        <p>从一幅水墨开始。</p>
+        <h1>南京<br>从这里开始</h1>
     </section>
 
     <div class="stage" id="stage">
         <canvas id="landscape-canvas"></canvas>
         <div class="poem-stage" id="poem-stage">
             <div class="poem poem-left-top" data-scene="0">
-                <h2>从一棵梧桐开始，<br>今天的南京慢慢展开。</h2>
+                <h2>南京从这里开始</h2>
             </div>
             <div class="poem poem-left-top" data-scene="1">
-                <h2>有些路，<br>从一座校园开始。</h2>
+                <h2>南京从这里开始</h2>
                 <button class="enter" data-route="nju">南大校史线</button>
             </div>
             <div class="poem poem-left-top" data-scene="2">
-                <h2>夜色落下时，<br>秦淮河会替你点亮一条路。</h2>
+                <h2>南京从这里开始</h2>
                 <button class="enter" data-route="night">秦淮夜游</button>
             </div>
             <div class="poem poem-left-top" data-scene="3">
-                <h2>烟火气藏在巷口，<br>也藏在一顿刚好的晚饭里。</h2>
+                <h2>南京从这里开始</h2>
                 <button class="enter" data-route="food">美食路线</button>
             </div>
             <div class="poem poem-left-top" data-scene="4">
-                <h2>如果今天想安静一点，<br>就去和一件旧物对话。</h2>
+                <h2>南京从这里开始</h2>
                 <button class="enter" data-route="expo">展览路线</button>
             </div>
         </div>
@@ -102,6 +101,10 @@
                     <span class="header-location">南京 · 周末探索中</span>
                 </div>
                 <div class="header-right">
+                    <button class="map-mode-toggle" id="map-mode-toggle" title="切换首页功能模式和纯地图模式" aria-pressed="false">
+                        <span class="map-mode-option map-mode-home active">首页功能</span>
+                        <span class="map-mode-option map-mode-map">纯地图</span>
+                    </button>
                     <span class="header-budget">¥100</span>
                 </div>
             </header>
@@ -187,13 +190,13 @@
         <div class="wheel-bg"></div>
         <div class="wheel-track" id="wheel-track">
             <div class="wheel-item" data-tab="routes" style="--wheel-hue:4;--wheel-color:#FF6B6B;">
-                <span class="wheel-icon">🧭</span>
+                <span class="wheel-icon">🗺️</span>
                 <span class="wheel-label">路线</span>
                 <span class="wheel-dot"></span>
             </div>
             <div class="wheel-item" data-tab="nearby" style="--wheel-hue:35;--wheel-color:#FFB347;">
-                <span class="wheel-icon">⚡</span>
-                <span class="wheel-label">补给</span>
+                <span class="wheel-icon">聊</span>
+                <span class="wheel-label">社区</span>
                 <span class="wheel-dot"></span>
             </div>
             <div class="wheel-item center active" data-tab="home" style="--wheel-hue:140;--wheel-color:#4ECB71;">
@@ -255,10 +258,12 @@
 <!-- ═══ Toast 通知容器 ═══ -->
 <div class="toast-container" id="toast-container"></div>
 
-<!-- ═══ 0520 南大剧情游戏全屏覆盖层 ═══ -->
-<div class="game-overlay" id="game-overlay">
-    <button class="game-close-btn" id="game-close-btn">退出游戏</button>
-    <iframe class="game-iframe" id="game-iframe" src="" frameborder="0"></iframe>
+<!-- ═══ 漫游社区弹层 ═══ -->
+<div class="community-overlay" id="community-overlay" aria-hidden="true">
+    <div class="community-overlay-shell">
+        <button class="community-overlay-close" id="community-overlay-close" type="button">关闭</button>
+        <div class="tab-content-inner" id="community-overlay-inner"></div>
+    </div>
 </div>
 
 <!-- ═══ AI 助手聊天面板 ═══ -->
@@ -339,6 +344,7 @@
 <!-- ═══ 人格地图样式配置 ═══ -->
 <script src="./persona-map-styles.js"></script>
 <script src="./supply-data.js"></script>
+<script src="./building-points.js"></script>
 
 <script src="./gsap.min.js"></script>
 <script src="./ScrollTrigger.min.js"></script>

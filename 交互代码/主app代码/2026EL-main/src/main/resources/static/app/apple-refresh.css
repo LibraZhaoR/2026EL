@@ -62,9 +62,7 @@ body::after,
 
 .opening {
     padding: 0 28px 56px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.72) 54%, #FFFFFF 100%),
-        var(--ab-canvas);
+    background: transparent;
 }
 
 .opening::before {
@@ -96,13 +94,13 @@ body::after,
 }
 
 .poem {
-    padding: 16px 18px;
-    border-radius: var(--ab-radius-lg);
-    background: rgba(255, 255, 255, 0.86);
-    border: 1px solid rgba(221, 221, 221, 0.78);
-    box-shadow: var(--ab-shadow-soft);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
+    padding: 0;
+    border-radius: 0;
+    background: transparent !important;
+    border: 0;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
 }
 
 .poem h2 {
@@ -153,6 +151,12 @@ body::after,
 }
 
 .enter {
+    background: transparent !important;
+    color: var(--ab-ink) !important;
+    border: 1px solid rgba(29, 29, 31, 0.28) !important;
+}
+
+.enter {
     padding: 12px 20px;
     font-weight: 800;
 }
@@ -176,7 +180,7 @@ body::after,
 .dots i.lit {
     width: 22px;
     border-radius: 999px;
-    background: var(--ab-rausch);
+    background: rgba(29, 29, 31, 0.82);
     box-shadow: none;
     transform: none;
 }

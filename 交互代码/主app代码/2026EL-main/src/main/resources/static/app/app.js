@@ -1969,8 +1969,13 @@ function showStopStory(routeKey, stopIndex) {
     const r = routes[routeKey];
     if (!r || !r.stops[stopIndex]) return;
     const stop = r.stops[stopIndex];
+    const buildingPoint = findBuildingPointByName(stop.name);
+    if (buildingPoint && showBuildingPointDetail(buildingPoint, "路线途经点")) return;
     if (!stop.story) { showToast("这个站点还没有故事"); return; }
 
+    const panel = document.querySelector("#story-overlay .story-panel");
+    panel?.classList.remove("building-story-panel");
+    panel?.querySelector(".story-image")?.remove();
     document.getElementById("story-badge").textContent =
         String(stopIndex+1).padStart(2,"0") + " · " +
         (routeKey === "nju" ? "校史" : routeKey === "night" ? "夜游" : routeKey === "food" ? "漫游" : "文化") + "节点";
@@ -2554,9 +2559,11 @@ function showMainPage() {
     window.addEventListener("resize", onMainResize);
 
     // ── Render new Swiss layout components ──
+    const initialRouteKey = getHomeRecommendedRouteKey();
     renderCarouselCards();
-    renderFeatureSection("night"); // default featured route
+    renderFeatureSection(initialRouteKey);
     renderRouteGrid();
+    renderHomeMerchantRecommendations();
 
     // ── Carousel scroll → update dots + feature section ──
     const carousel = document.getElementById("route-carousel");
@@ -2597,6 +2604,136 @@ function showMainPage() {
     // ── Setup scroll-triggered animations ──
     setupScrollAnimations();
 
+    // ── Map mode toggle (首页 / 纯地图) ──
+    let mapModePure = false;
+    const mapModeToggle = document.getElementById("map-mode-toggle");
+    const mapModeHomeOption = mapModeToggle?.querySelector(".map-mode-home");
+    const mapModeMapOption = mapModeToggle?.querySelector(".map-mode-map");
+    const mapContainer = document.getElementById("main-map-container");
+    const scrollHint = document.querySelector(".scroll-hint");
+
+    function getMapPOIsForPureMode() {
+        const buildings = getCitygoBuildingPoints();
+        const custom = Array.isArray(window.citygoMapPOIs) ? window.citygoMapPOIs : [];
+        return custom.length ? buildings.concat(custom) : buildings;
+    }
+
+    function clearMapPOIs() {
+        if (window._citygoPoiMarkers && amapInstance) {
+            window._citygoPoiMarkers.forEach(marker => amapInstance.remove(marker));
+        }
+        window._citygoPoiMarkers = [];
+        document.querySelector(".poi-info-card")?.remove();
+    }
+
+    function renderMapPOIs() {
+        if (!amapInstance || !window.AMap || !mapModePure) return;
+        clearMapPOIs();
+
+        getMapPOIsForPureMode().forEach((poi, index) => {
+            if (!Number.isFinite(Number(poi.lng)) || !Number.isFinite(Number(poi.lat))) return;
+            const isLocatorPoint = poi.kind === "building" || poi.category === "定位标号";
+            const markerLabel = isLocatorPoint
+                ? (poi.locatorLabel || String(index + 1).padStart(2, "0"))
+                : (poi.icon || "•");
+            const markerContent = document.createElement("button");
+            markerContent.className = `citygo-poi-marker${isLocatorPoint ? " citygo-building-marker" : ""}`;
+            markerContent.type = "button";
+            markerContent.innerHTML = `<span>${escapeHtml(markerLabel)}</span>`;
+            markerContent.title = poi.name || "南京地点";
+
+            const marker = new window.AMap.Marker({
+                position: [Number(poi.lng), Number(poi.lat)],
+                title: poi.name,
+                content: markerContent,
+                offset: new window.AMap.Pixel(-18, -36),
+                zIndex: 80,
+            });
+            marker.on("click", () => showPOIInfoCard({ ...poi, markerLabel }));
+            amapInstance.add(marker);
+            window._citygoPoiMarkers.push(marker);
+        });
+    }
+
+    function setPureMapMode(next) {
+        mapModePure = next;
+        mainPage.classList.toggle("map-mode-pure", mapModePure);
+        mapModeToggle?.classList.toggle("map-mode-active", mapModePure);
+        mapModeToggle?.setAttribute("aria-pressed", String(mapModePure));
+        mapModeHomeOption?.classList.toggle("active", !mapModePure);
+        mapModeMapOption?.classList.toggle("active", mapModePure);
+        if (mapContainer) {
+            mapContainer.style.pointerEvents = mapModePure ? "auto" : "none";
+            mapContainer.style.filter = mapModePure ? "none" : "saturate(0.45) contrast(0.82) brightness(1.14) sepia(0.08)";
+        }
+        if (scrollHint) scrollHint.style.display = mapModePure ? "none" : "";
+        if (amapInstance) {
+            if (mapModePure) {
+                clearRouteOverlays();
+                renderMapPOIs();
+            } else {
+                clearMapPOIs();
+                try { amapInstance.resize(); } catch(e) {}
+            }
+            setTimeout(() => amapInstance.resize(), 50);
+        }
+    }
+
+    if (mapModeToggle) {
+        mapModeToggle.addEventListener("click", (event) => {
+            const target = event.target;
+            if (target?.closest?.(".map-mode-home")) {
+                setPureMapMode(false);
+                return;
+            }
+            if (target?.closest?.(".map-mode-map")) {
+                setPureMapMode(true);
+                return;
+            }
+            const rect = mapModeToggle.getBoundingClientRect();
+            setPureMapMode(event.clientX >= rect.left + rect.width / 2);
+        });
+    }
+    window.citygoSetPureMapMode = setPureMapMode;
+
+    // ── Pure Map POI System ──
+    // Later data can call: window.citygoSetMapPOIs([{ name, lng, lat, category, intro }])
+    window.citygoMapPOIs = Array.isArray(window.citygoMapPOIs) ? window.citygoMapPOIs : [];
+    window.citygoRefreshMapPOIs = renderMapPOIs;
+    window.citygoSetMapPOIs = function(pois) {
+        window.citygoMapPOIs = Array.isArray(pois) ? pois : [];
+        renderMapPOIs();
+    };
+
+    function showPOIInfoCard(poi) {
+        // Remove existing card
+        document.querySelector(".poi-info-card")?.remove();
+        const card = document.createElement("div");
+        card.className = "poi-info-card";
+        const tags = Array.isArray(poi.tags) ? poi.tags.slice(0, 5) : [];
+        const isLocatorPoint = poi.kind === "building" || poi.category === "定位标号";
+        const categoryLabel = isLocatorPoint
+            ? `定位标号${poi.markerLabel ? ` ${poi.markerLabel}` : ""}`
+            : (poi.category || "地点");
+        card.innerHTML = `
+            <button class="poi-info-close">✕</button>
+            ${poi.image ? `<img class="poi-info-image" src="${escapeHtml(poi.image)}" alt="${escapeHtml(poi.name || "点位图片")}" loading="lazy">` : ""}
+            <div class="poi-info-category">${escapeHtml(categoryLabel)}</div>
+            <h3 class="poi-info-name">${escapeHtml(poi.name)}</h3>
+            <p class="poi-info-intro">${escapeHtml(poi.intro || "暂无介绍")}</p>
+            ${poi.address ? `<p class="poi-info-address">${escapeHtml(poi.address)}</p>` : ""}
+            ${tags.length ? `<div class="poi-info-tags">${tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+        `;
+        card.querySelector(".poi-info-close").addEventListener("click", () => card.remove());
+        document.getElementById("map-stage")?.appendChild(card);
+    }
+
+    document.getElementById("community-open-btn")?.addEventListener("click", openCommunityOverlay);
+    document.getElementById("community-overlay-close")?.addEventListener("click", closeCommunityOverlay);
+    document.getElementById("community-overlay")?.addEventListener("click", (event) => {
+        if (event.target === event.currentTarget) closeCommunityOverlay();
+    });
+
     // Sync initial tab state
     switchTab("home");
     setTimeout(initAMap, 300);
@@ -2636,6 +2773,80 @@ function getRouteDisplayTitle(route) {
     return raw.split(/[，,:：]/)[0] || raw;
 }
 
+function getSelectedPersonaCard() {
+    if (selectedPersonaId) {
+        const direct = personaCards.find(persona => persona.id === selectedPersonaId);
+        if (direct) return direct;
+    }
+    const selected = selectedPersonas[0];
+    if (selected?.id) {
+        const stored = personaCards.find(persona => persona.id === selected.id);
+        if (stored) return stored;
+    }
+    return null;
+}
+
+function getHomeRecommendedRouteKey() {
+    const persona = getSelectedPersonaCard();
+    const selectedRoute = selectedPersonas[0]?.routeKey || persona?.routeKey;
+    return selectedRoute && routes[selectedRoute] ? selectedRoute : "night";
+}
+
+function getHomeRouteOrder() {
+    const recommended = getHomeRecommendedRouteKey();
+    return [recommended, ...CAROUSEL_ROUTES.filter(key => key !== recommended)];
+}
+
+function getPersonaPlaceRecommendations(routeKey) {
+    const points = getCitygoBuildingPoints();
+    if (!points.length) return [];
+    const route = routes[routeKey];
+    const routeText = normalizeBuildingName((route?.stops || []).map(stop => stop.name).join(" "));
+    const matched = points.filter(point => {
+        const names = [point.name, ...(Array.isArray(point.aliases) ? point.aliases : [])];
+        return names.some(name => {
+            const normalized = normalizeBuildingName(name);
+            return normalized && routeText && (routeText.includes(normalized) || normalized.includes(routeText));
+        });
+    });
+    const fallbackIds = {
+        nju: ["nju-beidalou", "seu-sipailou", "nanjing-library"],
+        night: ["wanxiang-tiandi", "nanjing-1912", "nanjing-library"],
+        food: ["wanxiang-tiandi", "nanjing-library", "nanjing-1912"],
+        expo: ["nanjing-library", "poly-theatre", "nanjing-1912"],
+    }[routeKey] || [];
+    const fallback = fallbackIds
+        .map(id => points.find(point => point.id === id))
+        .filter(Boolean);
+    return [...matched, ...fallback, ...points]
+        .filter((point, index, arr) => point && arr.findIndex(item => item.id === point.id) === index)
+        .slice(0, 3);
+}
+
+function renderHomePersonaRecoBlock(routeKey) {
+    const persona = getSelectedPersonaCard();
+    const points = getPersonaPlaceRecommendations(routeKey);
+    if (!persona && !points.length) return "";
+    const title = persona ? `${persona.title} 的地点推荐` : "地点推荐";
+    const subtitle = persona?.unlockText || "根据当前路线挑选可展开查看的南京点位";
+    const cards = points.map((point, index) => `
+        <button class="home-place-card" type="button" data-home-place-index="${index}">
+            ${point.image ? `<img src="${escapeHtml(point.image)}" alt="${escapeHtml(point.name)}" loading="lazy">` : ""}
+            <span>${escapeHtml(point.name)}</span>
+            <small>${escapeHtml(point.address || "南京")}</small>
+        </button>
+    `).join("");
+    return `
+        <div class="home-persona-reco">
+            <div class="home-persona-reco-head">
+                <span>${escapeHtml(title)}</span>
+                <small>${escapeHtml(subtitle)}</small>
+            </div>
+            <div class="home-place-strip">${cards}</div>
+        </div>
+    `;
+}
+
 function renderRouteLaunchCard(key, route, options = {}) {
     const accent = ROUTE_ACCENT[key] || "#0066CC";
     const icon = ROUTE_ICON[key] || "📍";
@@ -2671,8 +2882,9 @@ function renderCarouselCards() {
     const track = document.getElementById("carousel-track");
     const dots = document.getElementById("carousel-dots");
     if (!track) return;
+    const routeOrder = getHomeRouteOrder();
 
-    track.innerHTML = CAROUSEL_ROUTES.map((key, i) => {
+    track.innerHTML = routeOrder.map((key, i) => {
         const r = routes[key];
         const accent = ROUTE_ACCENT[key];
         const icon = ROUTE_ICON[key];
@@ -2698,18 +2910,14 @@ function renderCarouselCards() {
     }).join("");
 
     if (dots) {
-        dots.innerHTML = CAROUSEL_ROUTES.map((_, i) => `<span class="carousel-dot${i === 0 ? " active" : ""}"></span>`).join("");
+        dots.innerHTML = routeOrder.map((_, i) => `<span class="carousel-dot${i === 0 ? " active" : ""}"></span>`).join("");
     }
 
     // Card click handlers
     track.querySelectorAll(".carousel-card").forEach(card => {
         card.addEventListener("click", () => {
             const routeKey = card.dataset.route;
-            if (routeKey === "nju") {
-                openGame();
-            } else {
-                openRoute(routeKey);
-            }
+            openRoute(routeKey);
         });
     });
 }
@@ -2729,7 +2937,7 @@ function updateFeatureFromCarousel() {
     if (!carousel) return;
     const cardW = carousel.clientWidth * 0.38 + 12;
     const idx = Math.round(carousel.scrollLeft / cardW);
-    const routeKey = CAROUSEL_ROUTES[idx];
+    const routeKey = getHomeRouteOrder()[idx];
     if (routeKey) renderFeatureSection(routeKey);
 }
 
@@ -2741,10 +2949,13 @@ function renderFeatureSection(routeKey) {
     const accent = ROUTE_ACCENT[routeKey];
     const icon = ROUTE_ICON[routeKey];
     const stopNames = (r.stops || []).map(s => s.name).join(" → ");
+    const persona = getSelectedPersonaCard();
+    const eyebrow = persona ? `${persona.title} 的路线推荐` : "今日推荐";
+    const placeRecommendations = getPersonaPlaceRecommendations(routeKey);
 
     section.innerHTML = `
         <div class="feature-header">
-            <p class="feature-eyebrow">今日推荐</p>
+            <p class="feature-eyebrow">${escapeHtml(eyebrow)}</p>
             <h2 class="feature-title">${r.title.split("：")[0].split(":")[0]}</h2>
             <p class="feature-desc">${r.desc}</p>
         </div>
@@ -2767,6 +2978,7 @@ function renderFeatureSection(routeKey) {
             </div>
         </div>
         <p style="font-size:12px;color:#999;margin-top:4px;padding:0 4px;">${stopNames}</p>
+        ${renderHomePersonaRecoBlock(routeKey)}
         <div class="feature-actions">
             <button class="feature-btn-primary" data-route="${routeKey}">开始探索</button>
             <button class="feature-btn-secondary" data-route="${routeKey}">邀朋友一起走</button>
@@ -2776,13 +2988,18 @@ function renderFeatureSection(routeKey) {
     // Bind buttons
     section.querySelector(".feature-btn-primary").addEventListener("click", (e) => {
         const key = e.target.dataset.route;
-        if (key === "nju") openGame();
-        else showRouteOnMap(key);
+        showRouteOnMap(key);
     });
     section.querySelector(".feature-btn-secondary").addEventListener("click", (e) => {
         const key = e.target.dataset.route;
         const routeId = ROUTE_KEY_TO_ID[key] || 1;
         showInviteForm(routeId);
+    });
+    section.querySelectorAll("[data-home-place-index]").forEach(button => {
+        button.addEventListener("click", () => {
+            const point = placeRecommendations[Number(button.dataset.homePlaceIndex)];
+            if (point) showBuildingPointDetail(point, "定位标号");
+        });
     });
 }
 
@@ -2830,8 +3047,7 @@ function renderRouteGrid() {
                 showMapRouteEditor();
                 return;
             }
-            if (routeKey === "nju") openGame();
-            else if (routeKey.startsWith("custom_")) openRoute(routeKey);
+            if (routeKey.startsWith("custom_")) openRoute(routeKey);
             else openRoute(routeKey);
         });
     });
@@ -2893,11 +3109,11 @@ function toggleScrollDrawer() {
 // ── Route marker map data for AMap ──
 const ROUTE_MAP_DATA = {
     nju: {
-        coords: [[32.056, 118.779], [32.057, 118.779]],
+        coords: [[32.0574, 118.7926], [32.0562, 118.7812]],
         stops: ["三江师范旧址", "北大楼"]
     },
     night: {
-        coords: [[32.020, 118.788], [32.021, 118.789], [32.012, 118.791]],
+        coords: [[32.020, 118.788], [32.0204, 118.7891], [32.0135, 118.7823]],
         stops: ["秦淮河", "夫子庙", "老门东"]
     },
     food: {
@@ -2909,6 +3125,77 @@ const ROUTE_MAP_DATA = {
         stops: ["南京博物院", "明故宫遗址"]
     }
 };
+
+function getCitygoBuildingPoints() {
+    const points = Array.isArray(window.CITYGO_BUILDING_POINTS) ? window.CITYGO_BUILDING_POINTS : [];
+    return points.map((point, index) => ({
+        kind: "building",
+        locatorLabel: String(index + 1).padStart(2, "0"),
+        ...point,
+    }));
+}
+
+function normalizeBuildingName(name) {
+    return String(name || "")
+        .replace(/[·\s\-—_（）()「」《》]/g, "")
+        .replace(/南京市?|景区|街区|校区|步行街|历史文化|建筑群|民国公馆区/g, "")
+        .toLowerCase();
+}
+
+function findBuildingPointByName(name) {
+    const target = normalizeBuildingName(name);
+    if (!target) return null;
+    return getCitygoBuildingPoints().find(point => {
+        const names = [point.name, ...(Array.isArray(point.aliases) ? point.aliases : [])];
+        return names.some(candidate => {
+            const normalized = normalizeBuildingName(candidate);
+            return normalized && (target === normalized || target.includes(normalized) || normalized.includes(target));
+        });
+    }) || null;
+}
+
+function showBuildingPointDetail(point, fallbackTitle = "定位标号") {
+    if (!point) return false;
+    const overlay = document.getElementById("story-overlay");
+    const panel = overlay?.querySelector(".story-panel");
+    const badge = document.getElementById("story-badge");
+    const title = document.getElementById("story-stop-name");
+    const text = document.getElementById("story-text");
+    const close = document.getElementById("story-close");
+    if (!overlay || !panel || !badge || !title || !text || !close) return false;
+
+    panel.classList.add("building-story-panel");
+    panel.querySelector(".story-image")?.remove();
+    if (point.image) {
+        const image = document.createElement("img");
+        image.className = "story-image";
+        image.src = point.image;
+        image.alt = point.name || "点位图片";
+        image.loading = "lazy";
+        title.insertAdjacentElement("afterend", image);
+    }
+
+    const tags = Array.isArray(point.tags) ? point.tags.slice(0, 4) : [];
+    const locatorText = point.locatorLabel ? `定位标号 ${point.locatorLabel}` : "定位标号";
+    badge.textContent = fallbackTitle === "路线途经点" ? `${fallbackTitle} · ${locatorText}` : locatorText;
+    title.textContent = point.name || "定位点";
+    text.innerHTML = `
+        <p>${escapeHtml(point.intro || "暂无介绍")}</p>
+        ${point.address ? `<p class="story-address">${escapeHtml(point.address)}</p>` : ""}
+        ${tags.length ? `<div class="story-tags">${tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+    `;
+    overlay.classList.add("open");
+
+    close.onclick = () => {
+        overlay.classList.remove("open");
+        panel.classList.remove("building-story-panel");
+        panel.querySelector(".story-image")?.remove();
+    };
+    overlay.onclick = (e) => {
+        if (e.target === e.currentTarget) close.onclick();
+    };
+    return true;
+}
 
 // ── AMap Initialization ──
 function initAMap() {
@@ -2979,6 +3266,9 @@ function initAMap() {
 
             amapReady = true;
             amapInitializing = false;
+            if (typeof window.citygoRefreshMapPOIs === "function") {
+                window.citygoRefreshMapPOIs();
+            }
 
             // Trigger resize after a frame
             setTimeout(() => amapInstance.resize(), 100);
@@ -3002,32 +3292,41 @@ function addAllRouteOverlays(AMap) {
     };
 
     Object.entries(ROUTE_MAP_DATA).forEach(([key, data]) => {
-        const coords = data.coords;
-        const stops = data.stops;
+        const coords = (Array.isArray(data.coords) ? data.coords : [])
+            .filter(c => Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1])));
+        if (!coords.length) return;
+        const stops = Array.isArray(data.stops) ? data.stops : [];
         const color = markerColors[key] || "#B64236";
-        const lngLatCoords = coords.map(c => [c[1], c[0]]);  // to [lng, lat]
+        const lngLatCoords = coords.map(c => [Number(c[1]), Number(c[0])]);  // to [lng, lat]
 
         // Add polyline for route
-        const polyline = new AMap.Polyline({
-            path: lngLatCoords,
-            strokeColor: color,
-            strokeOpacity: 0.6,
-            strokeWeight: 3,
-            strokeStyle: "dashed",
-            strokeDasharray: [10, 8],
-            lineJoin: "round",
-        });
-        amapInstance.add(polyline);
-        amapRouteLines.push(polyline);
+        if (lngLatCoords.length > 1) {
+            const polyline = new AMap.Polyline({
+                path: lngLatCoords,
+                strokeColor: color,
+                strokeOpacity: 0.6,
+                strokeWeight: 3,
+                strokeStyle: "dashed",
+                strokeDasharray: [10, 8],
+                lineJoin: "round",
+            });
+            try {
+                amapInstance.add(polyline);
+                amapRouteLines.push(polyline);
+            } catch (error) {
+                console.warn("Failed to add route polyline:", key, error);
+            }
+        }
 
         // Add markers for each stop
         coords.forEach((c, i) => {
+            const label = stops[i] || "途经点";
             const markerContent = document.createElement("div");
             markerContent.className = "route-marker";
-            markerContent.innerHTML = `<span class="dot"></span><span>${stops[i]}</span>`;
+            markerContent.innerHTML = `<span class="dot"></span><span>${escapeHtml(label)}</span>`;
 
             const marker = new AMap.Marker({
-                position: [c[1], c[0]],
+                position: [Number(c[1]), Number(c[0])],
                 content: markerContent,
                 offset: new AMap.Pixel(-30, -10),
                 zIndex: 10,
@@ -3036,11 +3335,17 @@ function addAllRouteOverlays(AMap) {
             marker._stopIndex = i;
 
             marker.on("click", () => {
+                const buildingPoint = findBuildingPointByName(label);
+                if (buildingPoint && showBuildingPointDetail(buildingPoint, "路线途经点")) return;
                 openRoute(key);
             });
 
-            amapInstance.add(marker);
-            amapMarkers.push(marker);
+            try {
+                amapInstance.add(marker);
+                amapMarkers.push(marker);
+            } catch (error) {
+                console.warn("Failed to add route marker:", key, label, error);
+            }
         });
     });
 }
@@ -3065,6 +3370,251 @@ function toggleMapFullscreen() {
     if (amapInstance) {
         setTimeout(() => amapInstance.resize(), 50);
     }
+}
+
+function drawPixelHomeMap() {
+    if (!mainMapCanvas) return;
+
+    const vw = Math.max(1, window.innerWidth);
+    const vh = Math.max(1, window.innerHeight);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelW = vw >= vh ? 640 : 360;
+    const pixelH = Math.max(vw >= vh ? 360 : 560, Math.round(pixelW * vh / vw));
+    const tile = 4;
+
+    mainMapCanvas.style.display = "block";
+    mainMapCanvas.width = Math.round(vw * dpr);
+    mainMapCanvas.height = Math.round(vh * dpr);
+    mainMapCanvas.style.width = vw + "px";
+    mainMapCanvas.style.height = vh + "px";
+
+    const low = document.createElement("canvas");
+    low.width = pixelW;
+    low.height = pixelH;
+    const g = low.getContext("2d");
+    g.imageSmoothingEnabled = false;
+
+    const palette = {
+        sidewalk: "#9FBBD5",
+        sidewalkLight: "#BFD2E8",
+        road: "#2F5878",
+        roadDark: "#23435F",
+        roadLine: "#E6F2FF",
+        grass: "#7FC16E",
+        grassLight: "#A5D77A",
+        grassDark: "#4F8B59",
+        sand: "#F1D56D",
+        water: "#7DB9DA",
+        waterDark: "#4E88AA",
+        outline: "#1E3650",
+        glass: "#74B7F2",
+        white: "#E9F3FF",
+        brick: "#A95A44",
+        roof: "#8E3F31",
+        blueWall: "#5B7EAD",
+        slateWall: "#6B89A7",
+        creamWall: "#E7E4D2"
+    };
+
+    const snap = (value) => Math.round(value / tile) * tile;
+    const rect = (x, y, w, h, color) => {
+        const sx = snap(x);
+        const sy = snap(y);
+        const sw = Math.max(tile, snap(x + w) - sx);
+        const sh = Math.max(tile, snap(y + h) - sy);
+        g.fillStyle = color;
+        g.fillRect(sx, sy, sw, sh);
+    };
+    const outlineRect = (x, y, w, h, fill, outline = palette.outline) => {
+        rect(x - tile, y - tile, w + tile * 2, h + tile * 2, outline);
+        rect(x, y, w, h, fill);
+    };
+    const px = (v) => v * pixelW;
+    const py = (v) => v * pixelH;
+
+    function drawRoad(x, y, w, h, dir) {
+        rect(x - tile, y - tile, w + tile * 2, h + tile * 2, palette.sidewalkLight);
+        rect(x, y, w, h, palette.road);
+        rect(x, y, w, tile, palette.roadDark);
+        rect(x, y + h - tile, w, tile, palette.roadDark);
+        rect(x, y, tile, h, palette.roadDark);
+        rect(x + w - tile, y, tile, h, palette.roadDark);
+
+        if (dir === "horizontal") {
+            const centerY = y + h / 2 - tile / 2;
+            for (let i = x + tile * 3; i < x + w - tile * 4; i += tile * 8) {
+                rect(i, centerY, tile * 4, tile, palette.roadLine);
+            }
+        } else {
+            const centerX = x + w / 2 - tile / 2;
+            for (let i = y + tile * 3; i < y + h - tile * 4; i += tile * 8) {
+                rect(centerX, i, tile, tile * 4, palette.roadLine);
+            }
+        }
+    }
+
+    function drawCrosswalk(x, y, w, h, dir) {
+        if (dir === "horizontal") {
+            for (let i = x; i < x + w; i += tile * 3) rect(i, y, tile * 2, h, palette.white);
+        } else {
+            for (let i = y; i < y + h; i += tile * 3) rect(x, i, w, tile * 2, palette.white);
+        }
+    }
+
+    function drawGrassPatch(x, y, w, h) {
+        outlineRect(x, y, w, h, palette.grass, palette.grassDark);
+        for (let i = 0; i < 18; i++) {
+            const gx = x + ((i * 23) % Math.max(tile, w - tile * 2));
+            const gy = y + ((i * 17) % Math.max(tile, h - tile * 2));
+            rect(gx, gy, tile * 2, tile, i % 3 === 0 ? palette.grassLight : palette.grassDark);
+        }
+    }
+
+    function drawTree(x, y, scale = 1) {
+        const s = tile * scale;
+        rect(x + s, y + s * 3, s, s, "#7B5335");
+        rect(x, y + s, s * 3, s * 2, palette.grassDark);
+        rect(x + s, y, s * 3, s * 3, palette.grass);
+        rect(x + s * 2, y + s, s * 2, s * 2, palette.grassLight);
+        rect(x + s, y + s * 2, s, s, "#2F6F48");
+    }
+
+    function drawBuilding(x, y, w, h, body, roof = palette.roof, opts = {}) {
+        rect(x + tile * 2, y + tile * 2, w, h, "rgba(30, 54, 80, 0.28)");
+        outlineRect(x, y, w, h, body);
+        rect(x, y, w, tile * 2, roof);
+        rect(x + tile, y + tile * 2, w - tile * 2, tile, "#2E4D6C");
+
+        const cols = opts.cols || Math.max(2, Math.floor(w / 18));
+        const rows = opts.rows || Math.max(2, Math.floor(h / 22));
+        const gapX = Math.floor((w - cols * tile * 2) / (cols + 1));
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const wx = x + gapX + col * (gapX + tile * 2);
+                const wy = y + tile * 5 + row * tile * 5;
+                if (wy + tile * 3 > y + h - tile * 4) continue;
+                rect(wx, wy, tile * 2, tile * 3, palette.glass);
+                rect(wx, wy, tile * 2, tile, palette.white);
+            }
+        }
+
+        const doorW = tile * 4;
+        rect(x + w / 2 - doorW / 2, y + h - tile * 5, doorW, tile * 5, "#31527A");
+        rect(x + w / 2 - tile / 2, y + h - tile * 3, tile, tile, palette.white);
+    }
+
+    function drawStore(x, y, w, h, awning) {
+        drawBuilding(x, y, w, h, palette.creamWall, palette.brick, { cols: 2, rows: 1 });
+        rect(x + tile, y + h - tile * 8, w - tile * 2, tile * 3, awning);
+        for (let i = x + tile; i < x + w - tile * 2; i += tile * 3) {
+            rect(i, y + h - tile * 8, tile * 2, tile * 3, palette.white);
+        }
+    }
+
+    function drawCar(x, y, color, dir = "horizontal") {
+        if (dir === "horizontal") {
+            rect(x, y, tile * 7, tile * 4, palette.outline);
+            rect(x + tile, y + tile, tile * 5, tile * 2, color);
+            rect(x + tile * 2, y, tile * 3, tile, palette.white);
+            rect(x + tile, y + tile * 3, tile, tile, "#142B40");
+            rect(x + tile * 5, y + tile * 3, tile, tile, "#142B40");
+        } else {
+            rect(x, y, tile * 4, tile * 7, palette.outline);
+            rect(x + tile, y + tile, tile * 2, tile * 5, color);
+            rect(x, y + tile * 2, tile, tile * 3, palette.white);
+            rect(x + tile * 3, y + tile, tile, tile, "#142B40");
+            rect(x + tile * 3, y + tile * 5, tile, tile, "#142B40");
+        }
+    }
+
+    function drawFountain(x, y) {
+        outlineRect(x, y, tile * 12, tile * 12, "#5EA9CE", palette.white);
+        rect(x + tile * 2, y + tile * 2, tile * 8, tile * 8, palette.water);
+        rect(x + tile * 5, y + tile * 4, tile * 2, tile * 4, palette.white);
+        rect(x + tile * 4, y + tile * 5, tile * 4, tile * 2, palette.waterDark);
+    }
+
+    rect(0, 0, pixelW, pixelH, palette.sidewalk);
+    for (let y = 0; y < pixelH; y += tile * 3) {
+        for (let x = 0; x < pixelW; x += tile * 3) {
+            const mark = (x * 7 + y * 11) % 37;
+            if (mark < 5) rect(x, y, tile, tile, mark % 2 ? "#90ABC8" : palette.sidewalkLight);
+        }
+    }
+
+    drawRoad(0, py(0.76), pixelW, py(0.16), "horizontal");
+    drawRoad(px(0.78), 0, px(0.14), pixelH, "vertical");
+    drawRoad(0, py(0.43), px(0.82), py(0.10), "horizontal");
+    drawRoad(px(0.34), py(0.10), px(0.11), py(0.66), "vertical");
+    drawRoad(0, py(0.05), px(0.78), py(0.08), "horizontal");
+
+    rect(px(0.93), 0, px(0.07), pixelH, palette.waterDark);
+    rect(px(0.94), tile, px(0.04), pixelH - tile * 2, palette.water);
+    for (let y = tile * 4; y < pixelH; y += tile * 8) rect(px(0.95), y, tile * 5, tile, "#BFE9FF");
+
+    drawCrosswalk(px(0.03), py(0.76), px(0.14), tile * 5, "horizontal");
+    drawCrosswalk(px(0.76), py(0.75), tile * 5, px(0.13), "vertical");
+    drawCrosswalk(px(0.34), py(0.42), tile * 5, px(0.12), "vertical");
+    drawCrosswalk(px(0.78), py(0.09), tile * 5, px(0.10), "vertical");
+
+    drawGrassPatch(px(0.02), py(0.22), px(0.20), py(0.18));
+    drawGrassPatch(px(0.58), py(0.26), px(0.18), py(0.18));
+    drawGrassPatch(px(0.49), py(0.58), px(0.24), py(0.16));
+    drawGrassPatch(px(0.07), py(0.58), px(0.18), py(0.10));
+
+    rect(px(0.05), py(0.30), px(0.12), tile * 3, palette.sand);
+    rect(px(0.61), py(0.34), px(0.12), tile * 3, palette.sand);
+    rect(px(0.56), py(0.66), px(0.12), tile * 3, palette.sand);
+
+    drawBuilding(px(0.02), py(0.09), px(0.22), py(0.18), palette.blueWall, "#7B4054", { cols: 4, rows: 3 });
+    drawBuilding(px(0.26), py(0.09), px(0.16), py(0.21), "#5278B0", "#8A4A35", { cols: 3, rows: 4 });
+    drawBuilding(px(0.46), py(0.10), px(0.22), py(0.18), palette.slateWall, "#914F32", { cols: 4, rows: 3 });
+    drawBuilding(px(0.69), py(0.06), px(0.14), py(0.17), "#658AB5", "#8F4B2F", { cols: 2, rows: 3 });
+
+    drawBuilding(px(0.25), py(0.32), px(0.17), py(0.13), "#6F85A0", "#4D637C", { cols: 3, rows: 2 });
+    drawStore(px(0.52), py(0.29), px(0.17), py(0.13), "#E56A5D");
+    drawStore(px(0.68), py(0.29), px(0.10), py(0.12), "#F0B24E");
+
+    drawBuilding(px(0.39), py(0.52), px(0.21), py(0.22), "#E6EAF2", "#456A96", { cols: 3, rows: 4 });
+    rect(px(0.39) + tile * 2, py(0.52) + tile * 2, px(0.21) - tile * 4, tile * 3, "#CBD9EA");
+    rect(px(0.43), py(0.50), px(0.13), tile * 3, palette.outline);
+    rect(px(0.44), py(0.49), px(0.11), tile * 2, "#F5F8FF");
+
+    drawFountain(px(0.66), py(0.55));
+
+    for (let i = 0; i < 18; i++) {
+        const tx = px(0.03 + ((i * 0.13) % 0.70));
+        const ty = py(0.18 + ((i * 0.17) % 0.55));
+        const inRoad = (tx > px(0.34) && tx < px(0.45)) || (ty > py(0.43) && ty < py(0.53));
+        if (!inRoad) drawTree(tx, ty, i % 3 === 0 ? 1.2 : 1);
+    }
+    for (let i = 0; i < 8; i++) drawTree(px(0.82 + (i % 2) * 0.055), py(0.18 + i * 0.075), 0.9);
+
+    drawCar(px(0.05), py(0.80), "#7EE08B");
+    drawCar(px(0.13), py(0.84), "#F36C65");
+    drawCar(px(0.49), py(0.79), "#F36C65");
+    drawCar(px(0.70), py(0.83), "#7EE08B");
+    drawCar(px(0.84), py(0.59), "#F0C452", "vertical");
+    drawCar(px(0.83), py(0.10), "#75A7FF", "vertical");
+
+    rect(px(0.06), py(0.68), tile * 5, tile * 12, "#8ED7F8");
+    rect(px(0.09), py(0.68), tile * 5, tile * 12, "#75A7FF");
+    rect(px(0.12), py(0.68), tile * 5, tile * 12, "#F36C65");
+
+    for (let i = 0; i < 9; i++) {
+        rect(px(0.28) + i * tile * 4, py(0.61) + Math.sin(i) * tile * 2, tile * 2, tile * 2, palette.sand);
+    }
+
+    rect(0, 0, pixelW, tile, "#D7E8F7");
+    rect(0, pixelH - tile, pixelW, tile, "#1E3650");
+    rect(0, 0, tile, pixelH, "#D7E8F7");
+    rect(pixelW - tile, 0, tile, pixelH, "#1E3650");
+
+    const ctx = mainMapCanvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, vw, vh);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(low, 0, 0, vw, vh);
 }
 
 function startCanvasMapFallback() {
@@ -3625,6 +4175,15 @@ function clearRouteOverlays() {
     }
 }
 
+function setRouteOverlaysVisible(visible) {
+    [...amapMarkers, ...amapRouteLines].forEach(overlay => {
+        try {
+            if (visible && typeof overlay.show === "function") overlay.show();
+            if (!visible && typeof overlay.hide === "function") overlay.hide();
+        } catch(e) {}
+    });
+}
+
 function drawRouteOnMap(routeKey) {
     if (!window.AMap || !amapInstance) return;
 
@@ -3677,7 +4236,11 @@ function drawRouteOnMap(routeKey) {
             zIndex: 60,
         });
         marker._routeKey = routeKey;
-        marker.on("click", () => openRoute(routeKey));
+        marker.on("click", () => {
+            const buildingPoint = findBuildingPointByName(label);
+            if (buildingPoint && showBuildingPointDetail(buildingPoint, "路线途经点")) return;
+            openRoute(routeKey);
+        });
         amapInstance.add(marker);
         amapMarkers.push(marker);
         markers.push(marker);
@@ -3712,11 +4275,7 @@ function showFloatCard(routeKey) {
 
     document.getElementById("float-card-start").onclick = () => {
         closeSheet();
-        if (routeKey === "nju") {
-            setTimeout(openGame, 300);
-        } else {
-            openRoute(routeKey);
-        }
+        openRoute(routeKey);
     };
     document.getElementById("float-card-invite").onclick = () => {
         const rid = ROUTE_KEY_TO_ID[routeKey] || 1;
@@ -3811,7 +4370,20 @@ function restoreAllMapOverlays() {
 }
 
 function switchTab(tab) {
-    if (tab === currentTab) return;
+    document.body.classList.remove("community-tab-active");
+    if (tab === "nearby") document.body.classList.add("community-tab-active");
+    if (tab !== "home" && typeof window.citygoSetPureMapMode === "function") {
+        window.citygoSetPureMapMode(false);
+    }
+
+    if (tab === currentTab) {
+        if (tab === "home") {
+            const mapStage = document.getElementById("map-stage");
+            if (mapStage) mapStage.style.display = "";
+            if (amapInstance) amapInstance.resize();
+        }
+        return;
+    }
 
     // Update nav active state (wheel nav)
     document.querySelectorAll(".wheel-item, .nav-item").forEach(i => i.classList.remove("active"));
@@ -3859,6 +4431,7 @@ function switchTab(tab) {
             snapScroll.style.display = "";
             snapScroll.scrollTop = 0;
         }
+        if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
     } else {
         // routes / nearby / pet / profile — hide map stage and all other tabs
         hideAllTabContent();
@@ -3868,12 +4441,11 @@ function switchTab(tab) {
             tabEl.classList.add("visible");
             const inner = tabEl.querySelector(".tab-content-inner");
             if (inner) {
-                // Routes tab always re-renders (dynamic custom routes + upload hero)
                 if (tab === "routes") renderRoutesTab(inner);
+                else if (tab === "nearby") renderCommunityPage(inner);
                 else if (!inner.dataset.rendered) {
                     inner.dataset.rendered = "1";
-                    if (tab === "nearby") renderNearbyTab(inner);
-                    else if (tab === "pet") renderPetTab(inner);
+                    if (tab === "pet") renderPetTab(inner);
                     else if (tab === "profile") renderProfileTab(inner);
                 }
             }
@@ -4553,7 +5125,7 @@ function showPoiDetailOverlayDianping(storeId) {
     ).join('') : '';
 
     const catLabel = {
-        food: '美食', coffee: '咖啡茶饮', ticket: '景点门票', hotel: '酒店住宿',
+        food: '美食', coffee: '咖啡茶饮', ticket: '博物馆/景点', hotel: '酒店住宿',
         shopping: '购物', entertainment: '休闲娱乐'
     }[biz.category] || biz.subcategory || '';
 
@@ -4697,7 +5269,7 @@ function renderNearbyTab(container) {
             <button class="need-chip active" data-need="all">全部推荐</button>
             <button class="need-chip" data-need="food">美食</button>
             <button class="need-chip" data-need="drink">咖啡茶饮</button>
-            <button class="need-chip" data-need="ticket">景点门票</button>
+            <button class="need-chip" data-need="ticket">博物馆</button>
             <button class="need-chip" data-need="hotel">酒店住宿</button>
             <button class="need-chip" data-need="coupon">今日优惠</button>
         </div>
@@ -4815,7 +5387,7 @@ function renderDianpingCard(item) {
     const distKm = distance >= 1000 ? `${(distance/1000).toFixed(1)}km` : `${distance || 500}m`;
 
     const catLabel = {
-        food: '美食', coffee: '咖啡', ticket: '景点', hotel: '酒店',
+        food: '美食', coffee: '咖啡', ticket: '博物馆', hotel: '酒店',
         shopping: '购物', entertainment: '休闲'
     }[item.category] || item.subcategory || '';
 
@@ -6517,80 +7089,8 @@ showMainPage = function() {
     addAiFloatButton();
     // Load Meituan food deals
     loadMeituanDeals();
-    // Add home supply entry card
-    addHomeSupplyEntry();
 };
 
-/* ═══════════════════════════════════════
-   0520 南大剧情游戏 · Game Overlay
-   ═══════════════════════════════════════ */
-
-function openGame() {
-    const overlay = document.getElementById("game-overlay");
-    const iframe = document.getElementById("game-iframe");
-    if (!overlay || !iframe) return;
-
-    iframe.src = "./0520-game/index.html";
-    overlay.classList.add("open");
-    document.body.style.overflow = "hidden";
-
-    // Notify any active audio to pause
-    if (typeof VNEngine !== "undefined" && VNEngine.audio) {
-        try { VNEngine.audio.pause(); } catch(e) {}
-    }
-}
-
-function closeGame() {
-    const overlay = document.getElementById("game-overlay");
-    const iframe = document.getElementById("game-iframe");
-    if (!overlay) return;
-
-    overlay.classList.remove("open");
-    document.body.style.overflow = "";
-    setTimeout(() => {
-        if (iframe) iframe.src = "";
-    }, 400);
-}
-
-// Hook game close button (DOM already ready since script loads at end of body)
-(function bindGameClose() {
-    const gameCloseBtn = document.getElementById("game-close-btn");
-    if (gameCloseBtn) {
-        gameCloseBtn.addEventListener("click", closeGame);
-    }
-})();
-
-// Handle enter buttons in the opening scene for NJU
-document.querySelectorAll(".enter[data-route='nju']").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openGame();
-    });
-});
-
-// Also hook the route sheet: when NJU route opens, show game button
-const _origOpenRoute = openRoute;
-openRoute = function(key) {
-    _origOpenRoute(key);
-    // Re-bind: after sheet renders, add game button for NJU
-    if (key === "nju") {
-        setTimeout(() => {
-            const actions = document.querySelector(".route-actions");
-            if (actions) {
-                const gameBtn = document.createElement("button");
-                gameBtn.className = "route-action-btn";
-                gameBtn.style.cssText = "background:linear-gradient(135deg,var(--nju-purple),var(--nju-purple-light));border-color:transparent;";
-                gameBtn.innerHTML = '<span class="icon">🎮</span><span class="label" style="color:#fff;">开始剧情游戏</span>';
-                gameBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    closeSheet();
-                    setTimeout(openGame, 300);
-                });
-                actions.appendChild(gameBtn);
-            }
-        }, 100);
-    }
-};
 
 /* ═══════════════════════════════════════
    AI 助手聊天面板 · AI Chat Panel
@@ -6601,13 +7101,14 @@ renderCarouselCards = function() {
     const track = document.getElementById("carousel-track");
     const dots = document.getElementById("carousel-dots");
     if (!track) return;
+    const routeOrder = getHomeRouteOrder();
 
-    track.innerHTML = CAROUSEL_ROUTES
+    track.innerHTML = routeOrder
         .map(key => renderRouteLaunchCard(key, routes[key], { carousel: true, compact: true }))
         .join("");
 
     if (dots) {
-        dots.innerHTML = CAROUSEL_ROUTES
+        dots.innerHTML = routeOrder
             .map((_, i) => `<span class="carousel-dot${i === 0 ? " active" : ""}"></span>`)
             .join("");
     }
@@ -6882,3 +7383,710 @@ function renderMockMeituanDeals(grid) {
         </div>
     `).join("");
 }
+
+/* Supply station renderer — saved before override */
+const renderRouteSupplyStation = renderNearbyTab;
+let routeSupplyPendingKey = null;
+
+/* ----------  Community Data & Helpers ---------- */
+
+const COMMUNITY_STORAGE_KEY = "citygo_community_posts";
+const COMMUNITY_FILE_LIMIT = 2.5 * 1024 * 1024;
+const COMMUNITY_POST_TYPES = [
+    { id: "route", label: "路线推荐", hint: "写下路线顺序、适合人群、预算和你会怎么走。" },
+    { id: "routeReview", label: "路线评价", hint: "评价一条路线的体验、节奏、拥挤程度和踩坑点。" },
+    { id: "placeReview", label: "地点评价", hint: "聊聊某个地点值不值得去、适合什么时候去。" },
+    { id: "opinion", label: "观点讨论", hint: "抛出一个南京漫游观点，看看大家怎么想。" },
+    { id: "forum", label: "推荐论坛", hint: "推荐一个值得加入的路线讨论区或同好小组。" },
+];
+const COMMUNITY_SEED_POSTS = [
+    {
+        id: "seed-night-review",
+        seed: true,
+        type: "routeReview",
+        author: "秦淮夜走员",
+        avatar: "夜",
+        title: "秦淮夜游线建议把老门东放在最后",
+        text: "夫子庙人会多，但从秦淮河边一路走到老门东，节奏会慢下来。建议 18:20 左右到河边，先看天色变暗，再进街区吃东西。",
+        routeKey: "night",
+        routeName: "秦淮夜游",
+        place: "秦淮河 / 老门东",
+        rating: 4.8,
+        tags: ["夜游", "路线评价", "适合拍照"],
+        media: [{ type: "image", url: "assets/scenes/qinhuai/scene.png", caption: "秦淮夜色参考" }],
+        comments: [
+            { author: "慢慢走", text: "同意，最后去老门东吃夜宵刚好。", time: "18分钟前" },
+            { author: "周末出门", text: "周六人很多吗？想避开最挤的时段。", time: "7分钟前" },
+        ],
+        likes: 128,
+        views: 1860,
+        time: "2小时前",
+    },
+    {
+        id: "seed-wutong-route",
+        seed: true,
+        type: "route",
+        author: "梧桐路书",
+        avatar: "梧",
+        title: "给第一次来南京的朋友：半日梧桐散步线",
+        text: "南大鼓楼校区出发，走上海路，拐进南秀村，最后到先锋书店。全程不赶，适合下午两点以后，路上咖啡店很多。",
+        routeKey: "food",
+        routeName: "午后餐茶线",
+        place: "上海路 / 南秀村",
+        rating: 4.6,
+        tags: ["自制路线", "citywalk", "咖啡"],
+        media: [{ type: "video", url: "", caption: "梧桐步道 12 秒短视频" }],
+        comments: [
+            { author: "纸袋拿铁", text: "这条我走过，南秀村真的适合慢慢逛。", time: "35分钟前" },
+        ],
+        likes: 96,
+        views: 1324,
+        time: "昨天",
+    },
+    {
+        id: "seed-place-review",
+        seed: true,
+        type: "placeReview",
+        author: "展厅边角料",
+        avatar: "展",
+        title: "南博不要只看主展，特展厅更适合深逛",
+        text: "如果只有两小时，我会把固定展快速扫一遍，把时间留给特展。建议提前查预约和闭馆时间，周末下午三点后体验会更轻松。",
+        routeKey: "expo",
+        routeName: "博物馆展览线",
+        place: "南京博物院",
+        rating: 4.9,
+        tags: ["地点评价", "展览", "预约提醒"],
+        media: [{ type: "image", url: "assets/scenes/museum/scene.png", caption: "博物馆氛围" }],
+        comments: [
+            { author: "新手逛展", text: "预约提醒太有用了，上次就是没约上。", time: "1小时前" },
+            { author: "路线收藏家", text: "可以和明故宫放同一天吗？", time: "46分钟前" },
+        ],
+        likes: 152,
+        views: 2402,
+        time: "3小时前",
+    },
+    {
+        id: "seed-forum",
+        seed: true,
+        type: "forum",
+        author: "路线召集人",
+        avatar: "社",
+        title: "推荐开一个「雨天南京」论坛",
+        text: "南京下雨的时候其实很适合室内线：南博、先锋书店、咖啡馆、地铁可达的小馆子。想拉一个专门收集雨天路线的讨论区。",
+        routeKey: "",
+        routeName: "",
+        place: "全城",
+        rating: null,
+        tags: ["论坛推荐", "雨天路线", "观点"],
+        media: [],
+        comments: [
+            { author: "伞下散步", text: "我投一票，雨天路线真的需要单独整理。", time: "22分钟前" },
+        ],
+        likes: 73,
+        views: 908,
+        time: "今天",
+    },
+];
+
+let communityFilter = "all";
+let communitySearchQuery = "";
+
+function getCommunityType(typeId) {
+    return COMMUNITY_POST_TYPES.find(type => type.id === typeId) || COMMUNITY_POST_TYPES[0];
+}
+
+function cloneCommunitySeeds() {
+    return JSON.parse(JSON.stringify(COMMUNITY_SEED_POSTS));
+}
+
+function loadCommunityPosts() {
+    try {
+        const saved = localStorage.getItem(COMMUNITY_STORAGE_KEY);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) return parsed;
+        }
+    } catch(e) {}
+    return cloneCommunitySeeds();
+}
+
+function saveCommunityPosts(posts) {
+    try {
+        localStorage.setItem(COMMUNITY_STORAGE_KEY, JSON.stringify(posts));
+    } catch(e) {
+        showToast("本地空间不足，视频或图片可以改用链接发布");
+    }
+}
+
+function communityText(text) {
+    return escapeHtml(text || "").replace(/\n/g, "<br>");
+}
+
+function getCommunityCurrentUserName() {
+    try {
+        const profile = getUserProfile();
+        return profile?.name || "我";
+    } catch(e) {
+        return "我";
+    }
+}
+
+function getCommunityAvatar(author) {
+    const safe = String(author || "我").trim();
+    return safe.slice(0, 1) || "我";
+}
+
+function getCommunityRouteOptions() {
+    const keys = typeof getAllDisplayRouteKeys === "function" ? getAllDisplayRouteKeys() : Object.keys(routes);
+    return keys
+        .filter(key => routes[key])
+        .map(key => `<option value="${escapeHtml(key)}">${escapeHtml(getRouteDisplayTitle(routes[key]))}</option>`)
+        .join("");
+}
+
+function getCommunityStats(posts) {
+    const routePosts = posts.filter(post => post.type === "route").length;
+    const reviewPosts = posts.filter(post => post.type === "routeReview" || post.type === "placeReview").length;
+    const comments = posts.reduce((sum, post) => sum + (post.comments || []).length, 0);
+    return { routePosts, reviewPosts, comments };
+}
+
+function renderCommunityFilters() {
+    const filters = [{ id: "all", label: "全部" }, ...COMMUNITY_POST_TYPES];
+    return filters.map(filter =>
+        `<button class="community-filter${communityFilter === filter.id ? " active" : ""}" type="button" data-community-filter="${filter.id}">
+            ${escapeHtml(filter.label)}
+        </button>`
+    ).join("");
+}
+
+function getCommunityPostTime(post) {
+    if (!post.timestamp) return post.time || "刚刚";
+    const diff = Date.now() - Number(post.timestamp);
+    if (diff < 60 * 1000) return "刚刚";
+    if (diff < 60 * 60 * 1000) return Math.floor(diff / 60000) + "分钟前";
+    if (diff < 24 * 60 * 60 * 1000) return Math.floor(diff / 3600000) + "小时前";
+    return Math.floor(diff / 86400000) + "天前";
+}
+
+function renderCommunityMedia(media) {
+    if (!Array.isArray(media) || !media.length) return "";
+    return `<div class="community-media-grid">
+        ${media.slice(0, 4).map(item => {
+            const caption = item.caption ? `<span>${escapeHtml(item.caption)}</span>` : "";
+            if (item.type === "video") {
+                return item.url
+                    ? `<figure class="community-media community-media-video"><video src="${escapeHtml(item.url)}" controls preload="metadata"></video>${caption}</figure>`
+                    : `<figure class="community-media community-media-video placeholder"><div class="community-video-placeholder"><b>VIDEO</b><small>${escapeHtml(item.caption || "短视频内容")}</small></div></figure>`;
+            }
+            return `<figure class="community-media"><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.caption || "社区图片")}" loading="lazy">${caption}</figure>`;
+        }).join("")}
+    </div>`;
+}
+
+function renderCommunityPost(post) {
+    const typeInfo = getCommunityType(post.type);
+    const tags = (post.tags && post.tags.length ? post.tags : [typeInfo.label]).slice(0, 5);
+    const commentList = (post.comments || []).slice(-3);
+    const routeName = post.routeName || (post.routeKey && routes[post.routeKey] ? getRouteDisplayTitle(routes[post.routeKey]) : "");
+    const rating = post.rating ? `<span class="community-rating">${Number(post.rating).toFixed(1)} 分</span>` : "";
+    const place = post.place ? `<span>${escapeHtml(post.place)}</span>` : "";
+    const routeChip = routeName ? `<button class="community-meta-chip action" type="button" data-community-open-route="${escapeHtml(post.id)}">${escapeHtml(routeName)}</button>` : "";
+
+    return `<article class="community-post" data-community-post="${escapeHtml(post.id)}">
+        <header class="community-post-head">
+            <div class="community-avatar">${escapeHtml(post.avatar || getCommunityAvatar(post.author))}</div>
+            <div class="community-author-block">
+                <div class="community-author-row">
+                    <strong>${escapeHtml(post.author || "匿名旅人")}</strong>
+                    <span class="community-type">${escapeHtml(typeInfo.label)}</span>
+                </div>
+                <span class="community-time">${escapeHtml(getCommunityPostTime(post))} · ${Number(post.views || 0)} 浏览</span>
+            </div>
+        </header>
+        <h3 class="community-post-title">${escapeHtml(post.title || "未命名帖子")}</h3>
+        <div class="community-post-meta">
+            ${routeChip}
+            ${place}
+            ${rating}
+        </div>
+        <p class="community-post-text">${communityText(post.text)}</p>
+        ${renderCommunityMedia(post.media)}
+        <div class="community-tags">${tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
+        <div class="community-actions">
+            <button type="button" data-community-like="${escapeHtml(post.id)}">${post.liked ? "已赞" : "赞"} · ${Number(post.likes || 0)}</button>
+            <button type="button" data-community-reply="${escapeHtml(post.id)}">引用观点</button>
+            ${routeName ? `<button type="button" data-community-open-route="${escapeHtml(post.id)}">打开路线</button>` : ""}
+        </div>
+        <div class="community-comments">
+            ${commentList.map(comment => `
+                <div class="community-comment">
+                    <b>${escapeHtml(comment.author || "匿名")}</b>
+                    <span>${communityText(comment.text)}</span>
+                    <small>${escapeHtml(comment.time || "刚刚")}</small>
+                </div>
+            `).join("")}
+            <div class="community-comment-box">
+                <input type="text" data-community-comment-input="${escapeHtml(post.id)}" placeholder="写下你的评论或建议" maxlength="120">
+                <button type="button" data-community-comment="${escapeHtml(post.id)}">发送</button>
+            </div>
+        </div>
+    </article>`;
+}
+
+function getFilteredCommunityPosts() {
+    const keyword = communitySearchQuery.trim().toLowerCase();
+    return loadCommunityPosts().filter(post => {
+        const typeMatch = communityFilter === "all" || post.type === communityFilter;
+        if (!typeMatch) return false;
+        if (!keyword) return true;
+        const haystack = [post.title, post.text, post.routeName, post.place, ...(post.tags || [])]
+            .join(" ")
+            .toLowerCase();
+        return haystack.includes(keyword);
+    });
+}
+
+function renderCommunityFeed(container) {
+    const feed = container.querySelector("#community-feed");
+    if (!feed) return;
+    const posts = getFilteredCommunityPosts();
+    feed.innerHTML = posts.length
+        ? posts.map(renderCommunityPost).join("")
+        : `<div class="community-empty">
+            <strong>还没有相关帖子</strong>
+            <span>换个筛选，或者自己发起一个路线讨论。</span>
+        </div>`;
+    bindCommunityFeedEvents(container);
+}
+
+function bindCommunityComposer(container) {
+    // Toggle composer expand/collapse
+    const toggle = container.querySelector("#community-composer-toggle");
+    const body = container.querySelector("#community-composer-body");
+    const composer = container.querySelector("#community-composer");
+    const chevron = container.querySelector("#community-composer-chevron");
+    const setOpen = (open) => {
+        if (!body) return;
+        body.hidden = !open;
+        composer?.classList.toggle("open", open);
+        toggle?.classList.toggle("expanded", open);
+        toggle?.setAttribute("aria-expanded", String(open));
+        if (chevron) chevron.textContent = open ? "⌄" : "›";
+    };
+    if (toggle && body) {
+        toggle.addEventListener("click", () => {
+            setOpen(body.hidden);
+        });
+        toggle.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setOpen(body.hidden);
+        });
+        setOpen(false);
+    }
+
+    const typeSelect = container.querySelector("#community-post-type");
+    const hint = container.querySelector("#community-type-hint");
+    const fileInput = container.querySelector("#community-media-files");
+    const preview = container.querySelector("#community-media-preview");
+
+    const syncHint = () => {
+        const type = getCommunityType(typeSelect?.value);
+        if (hint) hint.textContent = type.hint;
+    };
+    typeSelect?.addEventListener("change", syncHint);
+    syncHint();
+
+    fileInput?.addEventListener("change", () => {
+        const files = Array.from(fileInput.files || []);
+        if (!preview) return;
+        preview.textContent = files.length
+            ? files.slice(0, 4).map(file => file.name).join(" / ")
+            : "可选：上传图片或短视频，也可以只发文字。";
+    });
+
+    container.querySelector("#community-submit")?.addEventListener("click", () => submitCommunityPost(container));
+    container.querySelector("#community-clear")?.addEventListener("click", () => {
+        container.querySelector("#community-title").value = "";
+        container.querySelector("#community-text").value = "";
+        container.querySelector("#community-place").value = "";
+        container.querySelector("#community-image-url").value = "";
+        container.querySelector("#community-video-url").value = "";
+        container.querySelector("#community-tags-input").value = "";
+        if (fileInput) fileInput.value = "";
+        if (preview) preview.textContent = "可选：上传图片或短视频，也可以只发文字。";
+    });
+    container.querySelector("#community-map-route")?.addEventListener("click", showMapRouteEditor);
+
+    container.querySelector("#community-search")?.addEventListener("input", event => {
+        communitySearchQuery = event.target.value || "";
+        renderCommunityFeed(container);
+    });
+    container.querySelectorAll("[data-community-filter]").forEach(button => {
+        button.addEventListener("click", () => {
+            communityFilter = button.dataset.communityFilter || "all";
+            container.querySelectorAll("[data-community-filter]").forEach(btn => btn.classList.toggle("active", btn === button));
+            renderCommunityFeed(container);
+        });
+    });
+}
+
+function parseCommunityMediaUrls(value, type) {
+    return String(value || "")
+        .split(/[\n,，]+/)
+        .map(url => url.trim())
+        .filter(Boolean)
+        .map(url => ({ type, url, caption: type === "video" ? "视频链接" : "图片链接" }));
+}
+
+function readCommunityFile(file) {
+    return new Promise(resolve => {
+        if (!file || file.size > COMMUNITY_FILE_LIMIT) {
+            showToast("图片或视频过大，建议使用链接发布");
+            resolve(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+            type: file.type && file.type.startsWith("video") ? "video" : "image",
+            url: reader.result,
+            caption: file.name,
+        });
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    });
+}
+
+async function readCommunityFiles(fileList) {
+    const files = Array.from(fileList || []).slice(0, 4);
+    const media = await Promise.all(files.map(readCommunityFile));
+    return media.filter(Boolean);
+}
+
+function buildCommunityTags(typeInfo, routeName, rawTags) {
+    const tags = String(rawTags || "")
+        .split(/[,\s，#]+/)
+        .map(tag => tag.trim())
+        .filter(Boolean);
+    tags.unshift(typeInfo.label);
+    if (routeName) tags.push(routeName);
+    return [...new Set(tags)].slice(0, 6);
+}
+
+async function submitCommunityPost(container) {
+    const typeId = container.querySelector("#community-post-type")?.value || "route";
+    const typeInfo = getCommunityType(typeId);
+    const titleInput = container.querySelector("#community-title");
+    const textInput = container.querySelector("#community-text");
+    const routeKey = container.querySelector("#community-route")?.value || "";
+    const routeName = routeKey && routes[routeKey] ? getRouteDisplayTitle(routes[routeKey]) : "";
+    const place = container.querySelector("#community-place")?.value.trim() || "";
+    const ratingValue = container.querySelector("#community-rating")?.value || "";
+    const imageUrl = container.querySelector("#community-image-url")?.value || "";
+    const videoUrl = container.querySelector("#community-video-url")?.value || "";
+    const tagsRaw = container.querySelector("#community-tags-input")?.value || "";
+    const fileInput = container.querySelector("#community-media-files");
+    const title = titleInput?.value.trim() || "";
+    const text = textInput?.value.trim() || "";
+
+    if (!title && !text) {
+        showToast("至少写一个标题或正文");
+        return;
+    }
+
+    const submitBtn = container.querySelector("#community-submit");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "发布中...";
+    }
+
+    const media = [
+        ...parseCommunityMediaUrls(imageUrl, "image"),
+        ...parseCommunityMediaUrls(videoUrl, "video"),
+        ...(await readCommunityFiles(fileInput?.files)),
+    ].slice(0, 4);
+
+    const author = getCommunityCurrentUserName();
+    const post = {
+        id: "post_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7),
+        type: typeId,
+        author,
+        avatar: getCommunityAvatar(author),
+        title: title || typeInfo.label,
+        text: text || typeInfo.hint,
+        routeKey,
+        routeName,
+        place,
+        rating: ratingValue ? Number(ratingValue) : null,
+        tags: buildCommunityTags(typeInfo, routeName, tagsRaw),
+        media,
+        comments: [],
+        likes: 0,
+        views: 0,
+        timestamp: Date.now(),
+    };
+
+    const posts = loadCommunityPosts();
+    posts.unshift(post);
+    saveCommunityPosts(posts);
+    showToast("帖子已发布到漫游社区");
+    renderCommunityPage(container);
+}
+
+function findCommunityPost(posts, postId) {
+    return posts.find(post => String(post.id) === String(postId));
+}
+
+function bindCommunityFeedEvents(container) {
+    container.querySelectorAll("[data-community-like]").forEach(button => {
+        button.addEventListener("click", () => {
+            const posts = loadCommunityPosts();
+            const post = findCommunityPost(posts, button.dataset.communityLike);
+            if (!post) return;
+            post.liked = !post.liked;
+            post.likes = Math.max(0, Number(post.likes || 0) + (post.liked ? 1 : -1));
+            saveCommunityPosts(posts);
+            renderCommunityFeed(container);
+        });
+    });
+
+    container.querySelectorAll("[data-community-comment]").forEach(button => {
+        button.addEventListener("click", () => {
+            const postId = button.dataset.communityComment;
+            const input = container.querySelector(`[data-community-comment-input="${postId}"]`);
+            const text = input?.value.trim();
+            if (!text) return;
+            const posts = loadCommunityPosts();
+            const post = findCommunityPost(posts, postId);
+            if (!post) return;
+            post.comments = post.comments || [];
+            post.comments.push({ author: getCommunityCurrentUserName(), text, time: "刚刚" });
+            saveCommunityPosts(posts);
+            renderCommunityFeed(container);
+        });
+    });
+
+    container.querySelectorAll("[data-community-open-route]").forEach(button => {
+        button.addEventListener("click", () => {
+            const posts = loadCommunityPosts();
+            const post = findCommunityPost(posts, button.dataset.communityOpenRoute);
+            if (post?.routeKey && routes[post.routeKey]) openRoute(post.routeKey);
+            else showToast("这条帖子没有关联路线");
+        });
+    });
+
+    container.querySelectorAll("[data-community-reply]").forEach(button => {
+        button.addEventListener("click", () => {
+            const posts = loadCommunityPosts();
+            const post = findCommunityPost(posts, button.dataset.communityReply);
+            if (!post) return;
+            const body = container.querySelector("#community-composer-body");
+            const toggle = container.querySelector("#community-composer-toggle");
+            if (body?.hidden) toggle?.click();
+            const typeSelect = container.querySelector("#community-post-type");
+            const titleInput = container.querySelector("#community-title");
+            const textInput = container.querySelector("#community-text");
+            if (typeSelect) typeSelect.value = "opinion";
+            if (titleInput) titleInput.value = "回应：" + (post.title || "");
+            if (textInput) textInput.value = "\n\n引用「" + (post.author || "匿名") + "」：" + (post.text || "").slice(0, 60);
+            container.querySelector(".community-composer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            textInput?.focus();
+        });
+    });
+}
+
+function openCommunityOverlay() {
+    const overlay = document.getElementById("community-overlay");
+    const inner = document.getElementById("community-overlay-inner");
+    if (!overlay || !inner) return;
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("community-tab-active");
+    document.body.style.overflow = "hidden";
+    renderCommunityPage(inner);
+}
+
+function closeCommunityOverlay() {
+    const overlay = document.getElementById("community-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("open");
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("community-tab-active");
+    document.body.style.overflow = "";
+}
+
+function renderRouteSupplyFeatureCard() {
+    return `
+        <button class="route-supply-feature" type="button" id="route-supply-feature">
+            <span class="route-supply-feature-icon">+</span>
+            <span class="route-supply-feature-copy">
+                <strong>沿途补给推荐</strong>
+                <small>展开当前路线附近的餐饮、咖啡、门票和休息点</small>
+            </span>
+            <span class="route-supply-feature-arrow">›</span>
+        </button>
+        <div class="route-supply-inline" id="route-supply-inline" hidden></div>
+    `;
+}
+
+function getRouteSupplyPreviewItems(routeKey) {
+    const allData = (typeof SUPPLY_DATA !== "undefined") ? SUPPLY_DATA.getAll() : [];
+    if (!allData.length) return [];
+    const route = routes[routeKey];
+    const routeText = route ? route.stops.map(stop => stop.name).join(" ") : "";
+    const scored = allData.map(item => {
+        let score = 0;
+        if (item.onRoute) score += 4;
+        if (item.distance < 800) score += 3;
+        if (routeText && (item.tags || []).some(tag => routeText.includes(tag))) score += 2;
+        if (item.category === "coffee" || item.category === "food") score += 1;
+        return { item, score };
+    });
+    return scored.sort((a, b) => b.score - a.score || (a.item.distance || 9999) - (b.item.distance || 9999))
+        .slice(0, 5)
+        .map(entry => entry.item);
+}
+
+function renderRouteSupplyMiniCard(item) {
+    const dist = item.distance >= 1000 ? `${(item.distance / 1000).toFixed(1)}km` : `${item.distance || 500}m`;
+    const tags = (item.tags || []).slice(0, 2).map(tag => `<span>${escapeHtml(tag)}</span>`).join("");
+    return `
+        <button class="route-supply-mini-card" type="button" data-store-id="${escapeHtml(item.id)}">
+            <span class="route-supply-mini-icon">${categoryIcon(item.category)}</span>
+            <span class="route-supply-mini-copy">
+                <strong>${escapeHtml(item.name)}</strong>
+                <small>${escapeHtml(item.subcategory || "沿途补给")} · ${dist} · ${Number(item.rating || 4).toFixed(1)}分</small>
+                <span class="route-supply-mini-tags">${tags}</span>
+            </span>
+            <span class="route-supply-mini-price">¥${item.avgPrice || "--"}</span>
+        </button>
+    `;
+}
+
+function renderRouteSupplyInline(routeKey, container) {
+    if (!container) return;
+    const items = getRouteSupplyPreviewItems(routeKey);
+    if (!items.length) {
+        container.innerHTML = `<div class="route-supply-empty">暂无可展示的沿途补给。</div>`;
+        return;
+    }
+    container.innerHTML = `
+        <div class="route-supply-inline-head">
+            <strong>路线里的小补给站</strong>
+            <span>${items.length} 个推荐</span>
+        </div>
+        <div class="route-supply-mini-list">
+            ${items.map(renderRouteSupplyMiniCard).join("")}
+        </div>
+    `;
+    container.querySelectorAll(".route-supply-mini-card").forEach(card => {
+        card.addEventListener("click", () => showPoiDetailOverlayDianping(card.dataset.storeId));
+    });
+}
+
+function renderCommunityPage(container) {
+    const posts = loadCommunityPosts();
+    const stats = getCommunityStats(posts);
+    container.innerHTML = `
+        <div class="community-page">
+            <section class="community-header">
+                <div>
+                    <span class="community-kicker">CITYGO COMMUNITY</span>
+                    <h2>漫游社区</h2>
+                    <p>发布路线、评价路线和地点，浏览大家的评论、观点与论坛推荐。</p>
+                </div>
+                <div class="community-stats">
+                    <span><b>${stats.routePosts}</b> 路线</span>
+                    <span><b>${stats.reviewPosts}</b> 评价</span>
+                    <span><b>${stats.comments}</b> 评论</span>
+                </div>
+            </section>
+
+            <section class="community-composer" id="community-composer">
+                <div class="community-composer-top" id="community-composer-toggle" role="button" tabindex="0" aria-expanded="false">
+                    <div>
+                        <strong>发一条新帖</strong>
+                        <span id="community-type-hint"></span>
+                    </div>
+                    <span class="community-composer-chevron" id="community-composer-chevron">›</span>
+                </div>
+                <div class="community-composer-body" id="community-composer-body" hidden>
+                    <select id="community-post-type" class="community-input">
+                        ${COMMUNITY_POST_TYPES.map(type => `<option value="${type.id}">${escapeHtml(type.label)}</option>`).join("")}
+                    </select>
+                    <input id="community-title" class="community-input" type="text" maxlength="42" placeholder="标题：比如 我的梧桐下午路线 / 南博排队体验">
+                    <textarea id="community-text" class="community-textarea" rows="4" maxlength="800" placeholder="写路线、评价、观点，或推荐一个值得加入的论坛。"></textarea>
+                    <div class="community-form-grid">
+                        <select id="community-route" class="community-input">
+                            <option value="">关联路线（可选）</option>
+                            ${getCommunityRouteOptions()}
+                        </select>
+                        <input id="community-place" class="community-input" type="text" maxlength="30" placeholder="关联地点（可选）">
+                        <select id="community-rating" class="community-input">
+                            <option value="">评分（可选）</option>
+                            <option value="5">5.0 很推荐</option>
+                            <option value="4.5">4.5 值得去</option>
+                            <option value="4">4.0 还不错</option>
+                            <option value="3">3.0 一般</option>
+                            <option value="2">2.0 不太推荐</option>
+                        </select>
+                        <input id="community-tags-input" class="community-input" type="text" maxlength="60" placeholder="标签，用空格分隔">
+                    </div>
+                    <div class="community-media-uploader">
+                        <label>
+                            <span>上传图片/视频</span>
+                            <input id="community-media-files" type="file" accept="image/*,video/*" multiple>
+                        </label>
+                        <div id="community-media-preview">可选：上传图片或短视频，也可以只发文字。</div>
+                    </div>
+                    <div class="community-link-grid">
+                        <input id="community-image-url" class="community-input" type="url" placeholder="图片链接（可选，多个可换行或逗号分隔）">
+                        <input id="community-video-url" class="community-input" type="url" placeholder="视频链接（可选）">
+                    </div>
+                    <div class="community-compose-actions">
+                        <button class="community-primary" type="button" id="community-submit">发布到社区</button>
+                        <button class="community-secondary" type="button" id="community-map-route">用地图发路线</button>
+                        <button class="community-ghost" type="button" id="community-clear">清空</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="community-toolbar">
+                <div class="community-filters">${renderCommunityFilters()}</div>
+                <input id="community-search" type="search" placeholder="搜索路线、地点、观点" value="${escapeHtml(communitySearchQuery)}">
+            </section>
+
+            <div class="community-feed" id="community-feed"></div>
+        </div>
+    `;
+
+    bindCommunityComposer(container);
+    renderCommunityFeed(container);
+}
+
+function openRoutesSupplyPanel(routeKey) {
+    if (routeKey && routes[routeKey]) currentRouteKey = routeKey;
+    const inline = document.getElementById("route-supply-inline");
+    const trigger = document.getElementById("route-supply-feature");
+    if (!inline) return;
+    const willOpen = inline.hasAttribute("hidden");
+    if (willOpen) {
+        renderRouteSupplyInline(routeKey, inline);
+        inline.hidden = false;
+        inline.classList.add("open");
+        trigger?.classList.add("open");
+    } else {
+        inline.hidden = true;
+        inline.classList.remove("open");
+        trigger?.classList.remove("open");
+    }
+}
+
+addSupplyEntryToRouteSheet = function(sheetBody, routeKey) {
+    const entry = document.createElement("div");
+    entry.className = "route-supply-mini";
+    entry.innerHTML = renderRouteSupplyFeatureCard();
+    entry.querySelector("#route-supply-feature")?.addEventListener("click", () => openRoutesSupplyPanel(routeKey));
+    sheetBody.appendChild(entry);
+};

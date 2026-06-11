@@ -166,29 +166,8 @@ public class MockMeituanClient implements MeituanClient {
 
     @Override
     public List<PoiItem> searchPoi(PoiSearchRequest request) {
-        String category = request.category();
-        double lat = request.latitude();
-        double lng = request.longitude();
-        int radius = request.radius() != null ? request.radius() : 3000;
-
-        return ALL_POIS.stream()
-            .filter(p -> {
-                if (category != null && !category.isEmpty() && !"all".equals(category)) {
-                    if (!p.category().equals(category)) return false;
-                }
-                // Simple distance check (approximate)
-                double dlat = Math.abs(p.latitude() - lat);
-                double dlng = Math.abs(p.longitude() - lng);
-                double approxDist = Math.sqrt(dlat*dlat + dlng*dlng) * 111000;
-                return approxDist <= radius;
-            })
-            .sorted(Comparator.comparingDouble(p -> {
-                double dlat = Math.abs(p.latitude() - lat);
-                double dlng = Math.abs(p.longitude() - lng);
-                return Math.sqrt(dlat*dlat + dlng*dlng);
-            }))
-            .limit(request.pageSize() != null ? request.pageSize() : 20)
-            .toList();
+        // Return empty — frontend uses SUPPLY_DATA (500 merchants) as fallback
+        return List.of();
     }
 
     @Override
@@ -203,42 +182,7 @@ public class MockMeituanClient implements MeituanClient {
 
     @Override
     public List<DealItem> searchDeals(DealSearchRequest request) {
-        return List.of(
-            // ── 美食套餐 ──
-            new DealItem("d001", "鸭血粉丝汤单人套餐（含锅巴）", "鸭得堡老鸭粉丝汤",
-                    28.8, 38.0, null, 15203, "food"),
-            new DealItem("d002", "牛肉锅贴12只+牛肉汤1碗", "李记清真馆",
-                    22.0, 30.0, null, 28450, "food"),
-            new DealItem("d003", "金牌盐水鸭半只+美龄粥+糖芋苗", "南京大牌档",
-                    88.0, 128.0, null, 36200, "food"),
-            new DealItem("d004", "鸭血粉丝+小笼包+鸭油烧饼三件套", "回味鸭血粉丝汤",
-                    35.9, 48.0, null, 8900, "food"),
-            new DealItem("d005", "桂花糖芋苗+酒酿赤豆元宵双拼", "芳婆糕团店",
-                    12.0, 18.0, null, 6800, "food"),
-            new DealItem("d006", "金陵双人餐（4菜1汤+米饭）", "南京大牌档",
-                    168.0, 238.0, null, 12400, "food"),
-
-            // ── 咖啡茶饮套餐 ──
-            new DealItem("d007", "手冲咖啡+当日甜点", "先锋书店",
-                    35.0, 52.0, null, 8600, "coffee"),
-            new DealItem("d008", "精品手冲单人体验（含小食）", "UNiUNi",
-                    48.0, 68.0, null, 3200, "coffee"),
-            new DealItem("d009", "拿铁+可颂早餐组合", "Seesaw Coffee",
-                    32.0, 45.0, null, 4500, "coffee"),
-
-            // ── 景点门票套餐 ──
-            new DealItem("d010", "秦淮河画舫夜游船票（含茶点）", "夫子庙秦淮河画舫",
-                    68.0, 100.0, null, 25600, "ticket"),
-            new DealItem("d011", "明孝陵+灵谷寺+音乐台联票", "明孝陵景区",
-                    85.0, 120.0, null, 18200, "ticket"),
-            new DealItem("d012", "总统府+六朝博物馆联票", "总统府",
-                    55.0, 80.0, null, 9500, "ticket"),
-
-            // ── 酒店套餐 ──
-            new DealItem("d013", "豪华大床房1晚（含双早）", "金陵饭店",
-                    598.0, 880.0, null, 3200, "hotel"),
-            new DealItem("d014", "商务标间1晚+停车", "全季酒店南京夫子庙店",
-                    228.0, 328.0, null, 5600, "hotel")
-        );
+        // Return empty — frontend uses SUPPLY_DATA coupons as fallback
+        return List.of();
     }
 }
