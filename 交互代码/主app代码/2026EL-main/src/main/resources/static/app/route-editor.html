@@ -152,23 +152,109 @@
     window._AMapSecurityConfig = { securityJsCode: '' };
     const AMAP_KEY = '5427cfbccb2209b756af7fc782e8105b';
 </script>
-<script src="https://webapi.amap.com/maps?v=2.0&key=5427cfbccb2209b756af7fc782e8105b&plugin=AMap.Walking,AMap.Driving"></script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=5427cfbccb2209b756af7fc782e8105b&plugin=AMap.Walking,AMap.Driving,AMap.PlaceSearch"></script>
 <script>
 const state = { map:null, editMode:'origin', points:[], polyline:null, lastResult:null, pathCoords:[], pathStops:[] };
 
 function init() {
     state.map = new AMap.Map('map', { zoom:14, center:[118.796,32.060], mapStyle:'amap://styles/normal' });
     state.map.on('click', handleMapClick);
-    // Hide loading overlay once map renders
     var loadingEl = document.getElementById('re-loading');
     var hideLoading = function() {
         if (loadingEl) loadingEl.classList.add('hide');
         state.map.off('complete', hideLoading);
     };
     state.map.on('complete', hideLoading);
-    setTimeout(hideLoading, 5000); // safety timeout
+    setTimeout(hideLoading, 5000);
     setEditMode('origin');
+
+    // Read prefill data from URL hash (set by parent before iframe loads)
+    var hash = window.location.hash;
+    if (hash.indexOf('#prefill=') === 0) {
+        try {
+            var prefill = JSON.parse(decodeURIComponent(hash.substring(9)));
+            document.getElementById('mode-tip').innerText = '📍 正在搜索途经点位置…';
+            applyPrefill(prefill);
+            // Clean URL
+            history.replaceState(null, '', window.location.pathname);
+        } catch(e) {}
+    }
 }
+
+// Apply existing route waypoints to the editor
+function applyPrefill(data) {
+    var stopNames = data.stops || [];
+    if (!stopNames.length) return;
+
+    state.points.forEach(function(p) { if (p.marker) state.map.remove(p.marker); });
+    state.points = [];
+    state.pathCoords = [];
+    state.pathStops = [];
+
+    var ps = new AMap.PlaceSearch({ city: "南京", pageSize: 1 });
+    var found = [];
+
+    function searchNext(i) {
+        if (i >= stopNames.length) { finishPrefill(found, data); return; }
+        var name = stopNames[i];
+        ps.search(name, function(status, result) {
+            if (status === "complete" && result.poiList && result.poiList.pois.length) {
+                var p = result.poiList.pois[0];
+                var type = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+                found.push({ name: name, lng: p.location.lng, lat: p.location.lat, type: type });
+            } else {
+                ps.search(name + " 南京", function(s2, r2) {
+                    if (s2 === "complete" && r2.poiList && r2.poiList.pois.length) {
+                        var p2 = r2.poiList.pois[0];
+                        var type2 = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+                        found.push({ name: name, lng: p2.location.lng, lat: p2.location.lat, type: type2 });
+                    }
+                    setTimeout(function() { searchNext(i + 1); }, 100);
+                });
+                return;
+            }
+            // Both searches failed — fall back to hardcoded coords if available
+            if (data.coords && data.coords[i]) {
+                var lng2 = data.coords[i][1], lat2 = data.coords[i][0];
+                var type3 = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+                found.push({ name: name, lng: lng2, lat: lat2, type: type3 });
+            }
+            setTimeout(function() { searchNext(i + 1); }, 100);
+        });
+    }
+
+    function finishPrefill(points, data) {
+        if (!points.length) {
+            document.getElementById('mode-tip').innerText = '⚠️ 未找到途经点，请手动点击地图添加';
+            return;
+        }
+        document.getElementById('mode-tip').innerText = '✅ 已加载 ' + points.length + ' 个途经点';
+        setTimeout(function() { document.getElementById('mode-tip').innerText = '➕ 点击地图添加【途径点】'; }, 3000);
+        points.forEach(function(p) {
+            var lnglat = p.lng.toFixed(6) + "," + p.lat.toFixed(6);
+            var point = { type: p.type, lnglat: lnglat, customNamed: true, name: p.name };
+            point.marker = createMarker(new AMap.LngLat(p.lng, p.lat), point);
+            state.points.push(point);
+        });
+        var originName = document.getElementById("origin-name");
+        var destName = document.getElementById("destination-name");
+        var routeName = document.getElementById("route-name");
+        if (originName && points.length > 0) originName.value = points[0].name;
+        if (destName && points.length > 0) destName.value = points[points.length - 1].name;
+        if (routeName && data.routeName) routeName.value = data.routeName;
+        syncUI();
+        setEditMode("waypoint");
+        var allLngLats = points.map(function(p) { return new AMap.LngLat(p.lng, p.lat); });
+        if (allLngLats.length === 1) {
+            state.map.setZoomAndCenter(16, allLngLats[0]);
+        } else {
+            state.map.setFitView(allLngLats, false, [60, 60, 60, 60]);
+        }
+    }
+
+    searchNext(0);
+}
+
 
 function setEditMode(mode) {
     state.editMode = mode;

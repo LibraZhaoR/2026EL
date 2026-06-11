@@ -2080,11 +2080,10 @@ function openRoute(key) {
     const r = routes[key];
     if (!r) return;
 
-    // Exit pure map mode so the route sheet is visible
-    if (mapModePure && typeof window.citygoSetPureMapMode === "function") {
+    // Exit pure map mode via public API
+    if (typeof window.citygoSetPureMapMode === "function") {
         window.citygoSetPureMapMode(false);
     }
-    // Ensure we're on home tab
     if (currentTab !== "home") switchTab("home");
 
     currentRouteKey = key;
@@ -3342,8 +3341,7 @@ function renderRouteGrid() {
                 showMapRouteEditor();
                 return;
             }
-            if (routeKey.startsWith("custom_")) openRoute(routeKey);
-            else openRoute(routeKey);
+            showRouteOnMap(routeKey);
         });
     });
 }
@@ -3575,22 +3573,9 @@ function initAMap() {
             // ── Map interaction → fade header & hide route panel, restore on idle ──
             let mapInteractTimer = null;
             const mainHeader = document.querySelector(".main-header");
-            const snapScroll = document.getElementById("snap-scroll");
-            const mapRestoreBtn = document.getElementById("map-restore-btn");
             const fadeMapUI = () => {
                 if (currentTab !== "home") return;
                 if (mainHeader) mainHeader.style.opacity = "0";
-                // Hide route cards panel on map interaction
-                if (snapScroll && !snapScroll.classList.contains("hidden-by-map")) {
-                    snapScroll.classList.add("hidden-by-map");
-                    snapScroll.style.transform = "translateY(calc(100% + 60px))";
-                    snapScroll.style.transition = "transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1)";
-                }
-                // Show restore hint
-                if (mapRestoreBtn && mapRestoreBtn.style.display !== "block") {
-                    mapRestoreBtn.style.display = "block";
-                    setTimeout(() => mapRestoreBtn.classList.add("show"), 10);
-                }
                 clearTimeout(mapInteractTimer);
                 mapInteractTimer = setTimeout(() => {
                     if (currentTab !== "home") return;
@@ -3612,12 +3597,15 @@ function initAMap() {
             // Trigger resize after a frame
             setTimeout(() => amapInstance.resize(), 100);
             // Wait for map tiles to fully render before hiding loading bar
+            var _tilesDone = false;
             var mapTilesDone = function() {
-                // Let the map settle for a moment after tiles render
-                setTimeout(function() {
-                    hideMapLoading();
-                }, 400);
+                if (_tilesDone) return;
+                _tilesDone = true;
                 amapInstance.off("complete", mapTilesDone);
+                updateLoadingBar(90); // Jump to 90% immediately
+        setTimeout(function() { hideMapLoading(); }, 500);
+        // Calibrate landmark coords via AMap after tiles settle
+        setTimeout(function() { calibrateLandmarkCoords(AMap); }, 2500);
             };
             amapInstance.on("complete", mapTilesDone);
             // Safety: hide after 8s even if complete never fires
@@ -3638,71 +3626,68 @@ function initAMap() {
 }
 
 function addAllRouteOverlays(AMap) {
-    const markerColors = {
-        nju: "#6F4BB2",
-        night: "#D8A94A",
-        food: "#FF7A45",
-        expo: "#4FC3C7"
-    };
+    // Route markers and lines removed — routes are viewed via the editor
+}
 
-    Object.entries(ROUTE_MAP_DATA).forEach(([key, data]) => {
-        const coords = (Array.isArray(data.coords) ? data.coords : [])
-            .filter(c => Array.isArray(c) && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1])));
-        if (!coords.length) return;
-        const stops = Array.isArray(data.stops) ? data.stops : [];
-        const color = markerColors[key] || "#B64236";
-        const lngLatCoords = coords.map(c => [Number(c[1]), Number(c[0])]);  // to [lng, lat]
-
-        // Add polyline for route
-        if (lngLatCoords.length > 1) {
-            const polyline = new AMap.Polyline({
-                path: lngLatCoords,
-                strokeColor: color,
-                strokeOpacity: 0.6,
-                strokeWeight: 3,
-                strokeStyle: "dashed",
-                strokeDasharray: [10, 8],
-                lineJoin: "round",
-            });
-            try {
-                amapInstance.add(polyline);
-                amapRouteLines.push(polyline);
-            } catch (error) {
-                console.warn("Failed to add route polyline:", key, error);
-            }
+function calibrateLandmarkCoords(AMap) {
+    var cacheKey = "nj_lm_cal_v1";
+    try {
+        var cached = JSON.parse(localStorage.getItem(cacheKey));
+        if (cached) {
+            applyCalibration(cached);
+            return;
         }
+    } catch(e) {}
 
-        // Add markers for each stop (skip if no stop names provided)
-        if (!stops.length) return;
-        coords.forEach((c, i) => {
-            const label = stops[i] || "途经点";
-            const markerContent = document.createElement("div");
-            markerContent.className = "route-marker";
-            markerContent.innerHTML = `<span class="dot"></span><span>${escapeHtml(label)}</span>`;
+    var ps = new AMap.PlaceSearch({ city: "南京", pageSize: 1 });
+    var names = [];
+    // Collect all landmark/building names
+    if (window.NANJING_LANDMARKS) {
+        window.NANJING_LANDMARKS.forEach(function(l) { names.push(l.name); });
+    }
+    if (window.CITYGO_BUILDING_POINTS) {
+        window.CITYGO_BUILDING_POINTS.forEach(function(b) {
+            if (names.indexOf(b.name) === -1) names.push(b.name);
+        });
+    }
+    if (!names.length) return;
 
-            const marker = new AMap.Marker({
-                position: [Number(c[1]), Number(c[0])],
-                content: markerContent,
-                offset: new AMap.Pixel(-30, -10),
-                zIndex: 10,
-            });
-            marker._routeKey = key;
-            marker._stopIndex = i;
+    var results = {};
+    function searchOne(i) {
+        if (i >= names.length) {
+            try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) {}
+            applyCalibration(results);
+            return;
+        }
+        var name = names[i];
+        ps.search(name, function(status, result) {
+            if (status === "complete" && result.poiList && result.poiList.pois.length) {
+                var p = result.poiList.pois[0];
+                results[name] = [p.location.lng, p.location.lat];
+            }
+            setTimeout(function() { searchOne(i + 1); }, 200);
+        });
+    }
+    searchOne(0);
 
-            marker.on("click", () => {
-                const buildingPoint = findBuildingPointByName(label);
-                if (buildingPoint && showBuildingPointDetail(buildingPoint, "路线途经点")) return;
-                openRoute(key);
-            });
-
-            try {
-                amapInstance.add(marker);
-                amapMarkers.push(marker);
-            } catch (error) {
-                console.warn("Failed to add route marker:", key, label, error);
+    function applyCalibration(map) {
+        Object.keys(map).forEach(function(name) {
+            var ll = map[name];
+            if (window.NANJING_LANDMARKS) {
+                window.NANJING_LANDMARKS.forEach(function(l) {
+                    if (l.name === name) { l.lng = ll[0]; l.lat = ll[1]; }
+                });
+            }
+            if (window.CITYGO_BUILDING_POINTS) {
+                window.CITYGO_BUILDING_POINTS.forEach(function(b) {
+                    if (b.name === name) { b.lng = ll[0]; b.lat = ll[1]; }
+                });
             }
         });
-    });
+        if (typeof window.citygoRefreshMapPOIs === "function") {
+            window.citygoRefreshMapPOIs();
+        }
+    }
 }
 
 /**
@@ -4437,105 +4422,15 @@ let activeRouteOnMap = null;
 let currentRouteKey = null;
 
 function showRouteOnMap(routeKey) {
-    var r = routes[routeKey];
-    if (!r) return;
-
-    // Exit pure map mode so route panel can appear
-    if (mapModePure && typeof window.citygoSetPureMapMode === "function") {
+    if (!routes[routeKey]) return;
+    if (typeof window.citygoSetPureMapMode === "function") {
         window.citygoSetPureMapMode(false);
     }
-
-    // If map not ready, load it first
-    if (!amapInstance || !amapReady) {
-        showMapLoading("正在连接地图服务…");
-        initAMap();
-        var retries = 0;
-        var retryInterval = setInterval(function() {
-            if (amapInstance && amapReady) {
-                clearInterval(retryInterval);
-                hideMapLoading();
-                showRouteOnMap(routeKey);
-            }
-            retries++;
-            if (retries > 20) {
-                clearInterval(retryInterval);
-                hideMapLoading();
-                showToast("地图加载失败");
-            }
-        }, 500);
-        return;
-    }
-
-    // Close sheet if open
-    if (sheet && sheet.classList.contains("open")) {
-        sheet.classList.remove("open");
-        sheetBody.classList.remove("no-scroll");
-        currentRouteKey = null;
-    }
-
-    // Switch to home tab so the map is visible
     if (currentTab !== "home") switchTab("home");
-
-    // Remove home page map filter, enable interaction on map
-    var mc = document.getElementById("main-map-container");
-    if (mc) {
-        mc.style.filter = "";
-        mc.style.pointerEvents = "auto";
+    if (sheet && sheet.classList.contains("open")) {
+        sheet.classList.remove("open"); sheetBody.classList.remove("no-scroll"); currentRouteKey = null;
     }
-
-    // Aggressively clear ALL overlays (one-by-one to ensure removal)
-    if (amapInstance) {
-        while (amapMarkers.length) { try { amapInstance.remove(amapMarkers[0]); } catch(e) {} amapMarkers.shift(); }
-        while (amapRouteLines.length) { try { amapInstance.remove(amapRouteLines[0]); } catch(e) {} amapRouteLines.shift(); }
-    }
-    try {
-        var rData = ROUTE_MAP_DATA[routeKey];
-        var persona = ROUTE_PERSONA_COLORS[routeKey] || { color: "#F06D5E" };
-        if (rData && rData.coords && rData.coords.length && amapInstance && window.AMap) {
-            // 1. Route line — same style as route editor (thick + direction arrows)
-            var pts = (rData.plannedPath && rData.plannedPath.length >= 2) ? rData.plannedPath : rData.coords;
-            var lnglats = pts.map(function(c) { return [c[1], c[0]]; });
-            var poly = new AMap.Polyline({
-                path: lnglats,
-                strokeColor: persona.color,
-                strokeOpacity: 0.95,
-                strokeWeight: 7,
-                strokeStyle: "solid",
-                lineJoin: "round",
-                showDir: true
-            });
-            amapInstance.add(poly);
-            amapRouteLines.push(poly);
-            // 2. Markers at each stop
-            rData.coords.forEach(function(c, i) {
-                var label = rData.stops[i] || "途经点";
-                var mc = document.createElement("div");
-                mc.className = "route-marker";
-                mc.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
-                var marker = new AMap.Marker({
-                    position: [c[1], c[0]],
-                    content: mc,
-                    offset: new AMap.Pixel(-30, -10),
-                    zIndex: 60
-                });
-                marker.on("click", function() { openRoute(routeKey); });
-                amapInstance.add(marker);
-                amapMarkers.push(marker);
-            });
-            // 3. Zoom to route start
-            var firstPos = [rData.coords[0][1], rData.coords[0][0]];
-            amapInstance.setZoom(16);
-            amapInstance.setCenter(firstPos);
-        }
-    } catch(e) { console.warn("route draw error:", e); }
-    activeRouteOnMap = routeKey;
-
-    // Show route info popup (time, stops, close)
-    showRouteInfoPopup(routeKey);
-
-    // Ensure close button overlay
-    ensureMapCloseBtn();
-
+    showMapRouteEditor(routeKey);
 }
 
 /* ═══════════════════════════════════
@@ -5023,25 +4918,36 @@ function getCurrentLatLng() {
 
 let mapEditor = null;          // { overlay, amap, markers, polylines, waypoints, ... }
 
-function showMapRouteEditor() {
+function showMapRouteEditor(routeKey) {
     closeSheet();
 
-    // Remove previous editor iframe
     document.querySelector(".map-editor-iframe-overlay")?.remove();
     if (mapEditor) { closeMapEditor(); }
 
-    // ── Create fullscreen iframe overlay for route editor ──
     const overlay = document.createElement("div");
     overlay.className = "map-editor-iframe-overlay";
     overlay.style.cssText = "position:fixed;inset:0;z-index:200;background:#fff;";
 
+    // Build prefill data as URL hash param (foolproof, no async messaging)
+    var src = "./route-editor.html";
+    if (routeKey && routes[routeKey]) {
+        var r = routes[routeKey];
+        var mapData = ROUTE_MAP_DATA[routeKey];
+        if (mapData && mapData.stops && mapData.stops.length) {
+            var prefill = {
+                routeName: r.title || "",
+                stops: mapData.stops,
+            };
+            src += "#prefill=" + encodeURIComponent(JSON.stringify(prefill));
+        }
+    }
+
     const iframe = document.createElement("iframe");
-    iframe.src = "./route-editor.html";
+    iframe.src = src;
     iframe.style.cssText = "width:100%;height:100%;border:none;";
     overlay.appendChild(iframe);
     document.body.appendChild(overlay);
 
-    // ── Listen for messages from the editor iframe ──
     const msgHandler = function(e) {
         if (e.data && e.data.type === "close-editor") {
             closeMapEditor();
@@ -5049,16 +4955,12 @@ function showMapRouteEditor() {
         if (e.data && e.data.type === "route-saved") {
             const d = e.data.data;
             showToast("✅ 路线「" + (d.routeName || "自定义") + "」已保存！");
-            // Save to localStorage so loadCustomRoutes() can find it
             saveCustomRouteFromEditor(d);
-            // Reload custom routes from localStorage
             loadCustomRoutes();
             renderRouteGrid();
-            // Also refresh carousel (may pick up new custom routes if added)
             renderCarouselCards();
             const routesTab = document.querySelector("#tab-routes .tab-content-inner");
             if (routesTab) renderRoutesTab(routesTab);
-            // Close the map editor
             closeMapEditor();
         }
     };
@@ -5073,14 +4975,38 @@ function showMapRouteEditor() {
 function closeMapEditor() {
     if (!mapEditor) return;
 
-    const overlay = mapEditor.overlay;
+    var overlay = mapEditor.overlay;
     if (overlay && overlay._msgHandler) {
         window.removeEventListener("message", overlay._msgHandler);
     }
     try { overlay.remove(); } catch(e) {}
-    const navEl = getNavEl();
+
+    // Aggressively clear any leftover route markers/lines
+    if (amapInstance) {
+        while (amapMarkers.length) { try { amapInstance.remove(amapMarkers[0]); } catch(e) {} amapMarkers.shift(); }
+        while (amapRouteLines.length) { try { amapInstance.remove(amapRouteLines[0]); } catch(e) {} amapRouteLines.shift(); }
+    }
+
+    // Restore map container
+    var mc = document.getElementById("main-map-container");
+    if (mc) {
+        mc.style.cursor = "";
+        mc.style.filter = "";
+        mc.style.pointerEvents = "";
+        mc.classList.remove("amap-fullscreen");
+    }
+
+    // Restore UI elements
+    var snapScroll = document.getElementById("snap-scroll");
+    var header = document.querySelector(".main-header");
+    if (snapScroll) snapScroll.style.display = "";
+    if (header) header.style.display = "";
+
+    var navEl = getNavEl();
     if (navEl) navEl.style.zIndex = "10";
+
     mapEditor = null;
+    switchTab("home");
 }
 
 function refreshMapEditorDisplay() {
@@ -5387,49 +5313,6 @@ function getDistance(lat1, lng1, lat2, lng2) {
         + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
         * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function closeMapEditor() {
-    if (!mapEditor) return;
-
-    // Remove click handler
-    if (amapInstance && amapInstance._mapEditorClickHandler) {
-        amapInstance.off("click", amapInstance._mapEditorClickHandler);
-        amapInstance._mapEditorClickHandler = null;
-    }
-
-    // Clear editor overlays
-    if (amapInstance) {
-        if (mapEditor.markers) mapEditor.markers.forEach(m => { try { amapInstance.remove(m); } catch(e) {} });
-        if (mapEditor.polylines) mapEditor.polylines.forEach(p => { try { amapInstance.remove(p); } catch(e) {} });
-    }
-
-    // Remove overlay
-    try { mapEditor.overlay.remove(); } catch(e) {}
-
-    // Remove save dialog
-    document.querySelector(".map-editor-save-dialog")?.remove();
-
-    // Restore cursor & map container (back to home page look)
-    const mapContainer = document.getElementById("main-map-container");
-    if (mapContainer) {
-        mapContainer.style.cursor = "";
-        mapContainer.style.filter = "";              // Restore sepia
-        mapContainer.style.pointerEvents = "";        // Reset pointer events
-        mapContainer.classList.remove("amap-fullscreen");
-    }
-
-    // Restore map state
-    const snapScroll = document.getElementById("snap-scroll");
-    const header = document.querySelector(".main-header");
-    if (snapScroll) snapScroll.style.display = "";
-    if (header) header.style.display = "";
-
-    const navEl = getNavEl();
-    if (navEl) navEl.style.zIndex = "10";
-
-    mapEditor = null;
-    switchTab("home");
 }
 
 // ── Meituan POI categories with icons ──
