@@ -207,7 +207,98 @@ function renderDetail() {
       ${!r.is_official ? `<button class="btn-danger" onclick="deleteCurrentRoute()">🗑 删除路线</button>` : ''}
     </div>
   `;
+
+  // 渲染美团商户区域
+  renderMeituanSection();
 }
+
+// ══════════════════════════════════════════════════════
+//  美团商户模块
+// ══════════════════════════════════════════════════════
+
+function findNearbyMerchants(routePoints) {
+  // 根据路线的点位名称匹配附近商户
+  const pointNames = routePoints.map(p => p.name);
+  const pointAreas = routePoints.map(p => {
+    // 提取区域关键词
+    const keywords = ['夫子庙', '秦淮河', '老门东', '南大', '鼓楼', '先锋书店',
+      '丰富路', '颐和路', '明故宫', '博物院', '新街口', '玄武湖'];
+    for (const kw of keywords) {
+      if (p.name.includes(kw) || p.address.includes(kw)) return kw;
+    }
+    return null;
+  }).filter(Boolean);
+
+  // 匹配商户
+  const matched = [];
+  const seen = new Set();
+  for (const m of MEITUAN_MERCHANTS) {
+    if (seen.has(m.id)) continue;
+    const isNearPoint = pointNames.some(n => m.near_point && m.near_point.includes(n));
+    const isInArea = pointAreas.some(a => m.area.includes(a) || m.near_point.includes(a));
+    if (isNearPoint || isInArea) {
+      matched.push(m);
+      seen.add(m.id);
+    }
+  }
+
+  // 如果匹配太少，按区域补充
+  const areaSet = new Set(pointAreas);
+  for (const m of MEITUAN_MERCHANTS) {
+    if (matched.length >= 7) break;
+    if (seen.has(m.id)) continue;
+    if (areaSet.has(m.area)) {
+      matched.push(m);
+      seen.add(m.id);
+    }
+  }
+
+  return matched.slice(0, 10);
+}
+
+function renderMeituanSection() {
+  if (!currentRoute || !currentRoute.points) return;
+  const body = document.getElementById('meituan-body');
+  const merchants = findNearbyMerchants(currentRoute.points);
+
+  if (merchants.length === 0) {
+    document.getElementById('meituan-section').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('meituan-section').style.display = '';
+  body.innerHTML = merchants.map(m => `
+    <div class="merchant-card">
+      <div class="merchant-top">
+        <span class="merchant-name">${m.name}</span>
+        <span class="merchant-rating">⭐ ${m.rating}</span>
+      </div>
+      <div class="merchant-cat">${m.category}</div>
+      <div class="merchant-info-row">
+        <span class="merchant-phone">📞 ${m.phone}</span>
+        <span class="merchant-hours">🕐 ${m.hours}</span>
+      </div>
+      <div class="merchant-addr">📍 ${m.address}</div>
+      <div class="merchant-packages">
+        ${m.packages.map(p => `
+          <div class="pkg-item">
+            <div class="pkg-header">
+              <span class="pkg-name">${p.name}</span>
+              <span class="pkg-price">¥${p.price}</span>
+            </div>
+            <div class="pkg-desc">${p.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // 默认收起
+  body.style.display = 'none';
+  document.querySelector('.meituan-arrow').textContent = '▸';
+}
+
+// Meituan toggle handler (added in DOMContentLoaded)
 
 async function copyCurrentRoute() {
   if (!currentRoute) return;
@@ -540,4 +631,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 初始加载
   loadRoutes();
+
+  // 美团商户区域展开/收起
+  document.getElementById('meituan-header').addEventListener('click', () => {
+    const body = document.getElementById('meituan-body');
+    const arrow = document.querySelector('.meituan-arrow');
+    if (body.style.display === 'none') {
+      body.style.display = '';
+      arrow.textContent = '▾';
+    } else {
+      body.style.display = 'none';
+      arrow.textContent = '▸';
+    }
+  });
 });

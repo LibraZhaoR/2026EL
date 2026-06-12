@@ -26,7 +26,7 @@ travel:
     # 可选: mock(离线关键词回复) | openai(兼容OpenAI接口,如DeepSeek) | doubao(火山引擎豆包)
     provider: openai
     # DeepSeek API (兼容OpenAI格式), 换成其他兼容API只需改此地址
-    base-url: https://api.deepseek.com/v1/chat/completions
+    base-url: https://api.deepseek.com/chat/completions
     api-key: sk-0c4f9bc4e734467e98d1996aa4811c95
     model: deepseek-chat
   meituan:

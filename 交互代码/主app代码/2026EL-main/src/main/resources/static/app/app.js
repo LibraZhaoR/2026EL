@@ -83,6 +83,7 @@ const personaCards = [
             { emoji: "🍡", x: 22, y: 65, size: 26, floatY: 11, dur: 3.7 }
         ],
         routeKey: "shiguang_canyin",
+        routeKeys: ["food", "shiguang_canyin", "laomendong_manyou", "gaochun_guxiang", "banfang_zhilv"],
         bgImage: "assets/persona/1.png"
     },
     {
@@ -104,6 +105,7 @@ const personaCards = [
             { emoji: "📝", x: 24, y: 68, size: 28, floatY: 11, dur: 3.4 }
         ],
         routeKey: "xuelin_shuxiang",
+        routeKeys: ["xuelin_shuxiang", "qinhuai_wenmai", "keju_wenmai", "pukou_xungen", "minsu_jiyi"],
         bgImage: "assets/persona/2.png"
     },
     {
@@ -125,6 +127,7 @@ const personaCards = [
             { emoji: "💦", x: 20, y: 66, size: 24, floatY: 12, dur: 3.8 }
         ],
         routeKey: "qingnian_yundong",
+        routeKeys: ["qingnian_yundong", "hexi_xincheng", "chengqiang_xunli", "mingfeng_guyun"],
         bgImage: "assets/persona/3.png"
     },
     {
@@ -146,6 +149,7 @@ const personaCards = [
             { emoji: "📷", x: 20, y: 64, size: 28, floatY: 11, dur: 3.3 }
         ],
         routeKey: "banfang_zhilv",
+        routeKeys: ["chancha_xiuxing", "yige_ren_xian_guang", "jiangnan_yuanlin", "qixia_shangqiu", "qinglv_langman"],
         bgImage: "assets/persona/4.png"
     },
     {
@@ -167,6 +171,7 @@ const personaCards = [
             { emoji: "🗝️", x: 24, y: 66, size: 26, floatY: 11, dur: 3.6 }
         ],
         routeKey: "mingfeng_guyun",
+        routeKeys: ["expo", "bowu_jinghua", "hongse_jiyi", "liuchao_yimeng", "zongtongfu_zhoubian"],
         bgImage: "assets/persona/5.png"
     },
     {
@@ -188,6 +193,7 @@ const personaCards = [
             { emoji: "☁️", x: 22, y: 64, size: 28, floatY: 12, dur: 3.7 }
         ],
         routeKey: "yejing_denghuo",
+        routeKeys: ["minguo_fenghua", "yishu_manbu", "jiaotang_jianzhu", "nantang_jiushi", "modeng_nanjing"],
         bgImage: "assets/persona/6.png"
     },
     {
@@ -209,6 +215,7 @@ const personaCards = [
             { emoji: "🎐", x: 22, y: 66, size: 26, floatY: 11, dur: 3.5 }
         ],
         routeKey: "yejing_denghuo",
+        routeKeys: ["night", "yejing_denghuo", "fosi_xunli", "jinian_diantang", "jiulong_qifu"],
         bgImage: "assets/persona/7.png"
     },
     {
@@ -230,6 +237,7 @@ const personaCards = [
             { emoji: "📍", x: 22, y: 62, size: 28, floatY: 11, dur: 3.7 }
         ],
         routeKey: "gulou_xiaoyuan",
+        routeKeys: ["nju", "gulou_xiaoyuan", "qinzi_yanxue", "binjiang_fengguang"],
         bgImage: "assets/persona/8.png"
     }
 ];
@@ -2629,27 +2637,231 @@ function proceedToMain() {
     setTimeout(() => {
         personaSwiper.style.display = "none";
         personaSwiper.classList.remove("entering", "leaving");
-        showMainPage();
-        // Re-render carousel with persona-matched ordering
-        setTimeout(function() {
-            renderCarouselCards();
-            // Scroll to matched card
-            var matchedKey = (personaCards.find(function(p) { return p.id === selectedPersonaId; }) || {}).routeKey;
-            if (matchedKey) {
-                var cards = document.querySelectorAll("#carousel-track .route-launch-card");
-                for (var ci = 0; ci < cards.length; ci++) {
-                    if (cards[ci].dataset.route === matchedKey) {
-                        var carousel = document.getElementById("route-carousel");
-                        if (carousel) {
-                            var cardW = carousel.clientWidth * 0.38 + 12;
-                            carousel.scrollTo({ left: ci * cardW, behavior: "smooth" });
-                        }
-                        break;
+        // Show "特别的你" package first, then the homepage
+        showSpecialYouPackage();
+    }, 350);
+}
+
+// ══════════════════════════════════════════════════════
+//  "特别的你"· 人格专属礼包
+// ══════════════════════════════════════════════════════
+
+function showSpecialYouPackage() {
+    const overlay = document.getElementById("special-you-overlay");
+    if (!overlay) {
+        // Fallback: no overlay element, go straight to main
+        showMainPageDelayed();
+        return;
+    }
+
+    const personaCard = personaCards.find(p => p.id === selectedPersonaId);
+    if (!personaCard) {
+        showMainPageDelayed();
+        return;
+    }
+
+    // Set header
+    document.getElementById("special-you-persona-icon").textContent = personaCard.elements[0].emoji;
+    document.getElementById("special-you-title").textContent = personaCard.title + " · 专属礼包";
+    document.getElementById("special-you-subtitle").textContent = personaCard.unlockText || "专为你挑选的路线、商户与社区精选";
+
+    // Build sections
+    buildSpecialYouRoutes(personaCard);
+    buildSpecialYouMerchants(selectedPersonaId);
+    buildSpecialYouReviews(selectedPersonaId);
+
+    // Show overlay
+    overlay.setAttribute("aria-hidden", "false");
+    overlay.classList.add("active");
+
+    // Bind events
+    document.getElementById("special-you-close").onclick = closeSpecialYou;
+    document.getElementById("special-you-close-btn").onclick = closeSpecialYou;
+    document.getElementById("special-you-explore").onclick = onSpecialYouExplore;
+    document.getElementById("special-you-scrim").onclick = closeSpecialYou;
+    // Prevent card clicks from bubbling to scrim
+    document.getElementById("special-you-card").addEventListener("click", function(e) {
+        e.stopPropagation();
+    });
+}
+
+function buildSpecialYouRoutes(personaCard) {
+    const container = document.getElementById("special-you-routes");
+    if (!container) return;
+
+    // Use persona-specific route keys (each route assigned to exactly one persona)
+    const routeKeys = personaCard.routeKeys || [personaCard.routeKey];
+    const personaRouteKey = personaCard.routeKey;
+
+    const ordered = routeKeys
+        .map(k => [k, routes[k]])
+        .filter(([_, route]) => route != null);
+
+    container.innerHTML = ordered.map(([key, route]) => {
+        const isMatch = key === personaRouteKey;
+        const icon = isMatch ? "⭐" : "🗺️";
+        const bg = isMatch ? "var(--vermillion)" : "var(--sage)";
+        const title = typeof route.title === "string" ? route.title : (route.title || key);
+        const meta = Array.isArray(route.meta) ? route.meta.join(" · ") : (route.desc || "");
+
+        return `
+        <div class="sy-route-card" style="${isMatch ? 'border-color: var(--vermillion); background: rgba(226,168,80,0.04);' : ''}">
+            <div class="sy-route-icon" style="background:${bg};color:white;font-size:16px;">${icon}</div>
+            <div class="sy-route-info">
+                <div class="sy-route-name">${escapeHtml(title)}</div>
+                <div class="sy-route-meta">${escapeHtml(meta)}</div>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function buildSpecialYouMerchants(personaId) {
+    const container = document.getElementById("special-you-merchants");
+    if (!container) return;
+
+    // Get merchants from SUPPLY_DATA or fallback to built-in data
+    let merchants = [];
+    if (typeof SUPPLY_DATA !== "undefined" && typeof SUPPLY_DATA.getAll === "function") {
+        const allMerchants = SUPPLY_DATA.getAll();
+        const pref = PERSONA_MERCHANT_PREF[personaId];
+
+        if (pref && allMerchants.length) {
+            merchants = allMerchants
+                .map(item => {
+                    let score = 0;
+                    const catIdx = pref.priorityCats.indexOf(item.category);
+                    if (catIdx === 0) score += 8;
+                    else if (catIdx > 0) score += 5;
+                    else score -= 1;
+
+                    const itemTags = (item.tags || []).map(t => String(t).toLowerCase());
+                    const prefTags = pref.priorityTags.map(t => t.toLowerCase());
+                    score += itemTags.filter(t => prefTags.some(pt => t.includes(pt) || pt.includes(t))).length * 4;
+                    score += (Number(item.rating || 0) - 3.5) * 3;
+                    return { item, score };
+                })
+                .filter(e => e.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5)
+                .map(e => e.item);
+        }
+    }
+
+    // Fallback: use Nanjing classic merchants
+    if (!merchants.length) {
+        merchants = [
+            { name: "南京大牌档（夫子庙店）", category: "food", tags: ["金陵菜", "南京味", "老字号"], rating: 4.5, avgPrice: 78, subcategory: "金陵菜" },
+            { name: "鸡鸣汤包（老门东店）", category: "food", tags: ["汤包", "小吃"], rating: 4.5, avgPrice: 36, subcategory: "汤包" },
+            { name: "先锋书店（五台山总店）", category: "coffee", tags: ["书店", "文艺", "拍照"], rating: 4.7, avgPrice: 32, subcategory: "书店咖啡" },
+            { name: "蒋有记锅贴（老门东店）", category: "food", tags: ["小吃", "清真"], rating: 4.7, avgPrice: 32, subcategory: "面馆" },
+            { name: "李记清真馆", category: "food", tags: ["老字号", "小吃", "实惠"], rating: 4.6, avgPrice: 28, subcategory: "面馆" }
+        ];
+    }
+
+    container.innerHTML = merchants.slice(0, 5).map(m => {
+        const icon = categoryIcon(m.category);
+        const subcat = m.subcategory || "";
+        const tags = (m.tags || []).slice(0, 2).join(" · ");
+        let dealText = "";
+        if (m.avgPrice) dealText = "人均 ¥" + m.avgPrice;
+        if (m.deals && Array.isArray(m.deals) && m.deals.length) {
+            dealText += " · " + m.deals[0].name + " ¥" + m.deals[0].price;
+        }
+
+        return `
+        <div class="sy-merchant-card">
+            <span class="sy-merchant-icon">${icon}</span>
+            <div class="sy-merchant-info">
+                <div class="sy-merchant-name">${escapeHtml(m.name)}</div>
+                <div class="sy-merchant-meta">
+                    <span>${escapeHtml(subcat)}</span>
+                    <span>⭐ ${Number(m.rating || 4).toFixed(1)}</span>
+                    <span>${escapeHtml(tags)}</span>
+                </div>
+                ${dealText ? `<div class="sy-merchant-deal">${escapeHtml(dealText)}</div>` : ""}
+            </div>
+        </div>`;
+    }).join("");
+}
+
+function buildSpecialYouReviews(personaId) {
+    const container = document.getElementById("special-you-reviews");
+    if (!container) return;
+
+    const personaCard = personaCards.find(p => p.id === personaId);
+    const personaName = personaCard ? personaCard.title : "探索者";
+
+    // Mock community reviews matched to persona
+    const allReviews = [
+        { user: "咖啡地图控", avatar: "☕", time: "2小时前", stars: 5, text: "先锋书店五台山总店真的绝了！地下车库改造的书店，拍照巨出片。完全符合" + personaName + "的路线风格，走累了喝杯咖啡，太舒服了。", tag: "coffee" },
+        { user: "南京土著", avatar: "🦆", time: "昨天", stars: 5, text: "李记清真馆的牛肉锅贴yyds！丰富路从头吃到尾，跟着推荐路线走不会踩坑。推荐" + personaName + "的朋友都来试试。", tag: "food" },
+        { user: "旅行日记本", avatar: "📓", time: "3小时前", stars: 4, text: "沿着秦淮河慢慢走，夫子庙的灯影倒映在水面上特别美。很适合" + personaName + "这条路线，不赶时间，慢慢感受。", tag: "ticket" },
+        { user: "周末闲逛家", avatar: "🚶", time: "昨天", stars: 5, text: "颐和路的梧桐树荫太适合散步了！这种慢节奏的城市探索太舒服了，比起赶景点打卡舒服一百倍。", tag: "coffee" },
+        { user: "金陵味道", avatar: "🍜", time: "5小时前", stars: 4, text: "芳婆糕团店的糖芋苗太好吃了！这种藏在巷子里的老店才是真正的南京味道。推荐所有来南京玩的朋友。", tag: "food" },
+    ];
+
+    // Sort: reviews matching persona route tags first
+    const pref = PERSONA_MERCHANT_PREF[personaId];
+    const priorityTags = pref ? pref.priorityTags.map(t => t.toLowerCase()) : [];
+
+    const sorted = allReviews
+        .map(r => {
+            const matchScore = priorityTags.filter(pt => r.text.toLowerCase().includes(pt)).length;
+            return { ...r, matchScore };
+        })
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 4);
+
+    container.innerHTML = sorted.map(r => `
+        <div class="sy-review-card">
+            <div class="sy-review-user">
+                <span class="sy-review-avatar">${r.avatar}</span>
+                <span class="sy-review-name">${escapeHtml(r.user)}</span>
+                <span class="sy-review-stars">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</span>
+                <span class="sy-review-time">${escapeHtml(r.time)}</span>
+            </div>
+            <div class="sy-review-text">${escapeHtml(r.text)}</div>
+        </div>
+    `).join("");
+}
+
+function closeSpecialYou() {
+    const overlay = document.getElementById("special-you-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("active");
+    overlay.setAttribute("aria-hidden", "true");
+    showMainPageDelayed();
+}
+
+function onSpecialYouExplore() {
+    const overlay = document.getElementById("special-you-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("active");
+    overlay.setAttribute("aria-hidden", "true");
+    showMainPageDelayed();
+}
+
+function showMainPageDelayed() {
+    showMainPage();
+    // Re-render carousel with persona-matched ordering
+    setTimeout(function() {
+        renderCarouselCards();
+        // Scroll to matched card
+        var matchedKey = (personaCards.find(function(p) { return p.id === selectedPersonaId; }) || {}).routeKey;
+        if (matchedKey) {
+            var cards = document.querySelectorAll("#carousel-track .route-launch-card");
+            for (var ci = 0; ci < cards.length; ci++) {
+                if (cards[ci].dataset.route === matchedKey) {
+                    var carousel = document.getElementById("route-carousel");
+                    if (carousel) {
+                        var cardW = carousel.clientWidth * 0.38 + 12;
+                        carousel.scrollTo({ left: ci * cardW, behavior: "smooth" });
                     }
+                    break;
                 }
             }
-        }, 100);
-    }, 350);
+        }
+    }, 100);
 }
 
 function buildSwiperCards() {
@@ -8023,101 +8235,205 @@ let routeSupplyPendingKey = null;
 
 /* ----------  Community Data & Helpers ---------- */
 
-const COMMUNITY_STORAGE_KEY = "citygo_community_posts";
+const COMMUNITY_STORAGE_KEY = "citygo_community_posts_v2";
 const COMMUNITY_FILE_LIMIT = 2.5 * 1024 * 1024;
+
+// Expanded post types for Weibo-style community
 const COMMUNITY_POST_TYPES = [
-    { id: "route", label: "路线推荐", hint: "写下路线顺序、适合人群、预算和你会怎么走。" },
-    { id: "routeReview", label: "路线评价", hint: "评价一条路线的体验、节奏、拥挤程度和踩坑点。" },
-    { id: "placeReview", label: "地点评价", hint: "聊聊某个地点值不值得去、适合什么时候去。" },
-    { id: "opinion", label: "观点讨论", hint: "抛出一个南京漫游观点，看看大家怎么想。" },
-    { id: "forum", label: "推荐论坛", hint: "推荐一个值得加入的路线讨论区或同好小组。" },
+    { id: "text",    label: "纯文字", hint: "分享你的南京漫游想法或见闻。" },
+    { id: "photo",   label: "照片",   hint: "发一组南京的瞬间，梧桐、城墙、美食、街角。" },
+    { id: "route",   label: "路线",   hint: "分享一条你走过或推荐的南京路线。" },
+    { id: "place",   label: "景点",   hint: "聊聊某个南京景点的体验和建议。" },
+    { id: "merchant",label: "美食",   hint: "推荐或评价一家南京美食店家。" },
+    { id: "activity",label: "活动",   hint: "发起一场周末出行活动，找同行搭子。" },
+    { id: "question",label: "提问",   hint: "向社区提问，关于南京的一切。" },
 ];
+
+const COMMUNITY_FEED_TABS = [
+    { id: "all",    label: "推荐", icon: "✨" },
+    { id: "route",  label: "路线", icon: "🗺️" },
+    { id: "photo",  label: "照片", icon: "📷" },
+    { id: "video",  label: "视频", icon: "🎬" },
+    { id: "nearby", label: "附近", icon: "📍" },
+];
+
 const COMMUNITY_SEED_POSTS = [
     {
-        id: "seed-night-review",
-        seed: true,
-        type: "routeReview",
-        author: "秦淮夜走员",
-        avatar: "夜",
-        title: "秦淮夜游线建议把老门东放在最后",
-        text: "夫子庙人会多，但从秦淮河边一路走到老门东，节奏会慢下来。建议 18:20 左右到河边，先看天色变暗，再进街区吃东西。",
-        routeKey: "night",
-        routeName: "秦淮夜游",
-        place: "秦淮河 / 老门东",
-        rating: 4.8,
-        tags: ["夜游", "路线评价", "适合拍照"],
-        media: [{ type: "image", url: "assets/scenes/qinhuai/scene.png", caption: "秦淮夜色参考" }],
-        comments: [
-            { author: "慢慢走", text: "同意，最后去老门东吃夜宵刚好。", time: "18分钟前" },
-            { author: "周末出门", text: "周六人很多吗？想避开最挤的时段。", time: "7分钟前" },
+        id: "seed-night-review", seed: true, type: "route",
+        author: "秦淮夜走员", avatar: "夜",
+        title: "秦淮夜游：把老门东放在最后一站",
+        text: "夫子庙人多，但从秦淮河边一路走到老门东，节奏慢慢变好。建议18:20到河边，先看天色变暗，再进街区吃夜宵。\n\n全程约3小时，边走边拍最舒服。避开周六晚高峰，周日晚上人少很多。",
+        routeKey: "night", routeName: "秦淮夜游",
+        place: "秦淮河 / 老门东", rating: 4.8,
+        area: "秦淮区",
+        tags: ["夜游", "路线推荐", "拍照", "情侣"],
+        media: [
+            { type: "image", url: "assets/scenes/qinhuai/scene.png", caption: "秦淮夜色" },
+            { type: "image", url: "assets/persona/8.png", caption: "老门东灯笼" }
         ],
-        likes: 128,
-        views: 1860,
-        time: "2小时前",
+        comments: [
+            { id:"c1", author: "慢慢走", avatar: "慢", text: "同意，最后去老门东吃夜宵刚好。", time: "18分钟前", likes: 12, replies: [] },
+            { id:"c2", author: "周末出门", avatar: "周", text: "周六人很多吗？想避开最挤的时段。", time: "7分钟前", likes: 5, replies: [
+                { id:"r1", author: "秦淮夜走员", avatar: "夜", replyTo: "周末出门", text: "周六晚饭后人最多，建议周日或者工作日晚上去。", time: "5分钟前" }
+            ]},
+        ],
+        likes: 128, views: 1860, reposts: 24, quotes: 8, favorites: 56,
+        time: "2小时前", timestamp: Date.now() - 7200000,
     },
     {
-        id: "seed-wutong-route",
-        seed: true,
-        type: "route",
-        author: "梧桐路书",
-        avatar: "梧",
-        title: "给第一次来南京的朋友：半日梧桐散步线",
-        text: "南大鼓楼校区出发，走上海路，拐进南秀村，最后到先锋书店。全程不赶，适合下午两点以后，路上咖啡店很多。",
-        routeKey: "food",
-        routeName: "午后餐茶线",
-        place: "上海路 / 南秀村",
-        rating: 4.6,
-        tags: ["自制路线", "citywalk", "咖啡"],
-        media: [{ type: "video", url: "", caption: "梧桐步道 12 秒短视频" }],
-        comments: [
-            { author: "纸袋拿铁", text: "这条我走过，南秀村真的适合慢慢逛。", time: "35分钟前" },
+        id: "seed-wutong-route", seed: true, type: "route",
+        author: "梧桐路书", avatar: "梧",
+        title: "半日梧桐散步线：给第一次来南京的朋友",
+        text: "南大鼓楼校区出发→上海路→南秀村→先锋书店。全程不赶，适合下午两点后出发。路上咖啡店很多，可以随时停下来。\n\n📍 起点：南大北大楼\n📍 终点：先锋书店五台山总店\n⏱ 约2小时（含咖啡停留）",
+        routeKey: "food", routeName: "午后餐茶线",
+        place: "上海路 / 南秀村", rating: 4.6,
+        area: "鼓楼区",
+        tags: ["citywalk", "咖啡", "梧桐", "一人行"],
+        media: [
+            { type: "image", url: "assets/persona/2.png", caption: "梧桐大道午后" },
+            { type: "image", url: "assets/persona/4.png", caption: "南秀村街角" },
+            { type: "image", url: "assets/scenes/museum/scene.png", caption: "先锋书店" }
         ],
-        likes: 96,
-        views: 1324,
-        time: "昨天",
+        comments: [
+            { id:"c3", author: "纸袋拿铁", avatar: "咖", text: "这条我走过，南秀村真的适合慢慢逛。推荐一家叫「随园」的咖啡馆。", time: "35分钟前", likes: 23, replies: [] },
+        ],
+        likes: 96, views: 1324, reposts: 18, quotes: 3, favorites: 42,
+        time: "昨天", timestamp: Date.now() - 86400000,
     },
     {
-        id: "seed-place-review",
-        seed: true,
-        type: "placeReview",
-        author: "展厅边角料",
-        avatar: "展",
-        title: "南博不要只看主展，特展厅更适合深逛",
-        text: "如果只有两小时，我会把固定展快速扫一遍，把时间留给特展。建议提前查预约和闭馆时间，周末下午三点后体验会更轻松。",
-        routeKey: "expo",
-        routeName: "博物馆展览线",
-        place: "南京博物院",
-        rating: 4.9,
-        tags: ["地点评价", "展览", "预约提醒"],
-        media: [{ type: "image", url: "assets/scenes/museum/scene.png", caption: "博物馆氛围" }],
-        comments: [
-            { author: "新手逛展", text: "预约提醒太有用了，上次就是没约上。", time: "1小时前" },
-            { author: "路线收藏家", text: "可以和明故宫放同一天吗？", time: "46分钟前" },
+        id: "seed-place-review", seed: true, type: "place",
+        author: "展厅边角料", avatar: "展",
+        title: "南博不用只看主展，特展厅更适合深逛",
+        text: "如果你只有两小时：快速走一遍历史馆固定展（30min），然后直奔特展厅。最近的「江苏古代文明」特展非常值得。\n\n💡 预约提醒：周末必须提前3天在公众号预约，当天基本约不上。",
+        routeKey: "expo", routeName: "博物馆展览线",
+        place: "南京博物院", rating: 4.9,
+        area: "玄武区",
+        tags: ["博物馆", "展览", "预约提醒", "文化"],
+        media: [
+            { type: "image", url: "assets/scenes/museum/scene.png", caption: "南博特展厅入口" }
         ],
-        likes: 152,
-        views: 2402,
-        time: "3小时前",
+        comments: [
+            { id:"c4", author: "新手逛展", avatar: "新", text: "预约提醒太有用了，上次就是没约上。", time: "1小时前", likes: 8, replies: [] },
+            { id:"c5", author: "路线收藏家", avatar: "路", text: "可以和明故宫放同一天吗？步行距离。", time: "46分钟前", likes: 3, replies: [
+                { id:"r2", author: "展厅边角料", avatar: "展", replyTo: "路线收藏家", text: "完全可以！明故宫遗址就在南博东边，步行10分钟。", time: "40分钟前" }
+            ]},
+        ],
+        likes: 152, views: 2402, reposts: 31, quotes: 12, favorites: 89,
+        time: "3小时前", timestamp: Date.now() - 10800000,
     },
     {
-        id: "seed-forum",
-        seed: true,
-        type: "forum",
-        author: "路线召集人",
-        avatar: "社",
-        title: "推荐开一个「雨天南京」论坛",
-        text: "南京下雨的时候其实很适合室内线：南博、先锋书店、咖啡馆、地铁可达的小馆子。想拉一个专门收集雨天路线的讨论区。",
-        routeKey: "",
-        routeName: "",
-        place: "全城",
-        rating: null,
-        tags: ["论坛推荐", "雨天路线", "观点"],
+        id: "seed-photo-wall", seed: true, type: "photo",
+        author: "快门按不停", avatar: "拍",
+        title: "今天拍的颐和路：南京最适合拍照的梧桐街区",
+        text: "下午四点的光最好，梧桐叶把阳光筛成碎金。推荐从颐和路→牯岭路→莫干路这条线走，每条路都有自己的味道。",
+        routeKey: "", routeName: "", place: "颐和路公馆区", rating: null,
+        area: "鼓楼区",
+        tags: ["摄影", "梧桐", "民国建筑", "颐和路"],
+        media: [
+            { type: "image", url: "assets/persona/5.png", caption: "颐和路梧桐" },
+            { type: "image", url: "assets/persona/3.png", caption: "公馆区建筑" },
+            { type: "image", url: "assets/persona/1.png", caption: "街角咖啡馆" },
+            { type: "image", url: "assets/persona/6.png", caption: "雨后倒影" }
+        ],
+        comments: [],
+        likes: 203, views: 3401, reposts: 45, quotes: 6, favorites: 112,
+        time: "5小时前", timestamp: Date.now() - 18000000,
+    },
+    {
+        id: "seed-merchant-review", seed: true, type: "merchant",
+        author: "鸭血粉丝鉴定师", avatar: "鸭",
+        title: "实测：老门东三家鸭血粉丝汤横向对比",
+        text: "周末专门跑了三家老门东附近的鸭血粉丝汤店：\n\n1. 回味 — 汤底浓郁，鸭血嫩滑，¥22 ⭐4.5\n2. 鸭德堡 — 料足实惠，鸭杂多，¥18 ⭐4.2\n3. 小潘记 — 排队太久但值得，汤里有中药香，¥28 ⭐4.7\n\n个人推荐：第一次来去回味，愿意排队去小潘记。",
+        routeKey: "", routeName: "", place: "老门东美食街", rating: null,
+        area: "秦淮区",
+        tags: ["美食评测", "鸭血粉丝", "老门东", "吃货"],
+        media: [
+            { type: "image", url: "assets/persona/2.png", caption: "鸭血粉丝汤" }
+        ],
+        comments: [
+            { id:"c6", author: "南京土著", avatar: "南", text: "鸭德堡确实是性价比之王，本地人常去。", time: "2小时前", likes: 45, replies: [] },
+            { id:"c7", author: "游客小张", avatar: "游", text: "小潘记排队一般多久？中午去行吗？", time: "1小时前", likes: 2, replies: [
+                { id:"r3", author: "鸭血粉丝鉴定师", avatar: "鸭", replyTo: "游客小张", text: "中午11点前去基本不用排，12点后排队30-40分钟。", time: "55分钟前" }
+            ]},
+        ],
+        likes: 287, views: 5601, reposts: 52, quotes: 15, favorites: 178,
+        time: "6小时前", timestamp: Date.now() - 21600000,
+    },
+    {
+        id: "seed-activity", seed: true, type: "activity",
+        author: "周末出行组", avatar: "组",
+        title: "本周六：紫金山徒步+灵谷寺桂花，找3-4个搭子",
+        text: "路线：白马公园→紫金山登山道→头陀岭→灵谷寺→体育公园\n\n💰 预算：免费（自带水和零食）\n⏱ 时间：周六上午9:00集合\n📍 集合：白马公园南门\n👥 已有2人，再找2-3人\n\n要求：能走山路（中等强度），对户外有兴趣就行。",
+        routeKey: "mingfeng_guyun", routeName: "明风古韵线",
+        place: "紫金山 / 灵谷寺", rating: null,
+        area: "玄武区",
+        tags: ["活动招募", "徒步", "紫金山", "周末"],
+        media: [
+            { type: "image", url: "assets/persona/7.png", caption: "紫金山登山道" }
+        ],
+        comments: [
+            { id:"c8", author: "户外新人", avatar: "户", text: "难度大吗？平时只走过平路可以参加吗？", time: "3小时前", likes: 1, replies: [
+                { id:"r4", author: "周末出行组", avatar: "组", replyTo: "户外新人", text: "中等难度，有台阶路也有土路。如果你平时有运动习惯应该没问题！", time: "2小时前" }
+            ]},
+        ],
+        likes: 89, views: 1204, reposts: 12, quotes: 2, favorites: 38,
+        time: "8小时前", timestamp: Date.now() - 28800000,
+    },
+    {
+        id: "seed-question", seed: true, type: "question",
+        author: "新生报到中", avatar: "新",
+        title: "南大新生求问：周末一个人逛南京，推荐第一站去哪？",
+        text: "刚到南大报到，这个周末想自己出去逛逛。喜欢安静的地方，最好不要离鼓楼太远。求学长学姐安利！",
+        routeKey: "", routeName: "", place: "鼓楼区", rating: null,
+        area: "鼓楼区",
+        tags: ["提问", "南大新生", "一人行", "安静"],
         media: [],
         comments: [
-            { author: "伞下散步", text: "我投一票，雨天路线真的需要单独整理。", time: "22分钟前" },
+            { id:"c9", author: "大四老学姐", avatar: "老", text: "强烈推荐从南大北大楼出发走到先锋书店（五台山），全程梧桐树下散步，还能打卡南京最有名的书店。", time: "1小时前", likes: 34, replies: [] },
+            { id:"c10", author: "研一学长", avatar: "研", text: "玄武湖也很近！从鼓楼骑车过去15分钟，湖边走走超级舒服。", time: "45分钟前", likes: 28, replies: [] },
         ],
-        likes: 73,
-        views: 908,
-        time: "今天",
+        likes: 67, views: 980, reposts: 3, quotes: 0, favorites: 15,
+        time: "今天", timestamp: Date.now() - 3600000,
+    },
+    {
+        id: "seed-repost-example", seed: true, type: "text",
+        author: "爱转发的路人", avatar: "转",
+        title: "",
+        text: "",
+        routeKey: "", routeName: "", place: "", rating: null,
+        area: "",
+        tags: [],
+        media: [],
+        repostOf: {
+            originalPostId: "seed-night-review",
+            originalAuthor: "秦淮夜走员",
+            originalTitle: "秦淮夜游：把老门东放在最后一站",
+            originalText: "夫子庙人多，但从秦淮河边一路走到老门东，节奏慢慢变好。",
+            originalMedia: [{ type: "image", url: "assets/scenes/qinhuai/scene.png", caption: "秦淮夜色" }]
+        },
+        comments: [],
+        likes: 18, views: 300, reposts: 0, quotes: 0, favorites: 5,
+        time: "1小时前", timestamp: Date.now() - 3600000,
+    },
+    {
+        id: "seed-quote-example", seed: true, type: "text",
+        author: "有观点的读者", avatar: "观",
+        title: "",
+        text: "完全同意！我还想补充一点：从夫子庙走到老门东的途中，可以拐进乌衣巷看看。虽然很短，但是「旧时王谢堂前燕」的感觉很特别。",
+        routeKey: "", routeName: "", place: "", rating: null,
+        area: "秦淮区",
+        tags: ["观点", "秦淮", "citywalk"],
+        media: [],
+        quoteOf: {
+            originalPostId: "seed-night-review",
+            originalAuthor: "秦淮夜走员",
+            originalTitle: "秦淮夜游：把老门东放在最后一站",
+            originalText: "夫子庙人多，但从秦淮河边一路走到老门东，节奏慢慢变好。",
+            originalMedia: [{ type: "image", url: "assets/scenes/qinhuai/scene.png", caption: "秦淮夜色" }],
+        },
+        comments: [],
+        likes: 42, views: 680, reposts: 5, quotes: 2, favorites: 19,
+        time: "30分钟前", timestamp: Date.now() - 1800000,
     },
 ];
 
@@ -8529,6 +8845,231 @@ function bindCommunityFeedEvents(container) {
     });
 }
 
+// ══════════════════════════════════════════════════════
+//  Friend System · 好友系统 + 私聊
+// ══════════════════════════════════════════════════════
+
+const MOCK_FRIENDS = [
+    { id: "friend_01", name: "南京漫步者", avatar: "🚶", status: "online", lastMsg: "周末一起去老门东吗？", lastTime: "刚刚" },
+    { id: "friend_02", name: "咖啡控小陈", avatar: "☕", status: "online", lastMsg: "先锋书店那家咖啡不错！", lastTime: "5分钟前" },
+    { id: "friend_03", name: "摄影师大刘", avatar: "📷", status: "away", lastMsg: "昨天拍的梧桐大道绝了", lastTime: "1小时前" },
+    { id: "friend_04", name: "美食猎人阿林", avatar: "🍜", status: "online", lastMsg: "李记锅贴yyds!", lastTime: "昨天" },
+    { id: "friend_05", name: "文化探险家", avatar: "🏛", status: "offline", lastMsg: "南博的新展很值得看", lastTime: "2天前" },
+    { id: "friend_06", name: "夜游南京", avatar: "🌙", status: "away", lastMsg: "秦淮河的灯光秀今晚走起", lastTime: "3小时前" },
+];
+
+const MOCK_ADD_SUGGESTIONS = [
+    { id: "sug_01", name: "历史迷老沈", avatar: "📜", meta: "共同去过 南大校史线" },
+    { id: "sug_02", name: "甜点控小悦", avatar: "🍰", meta: "共同去过 午后餐茶线" },
+    { id: "sug_03", name: "骑行达人阿风", avatar: "🚲", meta: "共同探索 玄武湖" },
+];
+
+// Persistable chat messages (localStorage-backed)
+function loadChatMessages() {
+    try {
+        const raw = localStorage.getItem("citygo_friend_chats");
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+}
+
+function saveChatMessages(chats) {
+    try { localStorage.setItem("citygo_friend_chats", JSON.stringify(chats)); } catch (e) {}
+}
+
+function getOrCreateFriendChat(friendId) {
+    const all = loadChatMessages();
+    if (!all[friendId]) {
+        const friend = MOCK_FRIENDS.find(f => f.id === friendId);
+        all[friendId] = {
+            id: friendId,
+            name: friend ? friend.name : "好友",
+            messages: [{
+                fromMe: false,
+                text: friend ? `你好！一起探索南京吧~` : "Hi!",
+                time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+            }]
+        };
+        saveChatMessages(all);
+    }
+    return all[friendId];
+}
+
+function renderFriendChatMessages(friendId) {
+    const container = document.getElementById("friend-chat-messages");
+    if (!container) return;
+    const chat = getOrCreateFriendChat(friendId);
+    const friend = MOCK_FRIENDS.find(f => f.id === friendId);
+
+    container.innerHTML = chat.messages.map((msg, i) => `
+        <div class="friend-msg ${msg.fromMe ? 'me' : 'them'}">
+            <span class="friend-msg-avatar">${msg.fromMe ? '👤' : (friend ? friend.avatar : '👤')}</span>
+            <div>
+                <div class="friend-msg-bubble">${escapeHtml(msg.text)}</div>
+                <div class="friend-msg-time">${msg.time || ''}</div>
+            </div>
+        </div>
+    `).join("");
+
+    // Scroll to bottom
+    setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
+}
+
+function openFriendChat(friendId) {
+    const panel = document.getElementById("friend-chat-panel");
+    const friend = MOCK_FRIENDS.find(f => f.id === friendId);
+    if (!panel) return;
+
+    // Set header
+    document.getElementById("friend-chat-avatar").textContent = friend ? friend.avatar : "👤";
+    document.getElementById("friend-chat-name").textContent = friend ? friend.name : "好友";
+    document.getElementById("friend-chat-status").textContent = friend ? (friend.status === "online" ? "在线" : friend.status === "away" ? "离开" : "离线") : "";
+
+    // Store active friend
+    panel.dataset.friendId = friendId;
+
+    // Render messages
+    renderFriendChatMessages(friendId);
+
+    // Show panel
+    panel.classList.add("open");
+    document.body.style.overflow = "hidden";
+
+    // Focus input
+    setTimeout(() => document.getElementById("friend-chat-input")?.focus(), 300);
+}
+
+function closeFriendChat() {
+    const panel = document.getElementById("friend-chat-panel");
+    if (!panel) return;
+    panel.classList.remove("open");
+    document.body.style.overflow = "";
+    panel.removeAttribute("data-friend-id");
+}
+
+function sendFriendMessage() {
+    const panel = document.getElementById("friend-chat-panel");
+    const input = document.getElementById("friend-chat-input");
+    if (!panel || !input) return;
+
+    const text = input.value.trim();
+    if (!text) return;
+
+    const friendId = panel.dataset.friendId;
+    if (!friendId) return;
+
+    const all = loadChatMessages();
+    const chat = all[friendId];
+    if (!chat) return;
+
+    const now = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+    chat.messages.push({ fromMe: true, text, time: now });
+    saveChatMessages(all);
+
+    // Update last message for friend card
+    const friend = MOCK_FRIENDS.find(f => f.id === friendId);
+    if (friend) friend.lastMsg = text;
+
+    input.value = "";
+    renderFriendChatMessages(friendId);
+}
+
+// Friend add modal
+function openFriendAddModal() {
+    let modal = document.getElementById("friend-add-overlay");
+    if (!modal) {
+        // Create modal dynamically
+        modal = document.createElement("div");
+        modal.id = "friend-add-overlay";
+        modal.className = "friend-add-overlay";
+        modal.innerHTML = `
+            <div class="friend-add-card">
+                <h3>添加好友</h3>
+                <input type="text" class="friend-add-input" id="friend-add-search" placeholder="搜索用户名或路线…" />
+                <div class="friend-add-suggestions" id="friend-add-suggestions">
+                    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">推荐好友</p>
+                    ${MOCK_ADD_SUGGESTIONS.map(s => `
+                        <div class="friend-add-suggestion" data-id="${s.id}">
+                            <span class="friend-add-suggestion-avatar">${s.avatar}</span>
+                            <div>
+                                <div class="friend-add-suggestion-name">${escapeHtml(s.name)}</div>
+                                <div class="friend-add-suggestion-meta">${escapeHtml(s.meta)}</div>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="friend-add-actions">
+                    <button class="friend-add-btn-cancel" id="friend-add-cancel">取消</button>
+                    <button class="friend-add-btn-primary" id="friend-add-confirm">添加</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.addEventListener("click", function(e) {
+            if (e.target === modal) closeFriendAddModal();
+        });
+        document.getElementById("friend-add-cancel").addEventListener("click", closeFriendAddModal);
+        document.getElementById("friend-add-confirm").addEventListener("click", function() {
+            const search = document.getElementById("friend-add-search").value.trim();
+            if (search) {
+                showToast("好友请求已发送: " + search);
+            }
+            closeFriendAddModal();
+        });
+        document.querySelectorAll(".friend-add-suggestion").forEach(el => {
+            el.addEventListener("click", function() {
+                document.getElementById("friend-add-search").value = this.querySelector(".friend-add-suggestion-name").textContent;
+            });
+        });
+    }
+    modal.classList.add("active");
+}
+
+function closeFriendAddModal() {
+    const modal = document.getElementById("friend-add-overlay");
+    if (modal) modal.classList.remove("active");
+}
+
+function renderFriendsSection(container) {
+    const section = document.createElement("div");
+    section.className = "community-friends-section";
+    section.innerHTML = `
+        <div class="community-friends-header">
+            <span class="community-friends-title">👥 好友</span>
+            <button class="community-friends-add-btn" id="community-friends-add-btn">+ 添加好友</button>
+        </div>
+        ${MOCK_FRIENDS.map(f => `
+            <div class="friend-card" data-friend-id="${f.id}">
+                <div class="friend-card-avatar">
+                    ${f.avatar}
+                    ${f.status === "online" ? '<span class="friend-card-online"></span>' : ''}
+                </div>
+                <div class="friend-card-info">
+                    <div class="friend-card-name">${escapeHtml(f.name)}</div>
+                    <div class="friend-card-last-msg">${escapeHtml(f.lastMsg)}</div>
+                </div>
+                <span class="friend-card-time">${escapeHtml(f.lastTime)}</span>
+            </div>
+        `).join("")}
+    `;
+
+    // Insert after the composer section, before toolbar
+    const toolbar = container.querySelector(".community-toolbar");
+    if (toolbar) {
+        toolbar.parentNode.insertBefore(section, toolbar);
+    }
+
+    // Bind events
+    section.querySelectorAll(".friend-card").forEach(card => {
+        card.addEventListener("click", function() {
+            const friendId = this.dataset.friendId;
+            if (friendId) openFriendChat(friendId);
+        });
+    });
+    const addBtn = section.querySelector("#community-friends-add-btn");
+    if (addBtn) addBtn.addEventListener("click", openFriendAddModal);
+}
+
 function openCommunityOverlay() {
     const overlay = document.getElementById("community-overlay");
     const inner = document.getElementById("community-overlay-inner");
@@ -8698,6 +9239,667 @@ function renderCommunityPage(container) {
     renderCommunityFeed(container);
 }
 
+// ══════════════════════════════════════════════════════
+//  Weibo-style Community Feed Override
+// ══════════════════════════════════════════════════════
+
+communityFeedTab = "all";
+
+// Override: filter posts by feed tab instead of old communityFilter
+getFilteredCommunityPosts = function() {
+    const keyword = communitySearchQuery.trim().toLowerCase();
+    return loadCommunityPosts().filter(post => {
+        // Tab filter
+        if (communityFeedTab === "route") {
+            if (post.type !== "route" && !post.routeKey) return false;
+        } else if (communityFeedTab === "photo") {
+            const hasImage = (post.media || []).some(m => m.type === "image" || (!m.type && m.url));
+            if (post.type !== "photo" && !hasImage) return false;
+        } else if (communityFeedTab === "video") {
+            const hasVideo = (post.media || []).some(m => m.type === "video");
+            if (!hasVideo) return false;
+        } else if (communityFeedTab === "nearby") {
+            if (!post.place && !post.routeKey) return false;
+        }
+        // Keyword search
+        if (!keyword) return true;
+        const haystack = [post.title, post.text, post.routeName, post.place, ...(post.tags || [])]
+            .join(" ")
+            .toLowerCase();
+        return haystack.includes(keyword);
+    });
+};
+
+// ═══ Feed Tabs ═══
+function renderCommunityFeedTabs() {
+    const tabs = [
+        { id: "all", label: "推荐", icon: "🔥" },
+        { id: "route", label: "路线", icon: "🗺️" },
+        { id: "photo", label: "照片", icon: "📷" },
+        { id: "video", label: "视频", icon: "🎬" },
+        { id: "nearby", label: "附近", icon: "📍" }
+    ];
+    return tabs.map(t => {
+        const active = communityFeedTab === t.id ? " active" : "";
+        return `<button class="community-feed-tab${active}" data-feed-tab="${t.id}" type="button">
+            <span class="tab-icon">${t.icon}</span> ${t.label}
+        </button>`;
+    }).join("");
+}
+
+// ═══ Media Grid (Weibo-style: 1 large / 2 side-by-side / 3 with first large / 4+ grid) ═══
+function renderCommunityMediaGrid(media) {
+    if (!Array.isArray(media) || !media.length) return "";
+    const count = media.length;
+    let gridClass = "media-grid";
+    if (count === 1) gridClass = "media-one";
+    else if (count === 2) gridClass = "media-two";
+    else if (count === 3) gridClass = "media-three";
+
+    const items = media.slice(0, 9).map((item, i) => {
+        const url = escapeHtml(item.url || "");
+        const caption = item.caption ? `<span class="media-caption">${escapeHtml(item.caption)}</span>` : "";
+        if (item.type === "video") {
+            return `<div class="community-media-item media-video">
+                <video src="${url}" controls preload="metadata"></video>${caption}
+            </div>`;
+        }
+        return `<div class="community-media-item">
+            <img src="${url}" alt="${escapeHtml(item.caption || "图片")}" loading="lazy">${caption}
+        </div>`;
+    }).join("");
+
+    return `<div class="community-media-grid ${gridClass}">${items}</div>`;
+}
+
+// ═══ Route Chip ═══
+function renderCommunityRouteChip(post) {
+    const routeName = post.routeName || (post.routeKey && routes[post.routeKey] ? getRouteDisplayTitle(routes[post.routeKey]) : "");
+    if (!routeName) return "";
+    return `<div class="community-route-chip" data-route-key="${escapeHtml(post.routeKey||"")}" data-open-route="${escapeHtml(post.routeKey||"")}">
+        <span class="chip-icon">🗺️</span>
+        <div class="chip-info">
+            <span class="chip-name">${escapeHtml(routeName)}</span>
+            ${post.place ? `<span class="chip-meta">📍 ${escapeHtml(post.place)}</span>` : ""}
+        </div>
+        <button class="chip-action" type="button" data-open-route="${escapeHtml(post.routeKey||"")}">查看路线 ›</button>
+    </div>`;
+}
+
+// ═══ Weibo-style Post Card ═══
+function renderCommunityPostCard(post, isDetail) {
+    const typeInfo = getCommunityType(post.type);
+    const timeStr = getCommunityPostTime(post);
+    const avatar = escapeHtml(post.avatar || getCommunityAvatar(post.author));
+    const author = escapeHtml(post.author || "匿名旅人");
+    const badge = typeInfo ? `<span class="post-badge">${escapeHtml(typeInfo.label)}</span>` : "";
+    const title = post.title ? `<h3 class="post-title">${escapeHtml(post.title)}</h3>` : "";
+    const textHtml = communityText(post.text);
+    const textLong = (post.text || "").length > 200;
+    const truncated = !isDetail && textLong
+        ? communityText((post.text||"").substring(0, 200)) + `... <button class="post-expand-btn" type="button">展开全文</button>`
+        : textHtml;
+    const tags = (post.tags && post.tags.length) ? post.tags.map(t => `<span class="post-tag">${escapeHtml(t)}</span>`).join("") : "";
+    const routeChip = renderCommunityRouteChip(post);
+    const mediaGrid = renderCommunityMediaGrid(post.media);
+    const liked = post.liked ? " liked" : "";
+    const favorited = post.favorited ? " favorited" : "";
+
+    // Repost block
+    let repostBlock = "";
+    if (post.repostOf && post.repostOf.originalPostId) {
+        repostBlock = `<div class="repost-block">
+            <div class="repost-block-header">
+                <span class="repost-block-avatar">${escapeHtml((post.repostOf.originalAuthor||"").slice(0,1))}</span>
+                <span class="repost-block-author">${escapeHtml(post.repostOf.originalAuthor)}</span>
+            </div>
+            <div class="repost-block-title">${escapeHtml(post.repostOf.originalTitle||"")}</div>
+            <div class="repost-block-text">${communityText((post.repostOf.originalText||"").substring(0, 150))}</div>
+        </div>`;
+    }
+    // Quote block
+    let quoteBlock = "";
+    if (post.quoteOf && post.quoteOf.originalPostId) {
+        quoteBlock = `<div class="repost-block quote-block">
+            <div class="repost-block-header">
+                <span class="repost-block-avatar">${escapeHtml((post.quoteOf.originalAuthor||"").slice(0,1))}</span>
+                <span class="repost-block-author">@${escapeHtml(post.quoteOf.originalAuthor)}</span>
+            </div>
+            <div class="repost-block-text">${communityText((post.quoteOf.originalText||"").substring(0, 150))}</div>
+        </div>`;
+    }
+
+    // Repost header
+    const repostHeader = (post.repostOf || post.quoteOf)
+        ? `<div class="repost-header"><span class="repost-icon">${post.quoteOf ? "💬" : "🔄"}</span> ${post.quoteOf ? "引用转发" : "转发了"}</div>`
+        : "";
+
+    return `<article class="community-post-card" data-post-id="${escapeHtml(post.id)}">
+        ${repostHeader}
+        <div class="post-card-header">
+            <div class="post-avatar">${avatar}</div>
+            <div class="post-header-info">
+                <div class="post-author-row">
+                    <span class="post-author">${author}</span>
+                    ${badge}
+                    <span class="post-meta">${timeStr}</span>
+                </div>
+                ${!isDetail ? `<button class="post-follow-btn" type="button">+ 关注</button>` : ""}
+            </div>
+        </div>
+        <div class="post-body" data-post-body="${escapeHtml(post.id)}">
+            ${title}
+            <div class="post-text">${truncated}</div>
+            ${routeChip}
+            ${mediaGrid}
+            ${tags ? `<div class="post-tags">${tags}</div>` : ""}
+        </div>
+        ${repostBlock}
+        ${quoteBlock}
+        <div class="post-actions">
+            <button class="post-action${liked}" data-post-id="${escapeHtml(post.id)}" data-action="like" type="button">
+                ❤️ <span>${post.likes||0}</span>
+            </button>
+            <button class="post-action" data-post-id="${escapeHtml(post.id)}" data-action="comment" type="button">
+                💬 <span>${(post.comments||[]).length}</span>
+            </button>
+            <button class="post-action" data-post-id="${escapeHtml(post.id)}" data-action="repost" type="button">
+                🔄 <span>${(post.reposts||0)+(post.quotes||0)}</span>
+            </button>
+            <button class="post-action${favorited}" data-post-id="${escapeHtml(post.id)}" data-action="favorite" type="button">
+                ⭐
+            </button>
+            <button class="post-action" data-post-id="${escapeHtml(post.id)}" data-action="more" type="button">
+                ···
+            </button>
+        </div>
+    </article>`;
+}
+
+// Override: render community page with feed tabs
+const _origRenderCommunityPage_ = renderCommunityPage;
+renderCommunityPage = function(container) {
+    const posts = loadCommunityPosts();
+    const postCount = posts.length;
+    const userPosts = posts.filter(p => p.author === getCommunityCurrentUserName()).length;
+    container.innerHTML = `
+        <div class="community-page-v2">
+            <section class="community-header-v2">
+                <h2>漫游社区</h2>
+                <p>发现南京路线、分享城市探索、找到同行搭子</p>
+                <div class="community-header-stats">
+                    <span><b>${postCount}</b> 动态</span>
+                    ${userPosts ? `<span><b>${userPosts}</b> 我的</span>` : ""}
+                    <button class="community-friend-entry" type="button" id="community-friend-entry">👥 好友</button>
+                </div>
+            </section>
+            <nav class="community-feed-tabs" id="community-feed-tabs">
+                ${renderCommunityFeedTabs()}
+            </nav>
+            <div class="community-feed" id="community-feed"></div>
+        </div>
+    `;
+    renderCommunityFeed(container);
+    bindCommunityFeedEvents(container);
+    // Bind feed tab clicks
+    container.querySelectorAll(".community-feed-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            communityFeedTab = btn.dataset.feedTab;
+            container.querySelectorAll(".community-feed-tab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            renderCommunityFeed(container);
+        });
+    });
+    // Bind friend entry button
+    const friendEntry = container.querySelector("#community-friend-entry");
+    if (friendEntry) {
+        friendEntry.addEventListener("click", () => {
+            requireAuth(() => { if (typeof openFriendPage === "function") openFriendPage(); });
+        });
+    }
+};
+
+// Override: render feed
+const _origRenderCommunityFeed_ = renderCommunityFeed;
+renderCommunityFeed = function(container) {
+    const feed = container.querySelector("#community-feed");
+    if (!feed) return;
+    const posts = getFilteredCommunityPosts();
+    feed.innerHTML = posts.length
+        ? posts.map(p => renderCommunityPostCard(p, false)).join("")
+        : `<div class="community-empty-v2">
+            <span class="empty-icon">📝</span>
+            <strong>还没有动态</strong>
+            <span>成为第一个分享南京路线的人吧</span>
+        </div>`;
+    bindCommunityFeedEvents(container);
+};
+
+// Override: bind events for new card structure
+const _origBindCommunityFeedEvents_ = bindCommunityFeedEvents;
+bindCommunityFeedEvents = function(container) {
+    const posts = loadCommunityPosts();
+
+    container.querySelectorAll(".post-action").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const postId = this.dataset.postId;
+            const action = this.dataset.action;
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            if (action === "like") {
+                post.liked = !post.liked;
+                post.likes = (post.likes||0) + (post.liked ? 1 : -1);
+                saveCommunityPosts(posts);
+                renderCommunityFeed(container);
+            } else if (action === "repost") {
+                openRepostPanel(post, container);
+            } else if (action === "comment") {
+                openPostDetail(post, container);
+            } else if (action === "favorite") {
+                post.favorited = !post.favorited;
+                post.favorites = (post.favorites||0) + (post.favorited ? 1 : -1);
+                saveCommunityPosts(posts);
+                renderCommunityFeed(container);
+                showToast(post.favorited ? "已收藏" : "已取消收藏");
+            } else if (action === "more") {
+                showPostMoreMenu(post, container);
+            }
+        });
+    });
+
+    // Follow buttons
+    container.querySelectorAll(".post-follow-btn").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const following = this.textContent.includes("已关注");
+            this.textContent = following ? "+ 关注" : "✓ 已关注";
+            this.classList.toggle("following", !following);
+            showToast(following ? "已取消关注" : "已关注");
+        });
+    });
+
+    // Expand text
+    container.querySelectorAll(".post-expand-btn").forEach(btn => {
+        btn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const body = this.closest(".post-body");
+            const postId = body ? body.dataset.postBody : null;
+            if (postId) {
+                const post = posts.find(p => p.id === postId);
+                if (post && body) {
+                    body.querySelector(".post-text").innerHTML = communityText(post.text);
+                    this.remove();
+                }
+            }
+        });
+    });
+
+    // Post body click → detail
+    container.querySelectorAll(".post-body, .repost-block").forEach(el => {
+        el.addEventListener("click", function(e) {
+            if (e.target.closest("button") || e.target.closest(".post-action")) return;
+            const card = this.closest(".community-post-card");
+            const postId = card ? card.dataset.postId : null;
+            const post = posts.find(p => p.id === postId);
+            if (post && !post.repostOf) openPostDetail(post, container);
+            else if (post && post.repostOf) {
+                const orig = posts.find(p => p.id === post.repostOf.originalPostId);
+                if (orig) openPostDetail(orig, container);
+            }
+        });
+    });
+
+    // Route chip
+    container.querySelectorAll(".chip-action, .community-route-chip").forEach(el => {
+        el.addEventListener("click", function(e) {
+            e.stopPropagation();
+            const routeKey = this.closest("[data-route-key]")?.dataset.routeKey || this.dataset.openRoute;
+            if (routeKey && routes[routeKey]) {
+                if (typeof openRoute === "function") openRoute(routeKey);
+                else showRouteOnMap(routeKey);
+            }
+        });
+    });
+};
+
+// ═══ Repost Panel ═══
+function openRepostPanel(post, container) {
+    const overlay = document.createElement("div");
+    overlay.className = "repost-overlay";
+    overlay.innerHTML = `
+        <div class="repost-panel">
+            <div class="repost-panel-header">
+                <h3>转发动态</h3>
+                <button class="repost-close" type="button">✕</button>
+            </div>
+            <div class="repost-options">
+                <button class="repost-option" data-action="direct-repost">
+                    <span class="repost-option-icon">🔄</span>
+                    <div>
+                        <strong>直接转发</strong>
+                        <span>原样转发到社区</span>
+                    </div>
+                </button>
+                <button class="repost-option" data-action="quote-repost">
+                    <span class="repost-option-icon">💬</span>
+                    <div>
+                        <strong>引用转发</strong>
+                        <span>加上自己的文字和观点</span>
+                    </div>
+                </button>
+                <button class="repost-option" data-action="share-friend">
+                    <span class="repost-option-icon">📤</span>
+                    <div>
+                        <strong>分享给好友</strong>
+                        <span>发送到好友聊天</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector(".repost-close").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelectorAll(".repost-option").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const action = this.dataset.action;
+            if (action === "direct-repost") {
+                doDirectRepost(post);
+                overlay.remove();
+            } else if (action === "quote-repost") {
+                overlay.remove();
+                openQuoteComposer(post, container);
+            } else if (action === "share-friend") {
+                overlay.remove();
+                if (typeof openFriendPicker === "function") openFriendPicker(post);
+                else showToast("好友功能即将上线");
+            }
+        });
+    });
+}
+
+function doDirectRepost(post) {
+    const posts = loadCommunityPosts();
+    const newPost = {
+        id: "repost-" + Date.now(),
+        type: "text",
+        author: getCommunityCurrentUserName(),
+        avatar: getCommunityAvatar(getCommunityCurrentUserName()),
+        title: "",
+        text: "",
+        routeKey: "", routeName: "", place: "", rating: null,
+        area: "", tags: [],
+        media: [],
+        repostOf: {
+            originalPostId: post.id,
+            originalAuthor: post.author,
+            originalTitle: post.title,
+            originalText: post.text,
+            originalMedia: post.media || []
+        },
+        comments: [],
+        likes: 0, views: 0, reposts: 0, quotes: 0, favorites: 0,
+        time: "刚刚", timestamp: Date.now()
+    };
+    post.reposts = (post.reposts||0) + 1;
+    posts.unshift(newPost);
+    saveCommunityPosts(posts);
+    showToast("已转发");
+    if (typeof openCommunityOverlay === "function") openCommunityOverlay();
+}
+
+function openQuoteComposer(originalPost, container) {
+    const overlay = document.createElement("div");
+    overlay.className = "repost-overlay";
+    overlay.innerHTML = `
+        <div class="quote-composer-panel">
+            <div class="quote-composer-header">
+                <button class="quote-cancel" type="button">取消</button>
+                <h3>引用转发</h3>
+                <button class="quote-submit" type="button">发布</button>
+            </div>
+            <textarea class="quote-composer-text" placeholder="写下你的想法…" maxlength="500"></textarea>
+            <div class="quote-preview-block">
+                <div class="quote-preview-header">
+                    <span class="quote-preview-avatar">${escapeHtml((originalPost.author||'').slice(0,1))}</span>
+                    <span>${escapeHtml(originalPost.author)}</span>
+                </div>
+                <div class="quote-preview-title">${escapeHtml(originalPost.title||'')}</div>
+                <div class="quote-preview-text">${communityText((originalPost.text||'').substring(0,100))}</div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector(".quote-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector(".quote-submit").addEventListener("click", () => {
+        const text = overlay.querySelector(".quote-composer-text").value.trim();
+        if (!text) { showToast("请输入你的观点"); return; }
+        const posts = loadCommunityPosts();
+        const newPost = {
+            id: "quote-" + Date.now(),
+            type: "text",
+            author: getCommunityCurrentUserName(),
+            avatar: getCommunityAvatar(getCommunityCurrentUserName()),
+            title: "",
+            text: text,
+            routeKey: "", routeName: "", place: "", rating: null,
+            area: "", tags: [],
+            media: [],
+            quoteOf: {
+                originalPostId: originalPost.id,
+                originalAuthor: originalPost.author,
+                originalTitle: originalPost.title,
+                originalText: originalPost.text,
+                originalMedia: originalPost.media || []
+            },
+            comments: [],
+            likes: 0, views: 0, reposts: 0, quotes: 0, favorites: 0,
+            time: "刚刚", timestamp: Date.now()
+        };
+        originalPost.quotes = (originalPost.quotes||0) + 1;
+        posts.unshift(newPost);
+        saveCommunityPosts(posts);
+        overlay.remove();
+        showToast("引用转发已发布");
+        if (typeof openCommunityOverlay === "function") openCommunityOverlay();
+    });
+}
+
+// ═══ Post Detail Page ═══
+function openPostDetail(post, container) {
+    post.views = (post.views||0) + 1;
+    saveCommunityPosts(loadCommunityPosts());
+
+    const overlay = document.createElement("div");
+    overlay.className = "post-detail-overlay";
+    const allComments = combineCommentsAndReplies(post);
+    const commentHTML = allComments.map(c => {
+        const isReply = !!c.replyTo;
+        return `<div class="detail-comment${isReply ? ' is-reply' : ''}">
+            <div class="detail-comment-avatar">${escapeHtml(c.avatar||c.author.slice(0,1))}</div>
+            <div class="detail-comment-body">
+                <div class="detail-comment-header">
+                    <span class="detail-comment-author">${escapeHtml(c.author)}</span>
+                    ${isReply ? `<span class="reply-indicator">回复</span><span class="detail-comment-author">${escapeHtml(c.replyTo)}</span>` : ""}
+                    <span class="detail-comment-time">${escapeHtml(c.time)}</span>
+                </div>
+                <div class="detail-comment-text">${communityText(c.text)}</div>
+                <div class="detail-comment-actions">
+                    <button type="button" data-reply-to="${c.author}" data-comment-id="${c.id||''}">回复</button>
+                    <span>❤️ ${c.likes||0}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join("");
+
+    overlay.innerHTML = `
+        <div class="post-detail-scroll">
+            <div class="post-detail-header">
+                <button class="post-detail-back" type="button">← 返回</button>
+                <span>动态详情</span>
+            </div>
+            <div class="post-detail-card">
+                ${renderCommunityPostCard(post, true).replace(/<button[^>]*post-follow-btn[^>]*>[^<]*<\/button>/g, '')}
+            </div>
+            <div class="post-detail-comments">
+                <h4>评论 (${(post.comments||[]).length})</h4>
+                ${commentHTML || '<div class="no-comments">暂无评论，来说点什么吧</div>'}
+            </div>
+        </div>
+        <div class="post-detail-input-row">
+            <input type="text" id="detail-comment-input" placeholder="写下你的评论…" maxlength="200">
+            <button type="button" id="detail-comment-submit">发送</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => {
+        overlay.remove();
+        if (container) renderCommunityFeed(container);
+    };
+    overlay.querySelector(".post-detail-back").addEventListener("click", close);
+
+    overlay.querySelector("#detail-comment-submit").addEventListener("click", () => {
+        const input = overlay.querySelector("#detail-comment-input");
+        const text = input.value.trim();
+        if (!text) return;
+        post.comments = post.comments || [];
+        post.comments.push({
+            id: "cmt-" + Date.now(),
+            author: getCommunityCurrentUserName(),
+            avatar: getCommunityAvatar(getCommunityCurrentUserName()),
+            text: text, time: "刚刚", likes: 0, replies: []
+        });
+        saveCommunityPosts(loadCommunityPosts());
+        openPostDetail(post, container);
+        overlay.remove();
+    });
+
+    overlay.querySelectorAll("[data-reply-to]").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const replyTo = this.dataset.replyTo;
+            const commentId = this.dataset.commentId;
+            const input = overlay.querySelector("#detail-comment-input");
+            input.value = "@" + replyTo + " ";
+            input.focus();
+            input.dataset.replyToCommentId = commentId;
+        });
+    });
+}
+
+function combineCommentsAndReplies(post) {
+    const all = [];
+    (post.comments||[]).forEach(c => {
+        all.push(c);
+        (c.replies||[]).forEach(r => all.push(r));
+    });
+    return all;
+}
+
+// ═══ Post More Menu ═══
+function showPostMoreMenu(post, container) {
+    const overlay = document.createElement("div");
+    overlay.className = "repost-overlay";
+    overlay.innerHTML = `
+        <div class="more-menu-panel">
+            <button class="more-menu-item" data-action="copy-link">🔗 复制链接</button>
+            <button class="more-menu-item" data-action="not-interested">👎 不感兴趣</button>
+            <button class="more-menu-item" data-action="report">🚩 举报</button>
+            <button class="more-menu-item more-menu-cancel">取消</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector(".more-menu-cancel").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("[data-action='not-interested']").addEventListener("click", () => {
+        showToast("已反馈，将减少此类推荐");
+        overlay.remove();
+    });
+    overlay.querySelector("[data-action='report']").addEventListener("click", () => {
+        showToast("举报已提交，感谢你的反馈");
+        overlay.remove();
+    });
+    overlay.querySelector("[data-action='copy-link']").addEventListener("click", () => {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(post.id).then(() => showToast("链接已复制"));
+        }
+        overlay.remove();
+    });
+}
+
+// ═══ Composer: Quick Publish ═══
+function openQuickComposer(type) {
+    const overlay = document.createElement("div");
+    overlay.className = "repost-overlay";
+    const typeInfo = getCommunityType(type);
+    const routeOptions = Object.keys(routes).filter(k => routes[k]).map(k =>
+        `<option value="${k}">${escapeHtml(getRouteDisplayTitle(routes[k]))}</option>`
+    ).join("");
+
+    overlay.innerHTML = `
+        <div class="quick-composer-panel">
+            <div class="quick-composer-header">
+                <button class="composer-cancel" type="button">取消</button>
+                <h3>发${typeInfo.label}</h3>
+                <button class="composer-submit" type="button" id="quick-submit">发布</button>
+            </div>
+            <textarea class="quick-composer-text" id="quick-text" placeholder="${escapeHtml(typeInfo.hint)}" maxlength="500"></textarea>
+            <div class="quick-composer-extras">
+                <input class="quick-composer-title" id="quick-title" type="text" placeholder="标题（可选）" maxlength="50">
+                <select class="quick-composer-route" id="quick-route">
+                    <option value="">关联路线（可选）</option>
+                    ${routeOptions}
+                </select>
+                <input class="quick-composer-place" id="quick-place" type="text" placeholder="地点（可选）" maxlength="30">
+                <input class="quick-composer-tags" id="quick-tags" type="text" placeholder="标签，空格分隔（可选）" maxlength="50">
+                <input class="quick-composer-urls" id="quick-urls" type="text" placeholder="图片链接，逗号分隔（可选）">
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector(".composer-cancel").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector("#quick-submit").addEventListener("click", () => {
+        const text = overlay.querySelector("#quick-text").value.trim();
+        if (!text) { showToast("请输入内容"); return; }
+        const title = overlay.querySelector("#quick-title").value.trim();
+        const routeKey = overlay.querySelector("#quick-route").value;
+        const place = overlay.querySelector("#quick-place").value.trim();
+        const tagsStr = overlay.querySelector("#quick-tags").value.trim();
+        const urlsStr = overlay.querySelector("#quick-urls").value.trim();
+        const tags = tagsStr ? tagsStr.split(/\s+/).slice(0, 5) : [];
+        const media = urlsStr ? urlsStr.split(/[,，\n]/).filter(u => u.trim()).map((u,i) => ({ type:"image", url: u.trim(), caption: "" })).slice(0,9) : [];
+
+        const routeName = routeKey && routes[routeKey] ? getRouteDisplayTitle(routes[routeKey]) : "";
+        const posts = loadCommunityPosts();
+        const newPost = {
+            id: "post-" + Date.now(),
+            type: type,
+            author: getCommunityCurrentUserName(),
+            avatar: getCommunityAvatar(getCommunityCurrentUserName()),
+            title: title, text: text,
+            routeKey: routeKey, routeName: routeName, place: place,
+            area: "", rating: null,
+            tags: tags, media: media,
+            comments: [], likes: 0, views: 0, reposts: 0, quotes: 0, favorites: 0,
+            time: "刚刚", timestamp: Date.now()
+        };
+        posts.unshift(newPost);
+        saveCommunityPosts(posts);
+        overlay.remove();
+        showToast("发布成功！");
+        if (typeof openCommunityOverlay === "function") openCommunityOverlay();
+    });
+}
+
 function openRoutesSupplyPanel(routeKey) {
     if (routeKey && routes[routeKey]) currentRouteKey = routeKey;
     const inline = document.getElementById("route-supply-inline");
@@ -8723,3 +9925,1453 @@ addSupplyEntryToRouteSheet = function(sheetBody, routeKey) {
     entry.querySelector("#route-supply-feature")?.addEventListener("click", () => openRoutesSupplyPanel(routeKey));
     sheetBody.appendChild(entry);
 };
+
+// ══════════════════════════════════════════════════════
+//  Auth Service (Frontend)
+// ══════════════════════════════════════════════════════
+
+let currentAuthUser = null;
+
+const authApi = {
+    async register(email, password, nickname) {
+        const res = await fetch("/api/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, nickname })
+        });
+        return res.json();
+    },
+    async login(email, password) {
+        const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
+        return res.json();
+    },
+    async me() {
+        const res = await fetch("/api/auth/me");
+        return res.json();
+    },
+    async logout() {
+        const res = await fetch("/api/auth/logout", { method: "POST" });
+        return res.json();
+    },
+    async updateProfile(data) {
+        const res = await fetch("/api/auth/profile", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+        return res.json();
+    },
+    async changePassword(oldPassword, newPassword) {
+        const res = await fetch("/api/auth/change-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ oldPassword, newPassword })
+        });
+        return res.json();
+    }
+};
+
+async function initAuth() {
+    const result = await authApi.me();
+    if (result.code === 200 && result.data) {
+        currentAuthUser = result.data;
+        return true;
+    }
+    return false;
+}
+
+function isLoggedIn() {
+    return currentAuthUser != null;
+}
+
+function getCurrentUserId() {
+    return currentAuthUser ? currentAuthUser.id : null;
+}
+
+function getCurrentUserNickname() {
+    return currentAuthUser ? currentAuthUser.nickname : "我";
+}
+
+function requireAuth(action) {
+    if (isLoggedIn()) {
+        action();
+    } else {
+        showAuthModal("login", action);
+    }
+}
+
+// ═══ Auth Modal (Login / Register) ═══
+let authModalCallback = null;
+
+function showAuthModal(mode, callback) {
+    authModalCallback = callback || null;
+    const existing = document.getElementById("auth-modal-overlay");
+    if (existing) existing.remove();
+
+    const isLogin = mode === "login";
+    const overlay = document.createElement("div");
+    overlay.className = "auth-modal-overlay";
+    overlay.id = "auth-modal-overlay";
+
+    overlay.innerHTML = `
+        <div class="auth-modal">
+            <button class="auth-modal-close" type="button">✕</button>
+            <div class="auth-modal-logo">🏙️</div>
+            <h2>${isLogin ? '欢迎回来' : '加入城市漫游'}</h2>
+            <p class="auth-modal-sub">南京周末探索</p>
+
+            <form class="auth-form" id="auth-form">
+                ${!isLogin ? `<div class="auth-field">
+                    <label for="auth-nickname">昵称</label>
+                    <input type="text" id="auth-nickname" placeholder="你的昵称" maxlength="20" required>
+                </div>` : ''}
+                <div class="auth-field">
+                    <label for="auth-email">邮箱</label>
+                    <input type="email" id="auth-email" placeholder="your@email.com" required>
+                </div>
+                <div class="auth-field">
+                    <label for="auth-password">密码</label>
+                    <input type="password" id="auth-password" placeholder="至少6位字符" minlength="6" required>
+                </div>
+                <div class="auth-error" id="auth-error" style="display:none"></div>
+                <button class="auth-submit-btn" type="submit" id="auth-submit-btn">
+                    ${isLogin ? '登 录' : '注 册'}
+                </button>
+            </form>
+
+            <div class="auth-switch">
+                ${isLogin
+                    ? '还没有账号？<button type="button" id="auth-switch-btn">立即注册</button>'
+                    : '已有账号？<button type="button" id="auth-switch-btn">去登录</button>'}
+            </div>
+            <p class="auth-demo-note">开发演示模式 · 密码加密存储</p>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector(".auth-modal-close").addEventListener("click", () => overlay.remove());
+
+    // Switch mode
+    overlay.querySelector("#auth-switch-btn").addEventListener("click", () => {
+        overlay.remove();
+        showAuthModal(isLogin ? "register" : "login", callback);
+    });
+
+    // Form submit
+    overlay.querySelector("#auth-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = overlay.querySelector("#auth-submit-btn");
+        const errEl = overlay.querySelector("#auth-error");
+        btn.disabled = true;
+        btn.textContent = "处理中…";
+        errEl.style.display = "none";
+
+        const email = overlay.querySelector("#auth-email").value.trim();
+        const password = overlay.querySelector("#auth-password").value;
+
+        let result;
+        if (isLogin) {
+            result = await authApi.login(email, password);
+        } else {
+            const nickname = overlay.querySelector("#auth-nickname").value.trim();
+            result = await authApi.register(email, password, nickname);
+        }
+
+        if (result.code === 200 && result.data) {
+            currentAuthUser = result.data;
+            showToast(isLogin ? "登录成功" : "注册成功！欢迎加入");
+            overlay.remove();
+            if (authModalCallback) { authModalCallback(); authModalCallback = null; }
+            // Refresh community page if open
+            const nearby = document.querySelector('[data-tab="nearby"]');
+            if (nearby && nearby.style.display !== "none") {
+                const inner = nearby.querySelector(".tab-content-inner");
+                if (inner && typeof renderCommunityPage === "function") renderCommunityPage(inner);
+            }
+        } else {
+            errEl.textContent = result.msg || "操作失败，请重试";
+            errEl.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = isLogin ? "登 录" : "注 册";
+        }
+    });
+
+    // Focus first input
+    setTimeout(() => {
+        const firstInput = overlay.querySelector("input[type=text], input[type=email]");
+        if (firstInput) firstInput.focus();
+    }, 300);
+}
+
+// Override getCommunityCurrentUserName to use auth
+const _origGetCommunityCurrentUserName_ = getCommunityCurrentUserName;
+getCommunityCurrentUserName = function() {
+    if (currentAuthUser && currentAuthUser.nickname) return currentAuthUser.nickname;
+    return _origGetCommunityCurrentUserName_();
+};
+
+// Override getCommunityAvatar for auth user avatar
+const _origGetCommunityAvatar_ = getCommunityAvatar;
+getCommunityAvatar = function(author) {
+    if (currentAuthUser && author === currentAuthUser.nickname) {
+        return currentAuthUser.nickname.slice(0, 1);
+    }
+    return _origGetCommunityAvatar_(author);
+};
+
+// ══════════════════════════════════════════════════════
+//  Friend System
+// ══════════════════════════════════════════════════════
+
+const FRIEND_STORAGE_KEY = "citygo_friends_v1";
+
+const MOCK_FRIEND_USERS = [
+    { id: "u-arch", nickname: "建筑光影", avatar: "建", bio: "用镜头记录南京民国建筑", tags: ["建筑", "摄影", "民国", "Citywalk"], travelStyle: "慢节奏深度游", area: "鼓楼/玄武", matchReason: "都喜欢建筑摄影与民国风情" },
+    { id: "u-history", nickname: "金陵旧事", avatar: "陵", bio: "南京每块砖都有故事", tags: ["历史", "博物馆", "六朝", "城墙"], travelStyle: "文化沉浸式", area: "秦淮/老城南", matchReason: "共同关注南京历史与博物馆路线" },
+    { id: "u-coffee", nickname: "咖啡地图集", avatar: "咖", bio: "探索南京100家独立咖啡馆", tags: ["咖啡", "探店", "美食", "摄影"], travelStyle: "随性闲逛", area: "鼓楼/新街口", matchReason: "都对咖啡馆与城市漫步感兴趣" },
+    { id: "u-expo", nickname: "看展人小陈", avatar: "展", bio: "南艺毕业，专看小众展览", tags: ["展览", "艺术", "摄影", "设计"], travelStyle: "主题式打卡", area: "鼓楼/仙林", matchReason: "共同热爱艺术展览与文艺路线" },
+    { id: "u-sport", nickname: "周末运动搭子", avatar: "运", bio: "羽毛球+爬山+骑行", tags: ["运动", "爬山", "骑行", "户外"], travelStyle: "活力探索型", area: "紫金山/玄武湖", matchReason: "都喜欢户外运动与城市探索" },
+    { id: "u-nju", nickname: "南大新同学", avatar: "南", bio: "大一新生，想逛遍南京", tags: ["校园", "美食", "Citywalk", "拍照"], travelStyle: "好奇宝宝型", area: "鼓楼/栖霞", matchReason: "南大校友，共同探索校园周边" },
+    { id: "u-food", nickname: "南京甜口党", avatar: "甜", bio: "糕团、汤包、糖芋苗重度爱好者", tags: ["美食", "小吃", "探店", "糕团"], travelStyle: "美食驱动型", area: "秦淮/老门东", matchReason: "美食偏好高度重合，都爱老南京味道" },
+    { id: "u-night", nickname: "秦淮夜猫子", avatar: "夜", bio: "夜晚的南京才是真正的南京", tags: ["夜游", "酒吧", "夜景", "拍照"], travelStyle: "夜行动物型", area: "秦淮/1912", matchReason: "都喜欢夜游秦淮与城市夜景" }
+];
+
+// ═══ Data Layer ═══
+function loadFriendData() {
+    try {
+        const raw = localStorage.getItem(FRIEND_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : { friends: [], requests: [], blocked: [] };
+    } catch (e) { return { friends: [], requests: [], blocked: [] }; }
+}
+
+function saveFriendData(data) {
+    localStorage.setItem(FRIEND_STORAGE_KEY, JSON.stringify(data));
+}
+
+function getMyFriendIds() {
+    const data = loadFriendData();
+    return data.friends.map(f => f.userId);
+}
+
+function isFriend(userId) {
+    return getMyFriendIds().includes(userId);
+}
+
+function isBlocked(userId) {
+    const data = loadFriendData();
+    return data.blocked.some(b => b.userId === userId);
+}
+
+function hasPendingRequest(userId) {
+    const data = loadFriendData();
+    return data.requests.some(r => (r.fromId === userId || r.toId === userId) && r.status === "pending");
+}
+
+// ═══ Friend Page ═══
+let friendPageTab = "messages"; // messages | friends | requests | buddy
+
+function openFriendPage() {
+    const overlay = document.createElement("div");
+    overlay.className = "friend-page-overlay";
+    overlay.id = "friend-page-overlay";
+    renderFriendPage(overlay);
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function renderFriendPage(overlay) {
+    const friendCount = getMyFriendIds().length;
+    const data = loadFriendData();
+    const pendingCount = data.requests.filter(r => r.status === "pending" && r.toId === "me").length;
+    const unreadTotal = getTotalUnreadCount();
+
+    overlay.innerHTML = `
+        <div class="friend-page">
+            <div class="friend-page-header">
+                <button class="friend-page-back" type="button">← 返回</button>
+                <h2>${friendPageTab === 'messages' ? '消息' : '好友'}</h2>
+                <span class="friend-page-count">${friendCount}位好友</span>
+            </div>
+            <div class="friend-page-tabs">
+                <button class="friend-tab${friendPageTab==='messages'?' active':''}" data-friend-tab="messages">
+                    消息${unreadTotal ? `<span class="friend-badge">${unreadTotal}</span>` : ''}
+                </button>
+                <button class="friend-tab${friendPageTab==='friends'?' active':''}" data-friend-tab="friends">好友</button>
+                <button class="friend-tab${friendPageTab==='requests'?' active':''}" data-friend-tab="requests">
+                    新的朋友${pendingCount ? `<span class="friend-badge">${pendingCount}</span>` : ''}
+                </button>
+                <button class="friend-tab${friendPageTab==='buddy'?' active':''}" data-friend-tab="buddy">找搭子</button>
+            </div>
+            <div class="friend-page-body" id="friend-page-body">
+                ${renderFriendPageBody()}
+            </div>
+        </div>
+    `;
+
+    // Back button
+    overlay.querySelector(".friend-page-back").addEventListener("click", () => overlay.remove());
+
+    // Tab clicks
+    overlay.querySelectorAll(".friend-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            friendPageTab = btn.dataset.friendTab;
+            overlay.querySelectorAll(".friend-tab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const body = overlay.querySelector("#friend-page-body");
+            if (body) body.innerHTML = renderFriendPageBody();
+            bindFriendPageEvents(overlay);
+        });
+    });
+
+    bindFriendPageEvents(overlay);
+}
+
+function renderFriendPageBody() {
+    switch (friendPageTab) {
+        case "messages": return renderConversationList();
+        case "friends": return renderFriendList();
+        case "requests": return renderFriendRequests();
+        case "buddy": return renderBuddyFinder();
+        default: return renderConversationList();
+    }
+}
+
+function bindFriendPageEvents(overlay) {
+    // Search
+    const searchInput = overlay.querySelector("#friend-search");
+    if (searchInput) {
+        searchInput.addEventListener("input", () => {
+            const query = searchInput.value.trim().toLowerCase();
+            const list = overlay.querySelector("#friend-list");
+            if (list) {
+                list.querySelectorAll(".friend-card").forEach(card => {
+                    const name = (card.dataset.name || "").toLowerCase();
+                    const tags = (card.dataset.tags || "").toLowerCase();
+                    card.style.display = (!query || name.includes(query) || tags.includes(query)) ? "" : "none";
+                });
+            }
+        });
+    }
+
+    // Add friend buttons
+    overlay.querySelectorAll("[data-add-friend]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const userId = btn.dataset.addFriend;
+            const user = MOCK_FRIEND_USERS.find(u => u.id === userId);
+            if (!user) return;
+            const data = loadFriendData();
+            if (isFriend(userId)) { showToast("已经是好友了"); return; }
+            if (hasPendingRequest(userId)) { showToast("已有待处理的申请"); return; }
+            if (isBlocked(userId)) { showToast("无法添加该用户"); return; }
+
+            const msg = prompt("发送验证信息（可选）：", "你好，一起探索南京！");
+            if (msg === null) return;
+            data.requests.push({
+                id: "req-" + Date.now(),
+                fromId: "me",
+                toId: userId,
+                message: msg || "你好，一起探索南京！",
+                status: "pending",
+                createdAt: Date.now()
+            });
+            saveFriendData(data);
+            showToast("好友申请已发送");
+            renderFriendPage(overlay);
+        });
+    });
+
+    // Accept request
+    overlay.querySelectorAll("[data-accept-request]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const reqId = btn.dataset.acceptRequest;
+            const data = loadFriendData();
+            const req = data.requests.find(r => r.id === reqId);
+            if (!req) return;
+            req.status = "accepted";
+            req.handledAt = Date.now();
+            data.friends.push({
+                userId: req.fromId,
+                remark: "",
+                since: Date.now(),
+                lastInteractionAt: Date.now()
+            });
+            saveFriendData(data);
+            showToast("已接受好友申请");
+            renderFriendPage(overlay);
+        });
+    });
+
+    // Reject request
+    overlay.querySelectorAll("[data-reject-request]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const reqId = btn.dataset.rejectRequest;
+            const data = loadFriendData();
+            const req = data.requests.find(r => r.id === reqId);
+            if (!req) return;
+            req.status = "rejected";
+            req.handledAt = Date.now();
+            saveFriendData(data);
+            showToast("已拒绝");
+            renderFriendPage(overlay);
+        });
+    });
+
+    // Remove friend
+    overlay.querySelectorAll("[data-remove-friend]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (!confirm("确定删除该好友？")) return;
+            const userId = btn.dataset.removeFriend;
+            const data = loadFriendData();
+            data.friends = data.friends.filter(f => f.userId !== userId);
+            saveFriendData(data);
+            showToast("已删除好友");
+            renderFriendPage(overlay);
+        });
+    });
+
+    // Block user
+    overlay.querySelectorAll("[data-block-user]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (!confirm("确定拉黑该用户？拉黑后双方无法互动。")) return;
+            const userId = btn.dataset.blockUser;
+            const data = loadFriendData();
+            data.friends = data.friends.filter(f => f.userId !== userId);
+            data.requests = data.requests.filter(r => r.fromId !== userId && r.toId !== userId);
+            data.blocked.push({ userId, reason: "", createdAt: Date.now() });
+            saveFriendData(data);
+            showToast("已拉黑");
+            renderFriendPage(overlay);
+        });
+    });
+
+    // Chat friend button
+    overlay.querySelectorAll("[data-chat-friend]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const userId = btn.dataset.chatFriend;
+            const user = MOCK_FRIEND_USERS.find(u => u.id === userId);
+            if (user) openPrivateChat(userId, user.nickname, user.avatar);
+        });
+    });
+
+    // Conversation item click
+    overlay.querySelectorAll("[data-open-conv]").forEach(el => {
+        el.addEventListener("click", () => {
+            const convId = el.dataset.openConv;
+            const conv = loadChatData().conversations.find(c => c.id === convId);
+            if (conv) {
+                const otherUser = MOCK_FRIEND_USERS.find(u => u.id === conv.withUserId);
+                if (otherUser) openPrivateChat(conv.withUserId, otherUser.nickname, otherUser.avatar);
+            }
+        });
+    });
+}
+
+// ═══ Friend List Tab ═══
+function renderFriendList() {
+    const data = loadFriendData();
+    const friendIds = getMyFriendIds();
+    const friends = MOCK_FRIEND_USERS.filter(u => friendIds.includes(u.id));
+
+    const searchHTML = `<div class="friend-search-wrap">
+        <input type="search" id="friend-search" class="friend-search-input" placeholder="搜索好友昵称或兴趣…">
+    </div>`;
+
+    if (!friends.length) {
+        return searchHTML + `<div class="friend-empty">
+            <span class="friend-empty-icon">👋</span>
+            <strong>还没有好友</strong>
+            <p>去「找搭子」发现志同道合的南京探索伙伴</p>
+        </div>`;
+    }
+
+    const groupMap = {};
+    friends.forEach(f => {
+        f.tags.forEach(tag => {
+            if (!groupMap[tag]) groupMap[tag] = [];
+            groupMap[tag].push(f);
+        });
+    });
+
+    // Show friends grouped by primary interest
+    const cards = friends.map(f => {
+        const matchReasons = [];
+        const myTags = ["建筑", "咖啡", "历史", "美食", "摄影", "Citywalk", "校园", "夜游"];
+        const shared = f.tags.filter(t => myTags.includes(t));
+        if (shared.length >= 3) matchReasons.push(`共同喜欢 ${shared.length} 个主题`);
+        if (shared.length >= 1) matchReasons.push(`都对${shared[0]}感兴趣`);
+        matchReasons.push(f.matchReason);
+
+        return `<div class="friend-card" data-name="${f.nickname}" data-tags="${f.tags.join(' ')}">
+            <div class="friend-card-avatar">${f.avatar}</div>
+            <div class="friend-card-info">
+                <div class="friend-card-name">${escapeHtml(f.nickname)}</div>
+                <div class="friend-card-bio">${escapeHtml(f.bio)}</div>
+                <div class="friend-card-tags">${f.tags.map(t => `<span class="friend-tag">${escapeHtml(t)}</span>`).join("")}</div>
+                <div class="friend-card-match">🤝 ${matchReasons[0]}</div>
+            </div>
+            <div class="friend-card-actions">
+                <button class="friend-action-btn primary" type="button" data-chat-friend="${f.id}">💬 聊天</button>
+                <button class="friend-action-btn" type="button" data-remove-friend="${f.id}">删除</button>
+            </div>
+        </div>`;
+    }).join("");
+
+    return searchHTML + `<div class="friend-list" id="friend-list">${cards}</div>`;
+}
+
+// ═══ Friend Requests Tab ═══
+function renderFriendRequests() {
+    const data = loadFriendData();
+
+    // Received requests (from others to me)
+    const received = data.requests.filter(r => r.toId === "me" && r.status === "pending");
+    // Sent requests (from me to others)
+    const sent = data.requests.filter(r => r.fromId === "me");
+    // History (processed)
+    const history = data.requests.filter(r => r.status !== "pending" && (r.toId === "me" || r.fromId === "me"));
+
+    let html = "";
+
+    // Received section
+    html += `<div class="friend-section-title">收到的申请${received.length ? ` (${received.length})` : ''}</div>`;
+    if (received.length) {
+        html += received.map(r => {
+            const user = MOCK_FRIEND_USERS.find(u => u.id === r.fromId);
+            if (!user) return "";
+            const timeStr = getTimeAgo(r.createdAt);
+            const shared = user.tags.filter(t => ["建筑","咖啡","历史","美食","摄影","Citywalk","校园","夜游"].includes(t));
+            return `<div class="friend-request-card">
+                <div class="friend-card-avatar">${user.avatar}</div>
+                <div class="friend-card-info">
+                    <div class="friend-card-name">${escapeHtml(user.nickname)}</div>
+                    <div class="friend-card-bio">${escapeHtml(r.message)}</div>
+                    <div class="friend-card-tags">${user.tags.map(t => `<span class="friend-tag">${escapeHtml(t)}</span>`).join("")}</div>
+                    ${shared.length ? `<div class="friend-card-match">🤝 共同兴趣：${shared.join('、')}</div>` : ''}
+                    <div class="friend-card-time">${timeStr}</div>
+                </div>
+                <div class="friend-card-actions">
+                    <button class="friend-action-btn primary" type="button" data-accept-request="${r.id}">接受</button>
+                    <button class="friend-action-btn" type="button" data-reject-request="${r.id}">拒绝</button>
+                </div>
+            </div>`;
+        }).join("");
+    } else {
+        html += `<div class="friend-section-empty">暂无收到的申请</div>`;
+    }
+
+    // Sent section
+    html += `<div class="friend-section-title">我发出的申请</div>`;
+    if (sent.length) {
+        html += sent.map(r => {
+            const user = MOCK_FRIEND_USERS.find(u => u.id === r.toId);
+            if (!user) return "";
+            const statusMap = { pending: "等待通过", accepted: "已接受", rejected: "已拒绝", canceled: "已撤回" };
+            return `<div class="friend-request-card">
+                <div class="friend-card-avatar">${user ? user.avatar : '?'}</div>
+                <div class="friend-card-info">
+                    <div class="friend-card-name">${escapeHtml(user ? user.nickname : '未知用户')}</div>
+                    <div class="friend-card-bio">${escapeHtml(r.message)}</div>
+                    <span class="friend-request-status status-${r.status}">${statusMap[r.status] || r.status}</span>
+                </div>
+            </div>`;
+        }).join("");
+    } else {
+        html += `<div class="friend-section-empty">暂无发出的申请</div>`;
+    }
+
+    return `<div class="friend-requests-wrap">${html}</div>`;
+}
+
+// ═══ Buddy Finder Tab ═══
+function renderBuddyFinder() {
+    const friendIds = getMyFriendIds();
+    const blockedIds = (loadFriendData().blocked || []).map(b => b.userId);
+    const pendingUserIds = loadFriendData().requests.map(r => r.fromId === "me" ? r.toId : r.fromId);
+    const excludeIds = [...friendIds, ...blockedIds, ...pendingUserIds];
+
+    const available = MOCK_FRIEND_USERS.filter(u => !excludeIds.includes(u.id));
+
+    if (!available.length) {
+        return `<div class="friend-empty">
+            <span class="friend-empty-icon">🔍</span>
+            <strong>暂无可推荐的搭子</strong>
+            <p>你已经覆盖了所有可匹配的用户</p>
+        </div>`;
+    }
+
+    const cards = available.map(u => {
+        return `<div class="friend-card buddy-card" data-name="${u.nickname}" data-tags="${u.tags.join(' ')}">
+            <div class="friend-card-avatar">${u.avatar}</div>
+            <div class="friend-card-info">
+                <div class="friend-card-name">${escapeHtml(u.nickname)}</div>
+                <div class="friend-card-bio">${escapeHtml(u.bio)}</div>
+                <div class="friend-card-tags">${u.tags.map(t => `<span class="friend-tag">${escapeHtml(t)}</span>`).join("")}</div>
+                <div class="friend-card-match">🤝 ${escapeHtml(u.matchReason)}</div>
+                <div class="friend-card-meta">
+                    <span>📍 ${escapeHtml(u.area)}</span>
+                    <span>🎯 ${escapeHtml(u.travelStyle)}</span>
+                </div>
+            </div>
+            <div class="friend-card-actions">
+                <button class="friend-action-btn primary" type="button" data-add-friend="${u.id}">+ 添加</button>
+            </div>
+        </div>`;
+    }).join("");
+
+    return `<div class="friend-list" id="friend-list">${cards}</div>`;
+}
+
+function getTimeAgo(ts) {
+    if (!ts) return "";
+    const diff = Date.now() - ts;
+    if (diff < 60000) return "刚刚";
+    if (diff < 3600000) return Math.floor(diff/60000) + "分钟前";
+    if (diff < 86400000) return Math.floor(diff/3600000) + "小时前";
+    return Math.floor(diff/86400000) + "天前";
+}
+
+// ══════════════════════════════════════════════════════
+//  Chat System — Data Layer
+// ══════════════════════════════════════════════════════
+
+const CHAT_STORAGE_KEY = "citygo_chat_v1";
+
+function loadChatData() {
+    try {
+        const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+        const data = raw ? JSON.parse(raw) : { conversations: [], messages: {} };
+        if (!data.messages) data.messages = {};
+        return data;
+    } catch (e) { return { conversations: [], messages: {} }; }
+}
+
+function saveChatData(data) {
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(data));
+}
+
+function getOrCreateConversation(withUserId) {
+    const data = loadChatData();
+    let conv = data.conversations.find(c => c.withUserId === withUserId);
+    if (!conv) {
+        conv = {
+            id: "conv-" + Date.now(),
+            withUserId: withUserId,
+            type: isFriend(withUserId) ? "friend" : "buddy",
+            isPinned: false,
+            isMuted: false,
+            lastMessage: "",
+            lastMessageType: "text",
+            lastMessageAt: Date.now(),
+            createdAt: Date.now()
+        };
+        data.conversations.unshift(conv);
+        if (!data.messages[conv.id]) data.messages[conv.id] = [];
+        saveChatData(data);
+    }
+    return conv;
+}
+
+function getTotalUnreadCount() {
+    const data = loadChatData();
+    let count = 0;
+    data.conversations.forEach(conv => {
+        const msgs = data.messages[conv.id] || [];
+        const unread = msgs.filter(m => m.senderId !== "me" && m.status !== "read").length;
+        count += unread;
+    });
+    return count;
+}
+
+function getLastMessageSummary(conv) {
+    const data = loadChatData();
+    const msgs = data.messages[conv.id] || [];
+    const last = msgs[msgs.length - 1];
+    if (!last) return "";
+    if (last.status === "recalled") return "消息已撤回";
+    switch (last.type) {
+        case "text": return (last.text || "").substring(0, 30) + ((last.text||"").length > 30 ? "…" : "");
+        case "image": return "[图片]";
+        case "video": return "[视频]";
+        case "route": return "[路线] " + (last.routeName || "路线");
+        case "poi": return "[景点] " + (last.poiName || "景点");
+        case "merchant": return "[商家] " + (last.merchantName || "商家");
+        case "post": return "[动态] " + ((last.postTitle || "").substring(0, 15));
+        case "location": return "[集合地点]";
+        case "invitation": return "[路线邀请]";
+        default: return last.text || "";
+    }
+}
+
+// ══════════════════════════════════════════════════════
+//  Conversation List (消息 Tab)
+// ══════════════════════════════════════════════════════
+
+function renderConversationList() {
+    const data = loadChatData();
+    const friendIds = getMyFriendIds();
+
+    // Auto-create conversations for friends that don't have one yet
+    friendIds.forEach(fid => {
+        if (!data.conversations.find(c => c.withUserId === fid)) {
+            getOrCreateConversation(fid);
+        }
+    });
+
+    // Reload after auto-creation
+    const freshData = loadChatData();
+    const conversations = freshData.conversations;
+
+    // Sort: pinned first, then by lastMessageAt desc
+    conversations.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return (b.lastMessageAt || b.createdAt) - (a.lastMessageAt || a.createdAt);
+    });
+
+    if (!conversations.length) {
+        return `<div class="chat-empty">
+            <span class="chat-empty-icon">💬</span>
+            <strong>暂无消息</strong>
+            <p>添加好友后即可开始聊天</p>
+        </div>`;
+    }
+
+    const items = conversations.map(conv => {
+        const user = MOCK_FRIEND_USERS.find(u => u.id === conv.withUserId);
+        if (!user) return "";
+        const msgs = freshData.messages[conv.id] || [];
+        const unread = msgs.filter(m => m.senderId !== "me" && m.status !== "read").length;
+        const lastTime = conv.lastMessageAt ? getTimeAgo(conv.lastMessageAt) : "";
+        const summary = getLastMessageSummary(conv);
+        const avatar = user.avatar;
+        const name = user.nickname;
+        const isPinned = conv.isPinned;
+        const isMuted = conv.isMuted;
+
+        return `<div class="chat-conv-item${isPinned ? ' pinned' : ''}" data-open-conv="${conv.id}">
+            <div class="chat-conv-avatar">${escapeHtml(avatar)}</div>
+            <div class="chat-conv-info">
+                <div class="chat-conv-top">
+                    <span class="chat-conv-name">${escapeHtml(name)}</span>
+                    ${isPinned ? '<span class="chat-conv-pin">📌</span>' : ''}
+                    ${isMuted ? '<span class="chat-conv-mute">🔕</span>' : ''}
+                    <span class="chat-conv-time">${lastTime}</span>
+                </div>
+                <div class="chat-conv-preview">${escapeHtml(summary || '开始聊天吧')}</div>
+                ${unread ? `<span class="chat-conv-badge">${unread > 99 ? '99+' : unread}</span>` : ''}
+            </div>
+        </div>`;
+    }).join("");
+
+    return `<div class="chat-conv-list">${items}</div>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  Private Chat Page
+// ══════════════════════════════════════════════════════
+
+let currentChatUserId = null;
+let currentChatConvId = null;
+let chatRefreshTimer = null;
+
+function openPrivateChat(userId, userName, userAvatar) {
+    if (isBlocked(userId)) { showToast("无法与该用户聊天"); return; }
+    if (!isFriend(userId)) {
+        // Check if there's a pending/accepted buddy request
+        const data = loadFriendData();
+        const hasRelation = data.requests.some(r =>
+            (r.fromId === userId || r.toId === userId) && r.status === "accepted"
+        );
+        if (!hasRelation && !isFriend(userId)) {
+            showToast("需要先成为好友或搭子才能聊天");
+            return;
+        }
+    }
+
+    currentChatUserId = userId;
+    const conv = getOrCreateConversation(userId);
+    currentChatConvId = conv.id;
+
+    const overlay = document.createElement("div");
+    overlay.className = "chat-page-overlay";
+    overlay.id = "chat-page-overlay";
+    renderChatPage(overlay, userId, userName, userAvatar);
+    document.body.appendChild(overlay);
+
+    // Mark messages as read
+    markConversationRead(conv.id);
+
+    // Auto-refresh
+    chatRefreshTimer = setInterval(() => {
+        const chatOverlay = document.getElementById("chat-page-overlay");
+        if (chatOverlay) {
+            const body = chatOverlay.querySelector("#chat-messages");
+            if (body) {
+                const conv = getOrCreateConversation(currentChatUserId);
+                body.innerHTML = renderChatMessages(conv.id);
+                scrollChatToBottom(body);
+            }
+        }
+    }, 3000);
+}
+
+function closeChat() {
+    currentChatUserId = null;
+    currentChatConvId = null;
+    if (chatRefreshTimer) { clearInterval(chatRefreshTimer); chatRefreshTimer = null; }
+    const overlay = document.getElementById("chat-page-overlay");
+    if (overlay) overlay.remove();
+}
+
+function renderChatPage(overlay, userId, userName, userAvatar) {
+    const user = MOCK_FRIEND_USERS.find(u => u.id === userId);
+    const tags = user ? user.tags : [];
+    const bio = user ? user.bio : "";
+    const conv = getOrCreateConversation(userId);
+    const relationLabel = isFriend(userId) ? "好友" : "临时搭子";
+
+    overlay.innerHTML = `
+        <div class="chat-page">
+            <div class="chat-header">
+                <button class="chat-back" type="button">←</button>
+                <div class="chat-avatar-sm">${escapeHtml(userAvatar)}</div>
+                <div class="chat-header-info">
+                    <div class="chat-header-name">${escapeHtml(userName)}</div>
+                    <div class="chat-header-status">
+                        <span class="chat-relation-tag">${relationLabel}</span>
+                        <span>在线</span>
+                    </div>
+                </div>
+                <button class="chat-more-btn" type="button" id="chat-more-btn">⋯</button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                ${renderChatMessages(conv.id)}
+            </div>
+            <div class="chat-input-row">
+                <button class="chat-plus-btn" type="button" id="chat-plus-btn">+</button>
+                <textarea class="chat-textarea" id="chat-textarea" rows="1" placeholder="说点什么…" maxlength="500"></textarea>
+                <button class="chat-send-btn" type="button" id="chat-send-btn">发送</button>
+            </div>
+            <div class="chat-attach-panel" id="chat-attach-panel" style="display:none">
+                <button class="chat-attach-item" data-attach="route">🗺️ 路线</button>
+                <button class="chat-attach-item" data-attach="poi">📍 景点</button>
+                <button class="chat-attach-item" data-attach="merchant">🛍️ 商家</button>
+                <button class="chat-attach-item" data-attach="post">📝 社区动态</button>
+                <button class="chat-attach-item" data-attach="location">📌 集合地点</button>
+                <button class="chat-attach-item" data-attach="invitation">🎫 路线邀请</button>
+            </div>
+        </div>
+    `;
+
+    // Back button
+    overlay.querySelector(".chat-back").addEventListener("click", closeChat);
+
+    // More button
+    overlay.querySelector("#chat-more-btn").addEventListener("click", () => {
+        showChatSettings(userId, userName);
+    });
+
+    // Scroll to bottom
+    const msgBody = overlay.querySelector("#chat-messages");
+    scrollChatToBottom(msgBody);
+
+    // Send message
+    const sendMsg = () => {
+        const textarea = overlay.querySelector("#chat-textarea");
+        const text = textarea.value.trim();
+        if (!text) return;
+        sendChatMessage(conv.id, "text", { text: text });
+        textarea.value = "";
+        textarea.style.height = "auto";
+        refreshChatMessages(overlay, conv.id);
+    };
+    overlay.querySelector("#chat-send-btn").addEventListener("click", sendMsg);
+    overlay.querySelector("#chat-textarea").addEventListener("keydown", e => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+    });
+
+    // Auto-resize textarea
+    overlay.querySelector("#chat-textarea").addEventListener("input", function() {
+        this.style.height = "auto";
+        this.style.height = Math.min(this.scrollHeight, 120) + "px";
+    });
+
+    // Attach panel toggle
+    overlay.querySelector("#chat-plus-btn").addEventListener("click", () => {
+        const panel = overlay.querySelector("#chat-attach-panel");
+        panel.style.display = panel.style.display === "none" ? "flex" : "none";
+    });
+
+    // Attach items
+    overlay.querySelectorAll(".chat-attach-item").forEach(item => {
+        item.addEventListener("click", () => {
+            const type = item.dataset.attach;
+            const panel = overlay.querySelector("#chat-attach-panel");
+            panel.style.display = "none";
+            handleChatAttachment(conv.id, type, overlay);
+        });
+    });
+
+    // Long press / context menu on messages
+    overlay.querySelectorAll(".chat-msg-bubble").forEach(bubble => {
+        bubble.addEventListener("contextmenu", e => {
+            e.preventDefault();
+            const msgId = bubble.closest("[data-msg-id]")?.dataset.msgId;
+            if (msgId) showChatMessageMenu(msgId, conv.id, overlay);
+        });
+        bubble.addEventListener("click", e => {
+            // Single tap on failed message to retry
+            const msgEl = bubble.closest("[data-msg-id]");
+            if (msgEl && msgEl.classList.contains("msg-failed")) {
+                const msgId = msgEl.dataset.msgId;
+                retryChatMessage(conv.id, msgId, overlay);
+            }
+        });
+    });
+
+    // Route card clicks
+    overlay.querySelectorAll("[data-open-route]").forEach(el => {
+        el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const routeKey = el.dataset.openRoute;
+            if (routeKey && routes[routeKey] && typeof openRoute === "function") {
+                openRoute(routeKey);
+            }
+        });
+    });
+
+    // Invitation accept/reject
+    overlay.querySelectorAll("[data-accept-invite]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const msgId = btn.dataset.acceptInvite;
+            const data = loadChatData();
+            const msgs = data.messages[conv.id] || [];
+            const msg = msgs.find(m => m.id === msgId);
+            if (msg) { msg.inviteStatus = "accepted"; saveChatData(data); }
+            refreshChatMessages(overlay, conv.id);
+            showToast("已接受邀请！");
+        });
+    });
+    overlay.querySelectorAll("[data-decline-invite]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const msgId = btn.dataset.declineInvite;
+            const data = loadChatData();
+            const msgs = data.messages[conv.id] || [];
+            const msg = msgs.find(m => m.id === msgId);
+            if (msg) { msg.inviteStatus = "declined"; saveChatData(data); }
+            refreshChatMessages(overlay, conv.id);
+            showToast("已拒绝邀请");
+        });
+    });
+}
+
+function scrollChatToBottom(body) {
+    setTimeout(() => { if (body) body.scrollTop = body.scrollHeight; }, 100);
+}
+
+function refreshChatMessages(overlay, convId) {
+    const body = overlay.querySelector("#chat-messages");
+    if (body) {
+        body.innerHTML = renderChatMessages(convId);
+        scrollChatToBottom(body);
+        // Re-bind context menus
+        body.querySelectorAll(".chat-msg-bubble").forEach(bubble => {
+            bubble.addEventListener("contextmenu", e => {
+                e.preventDefault();
+                const msgId = bubble.closest("[data-msg-id]")?.dataset.msgId;
+                if (msgId) showChatMessageMenu(msgId, convId, overlay);
+            });
+        });
+    }
+}
+
+// ═══ Message Rendering ═══
+function renderChatMessages(convId) {
+    const data = loadChatData();
+    const msgs = data.messages[convId] || [];
+    if (!msgs.length) {
+        return `<div class="chat-msgs-empty">
+            <span>👋</span>
+            <p>开始你们的第一次对话吧</p>
+        </div>`;
+    }
+
+    let html = "";
+    let lastDate = "";
+    let lastSenderId = "";
+    let lastTime = 0;
+
+    msgs.forEach((msg, i) => {
+        const msgDate = new Date(msg.timestamp || Date.now()).toLocaleDateString("zh-CN", { month:"numeric", day:"numeric", weekday:"short" });
+        if (msgDate !== lastDate) {
+            html += `<div class="chat-date-divider"><span>${msgDate}</span></div>`;
+            lastDate = msgDate;
+            lastSenderId = "";
+        }
+
+        const isMe = msg.senderId === "me";
+        const showAvatar = msg.senderId !== lastSenderId || (msg.timestamp - lastTime > 300000);
+        const statusIcon = isMe ? renderMsgStatus(msg.status) : "";
+        lastSenderId = msg.senderId;
+        lastTime = msg.timestamp || 0;
+
+        html += `<div class="chat-msg-row${isMe ? ' msg-mine' : ''}${msg.status === 'failed' ? ' msg-failed' : ''}" data-msg-id="${msg.id}">
+            ${!isMe && showAvatar ? `<div class="chat-msg-avatar">${escapeHtml(msg.senderAvatar||'?')}</div>` : (!isMe ? `<div class="chat-msg-avatar-spacer"></div>` : '')}
+            <div class="chat-msg-content">
+                ${renderChatMessageBubble(msg)}
+                ${statusIcon ? `<span class="chat-msg-status">${statusIcon}</span>` : ''}
+            </div>
+        </div>`;
+    });
+
+    return html;
+}
+
+function renderMsgStatus(status) {
+    switch (status) {
+        case "sending": return "⏳";
+        case "sent": return "✓";
+        case "delivered": return "✓✓";
+        case "read": return "✓✓";
+        case "failed": return "❌";
+        default: return "";
+    }
+}
+
+function renderChatMessageBubble(msg) {
+    if (msg.status === "recalled") {
+        return `<div class="chat-msg-bubble msg-recalled"><em>消息已撤回</em></div>`;
+    }
+
+    let content = "";
+    switch (msg.type) {
+        case "text":
+            content = `<div class="chat-msg-text">${chatFormatText(msg.text||"")}</div>`;
+            break;
+        case "image":
+            content = `<div class="chat-msg-image"><img src="${escapeHtml(msg.imageUrl||'')}" alt="图片" loading="lazy" onclick="this.classList.toggle('expanded')"><span class="chat-msg-img-label">📷 图片</span></div>`;
+            break;
+        case "video":
+            content = `<div class="chat-msg-video"><video src="${escapeHtml(msg.videoUrl||'')}" controls preload="metadata" poster="${escapeHtml(msg.thumbUrl||'')}"></video></div>`;
+            break;
+        case "route":
+            content = renderChatRouteCard(msg);
+            break;
+        case "poi":
+            content = renderChatPoiCard(msg);
+            break;
+        case "merchant":
+            content = renderChatMerchantCard(msg);
+            break;
+        case "post":
+            content = renderChatPostCard(msg);
+            break;
+        case "location":
+            content = `<div class="chat-msg-location">📌 <strong>${escapeHtml(msg.locationName||'集合地点')}</strong><br><span>${escapeHtml(msg.locationAddr||'')}</span></div>`;
+            break;
+        case "invitation":
+            content = renderChatInvitationCard(msg);
+            break;
+        default:
+            content = `<div class="chat-msg-text">${chatFormatText(msg.text||"")}</div>`;
+    }
+
+    if (msg.replyTo) {
+        content = `<div class="chat-msg-reply-preview" data-reply-to="${msg.replyTo}">
+            <span class="reply-line"></span>
+            <span>${escapeHtml((msg.replyToText||'').substring(0, 40))}</span>
+        </div>` + content;
+    }
+
+    return `<div class="chat-msg-bubble">${content}</div>`;
+}
+
+function chatFormatText(text) {
+    return escapeHtml(text || "")
+        .replace(/\n/g, "<br>")
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+
+// ═══ Message Cards ═══
+function renderChatRouteCard(msg) {
+    const route = msg.routeKey && routes[msg.routeKey] ? routes[msg.routeKey] : null;
+    const title = msg.routeName || (route ? getRouteDisplayTitle(route) : "路线");
+    const spots = msg.spotCount || (route ? (route.stops ? route.stops.length : 0) : 0);
+    return `<div class="chat-card route-card" data-open-route="${escapeHtml(msg.routeKey||'')}">
+        <div class="chat-card-icon">🗺️</div>
+        <div class="chat-card-body">
+            <div class="chat-card-title">${escapeHtml(title)}</div>
+            <div class="chat-card-meta">${spots}个景点 · ${escapeHtml(msg.duration||'约3小时')}</div>
+        </div>
+        <button class="chat-card-action" type="button" data-open-route="${escapeHtml(msg.routeKey||'')}">查看</button>
+    </div>`;
+}
+
+function renderChatPoiCard(msg) {
+    return `<div class="chat-card poi-card">
+        <div class="chat-card-icon">📍</div>
+        <div class="chat-card-body">
+            <div class="chat-card-title">${escapeHtml(msg.poiName||'景点')}</div>
+            <div class="chat-card-meta">${escapeHtml(msg.poiArea||'')} · ${escapeHtml(msg.poiDuration||'约1小时')}</div>
+        </div>
+    </div>`;
+}
+
+function renderChatMerchantCard(msg) {
+    return `<div class="chat-card merchant-card">
+        <div class="chat-card-icon">🛍️</div>
+        <div class="chat-card-body">
+            <div class="chat-card-title">${escapeHtml(msg.merchantName||'商家')}</div>
+            <div class="chat-card-meta">${escapeHtml(msg.merchantType||'')} · ${escapeHtml(msg.merchantArea||'')} · 人均${escapeHtml(String(msg.merchantPrice||''))}</div>
+        </div>
+    </div>`;
+}
+
+function renderChatPostCard(msg) {
+    return `<div class="chat-card post-card">
+        <div class="chat-card-icon">📝</div>
+        <div class="chat-card-body">
+            <div class="chat-card-title">${escapeHtml(msg.postTitle||'社区动态')}</div>
+            <div class="chat-card-meta">${escapeHtml(msg.postAuthor||'')} · ${escapeHtml((msg.postText||'').substring(0,40))}</div>
+        </div>
+    </div>`;
+}
+
+function renderChatInvitationCard(msg) {
+    const responded = msg.inviteStatus === "accepted" || msg.inviteStatus === "declined";
+    return `<div class="chat-card invitation-card">
+        <div class="chat-card-icon">🎫</div>
+        <div class="chat-card-body">
+            <div class="chat-card-title">路线邀请：${escapeHtml(msg.routeName||'路线')}</div>
+            <div class="chat-card-meta">
+                📅 ${escapeHtml(msg.inviteDate||'')} ⏰ ${escapeHtml(msg.inviteTime||'')}<br>
+                📍 ${escapeHtml(msg.meetingPoint||'')} 💰 人均${escapeHtml(String(msg.budget||''))}
+            </div>
+            ${!responded && msg.senderId !== "me" ? `
+                <div class="chat-invite-actions">
+                    <button class="chat-invite-accept" type="button" data-accept-invite="${msg.id}">接受</button>
+                    <button class="chat-invite-decline" type="button" data-decline-invite="${msg.id}">拒绝</button>
+                </div>
+            ` : `<div class="chat-invite-status">${msg.inviteStatus === 'accepted' ? '✅ 已接受' : msg.inviteStatus === 'declined' ? '❌ 已拒绝' : '⏳ 等待回复'}</div>`}
+        </div>
+    </div>`;
+}
+
+// ═══ Send Message ═══
+function sendChatMessage(convId, type, payload) {
+    const data = loadChatData();
+    if (!data.messages[convId]) data.messages[convId] = [];
+
+    const msg = {
+        id: "msg-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+        type: type,
+        senderId: "me",
+        senderAvatar: getCommunityAvatar(getCommunityCurrentUserName()),
+        timestamp: Date.now(),
+        status: "sent",
+        ...payload
+    };
+
+    data.messages[convId].push(msg);
+
+    // Update conversation
+    const conv = data.conversations.find(c => c.id === convId);
+    if (conv) {
+        conv.lastMessage = type === "text" ? (payload.text || "").substring(0, 30) : type;
+        conv.lastMessageType = type;
+        conv.lastMessageAt = Date.now();
+    }
+
+    saveChatData(data);
+
+    // Simulate reply after 1-3s for demo
+    if (type === "text" && payload.text) {
+        setTimeout(() => {
+            const updatedData = loadChatData();
+            if (!updatedData.messages[convId]) updatedData.messages[convId] = [];
+            const replies = [
+                "好的！",
+                "这个路线不错 👍",
+                "我也想去！",
+                "周末有空吗？",
+                "听起来很棒",
+                "收藏了 ✨",
+                "下次一起啊",
+                "南京这些地方我都去过"
+            ];
+            const reply = {
+                id: "msg-" + Date.now() + "-reply",
+                type: "text",
+                senderId: currentChatUserId,
+                senderAvatar: MOCK_FRIEND_USERS.find(u => u.id === currentChatUserId)?.avatar || "?",
+                text: replies[Math.floor(Math.random() * replies.length)],
+                timestamp: Date.now(),
+                status: "delivered"
+            };
+            updatedData.messages[convId].push(reply);
+            const conv2 = updatedData.conversations.find(c => c.id === convId);
+            if (conv2) {
+                conv2.lastMessage = reply.text.substring(0, 30);
+                conv2.lastMessageAt = Date.now();
+            }
+            saveChatData(updatedData);
+
+            // Refresh UI if chat is open
+            const overlay = document.getElementById("chat-page-overlay");
+            if (overlay && currentChatConvId === convId) {
+                refreshChatMessages(overlay, convId);
+            }
+        }, 1000 + Math.random() * 2000);
+    }
+}
+
+function retryChatMessage(convId, msgId, overlay) {
+    const data = loadChatData();
+    const msgs = data.messages[convId] || [];
+    const msg = msgs.find(m => m.id === msgId);
+    if (msg) {
+        msg.status = "sent";
+        saveChatData(data);
+        refreshChatMessages(overlay, convId);
+        showToast("消息已重新发送");
+    }
+}
+
+function markConversationRead(convId) {
+    const data = loadChatData();
+    const msgs = data.messages[convId] || [];
+    let changed = false;
+    msgs.forEach(m => {
+        if (m.senderId !== "me" && m.status !== "read") {
+            m.status = "read";
+            changed = true;
+        }
+    });
+    if (changed) saveChatData(data);
+}
+
+// ═══ Chat Attachments ═══
+function handleChatAttachment(convId, type, overlay) {
+    switch (type) {
+        case "route": {
+            const routeKeys = Object.keys(routes).filter(k => routes[k]);
+            if (!routeKeys.length) { showToast("暂无可发送的路线"); return; }
+            const options = routeKeys.map(k => `${k}: ${getRouteDisplayTitle(routes[k])}`).join("\n");
+            const key = prompt("选择路线（输入路线关键词）：\n" + options);
+            if (!key) return;
+            const matched = routeKeys.find(k => k.includes(key) || (routes[k].title||"").includes(key));
+            if (!matched) { showToast("未找到匹配路线"); return; }
+            const route = routes[matched];
+            sendChatMessage(convId, "route", {
+                routeKey: matched,
+                routeName: getRouteDisplayTitle(route),
+                spotCount: route.stops ? route.stops.length : 0,
+                duration: route.duration || "约3小时"
+            });
+            refreshChatMessages(overlay, convId);
+            break;
+        }
+        case "poi": {
+            const name = prompt("景点名称：");
+            if (!name) return;
+            const area = prompt("所在区域（可选）：", "鼓楼区");
+            sendChatMessage(convId, "poi", {
+                poiName: name,
+                poiArea: area || "",
+                poiDuration: "约1小时"
+            });
+            refreshChatMessages(overlay, convId);
+            break;
+        }
+        case "merchant": {
+            const name = prompt("商家名称：");
+            if (!name) return;
+            sendChatMessage(convId, "merchant", {
+                merchantName: name,
+                merchantType: "餐饮",
+                merchantArea: "鼓楼区",
+                merchantPrice: "50"
+            });
+            refreshChatMessages(overlay, convId);
+            break;
+        }
+        case "post": {
+            const posts = loadCommunityPosts();
+            if (!posts.length) { showToast("暂无社区动态"); return; }
+            const post = posts[0];
+            sendChatMessage(convId, "post", {
+                postId: post.id,
+                postTitle: post.title || "社区动态",
+                postAuthor: post.author,
+                postText: (post.text||"").substring(0, 100)
+            });
+            refreshChatMessages(overlay, convId);
+            break;
+        }
+        case "location": {
+            const name = prompt("集合地点名称：", "新街口地铁站");
+            if (!name) return;
+            const addr = prompt("地址详情（可选）：", "鼓楼区中山路");
+            sendChatMessage(convId, "location", {
+                locationName: name,
+                locationAddr: addr || ""
+            });
+            refreshChatMessages(overlay, convId);
+            break;
+        }
+        case "invitation": {
+            const routeKey = Object.keys(routes).find(k => routes[k]);
+            const route = routeKey ? routes[routeKey] : null;
+            const routeName = prompt("路线名称：", route ? getRouteDisplayTitle(route) : "南京一日游");
+            if (!routeName) return;
+            const date = prompt("出行日期：", "本周六");
+            const time = prompt("集合时间：", "09:00");
+            const point = prompt("集合地点：", "新街口地铁站");
+            const budget = prompt("人均预算：", "100元");
+            sendChatMessage(convId, "invitation", {
+                routeName: routeName,
+                routeKey: routeKey || "",
+                inviteDate: date || "本周六",
+                inviteTime: time || "09:00",
+                meetingPoint: point || "新街口",
+                budget: budget || "100元",
+                inviteStatus: "pending"
+            });
+            refreshChatMessages(overlay, convId);
+            break;
+        }
+    }
+}
+
+// ═══ Message Context Menu ═══
+function showChatMessageMenu(msgId, convId, overlay) {
+    const data = loadChatData();
+    const msgs = data.messages[convId] || [];
+    const msg = msgs.find(m => m.id === msgId);
+    if (!msg) return;
+
+    const isMe = msg.senderId === "me";
+    const menu = document.createElement("div");
+    menu.className = "chat-msg-menu";
+    const items = [
+        { label: "📋 复制", action: "copy", show: msg.type === "text" },
+        { label: "💬 回复", action: "reply", show: true },
+        { label: "↩️ 撤回", action: "recall", show: isMe && msg.status !== "recalled" && (Date.now() - msg.timestamp < 120000) },
+        { label: "🗑️ 删除", action: "delete", show: true },
+        { label: "🚩 举报", action: "report", show: !isMe },
+        { label: "取消", action: "cancel", show: true }
+    ];
+
+    menu.innerHTML = items.filter(i => i.show).map(i =>
+        `<button class="chat-msg-menu-item" data-action="${i.action}">${i.label}</button>`
+    ).join("");
+
+    menu.style.position = "fixed";
+    menu.style.bottom = "80px";
+    menu.style.left = "50%";
+    menu.style.transform = "translateX(-50%)";
+    menu.style.zIndex = "2000";
+    document.body.appendChild(menu);
+
+    menu.querySelectorAll(".chat-msg-menu-item").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const action = btn.dataset.action;
+            menu.remove();
+            if (action === "cancel") return;
+            if (action === "copy") {
+                navigator.clipboard?.writeText(msg.text||"");
+                showToast("已复制");
+            } else if (action === "recall") {
+                msg.status = "recalled";
+                saveChatData(data);
+                refreshChatMessages(overlay, convId);
+                showToast("消息已撤回");
+            } else if (action === "delete") {
+                data.messages[convId] = msgs.filter(m => m.id !== msgId);
+                saveChatData(data);
+                refreshChatMessages(overlay, convId);
+                showToast("已删除");
+            } else if (action === "reply") {
+                const textarea = overlay.querySelector("#chat-textarea");
+                if (textarea) {
+                    textarea.value = "[回复] " + (msg.text||"").substring(0, 40) + "\n";
+                    textarea.focus();
+                }
+            } else if (action === "report") {
+                showToast("举报已提交");
+            }
+        });
+    });
+
+    // Close on outside click
+    setTimeout(() => {
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener("click", closeMenu); }
+        };
+        document.addEventListener("click", closeMenu);
+    }, 100);
+}
+
+// ═══ Chat Settings ═══
+function showChatSettings(userId, userName) {
+    const overlay = document.createElement("div");
+    overlay.className = "repost-overlay";
+    const conv = getOrCreateConversation(userId);
+    overlay.innerHTML = `
+        <div class="more-menu-panel">
+            <div class="chat-settings-header">${escapeHtml(userName)}</div>
+            <button class="more-menu-item" data-action="pin">📌 ${conv.isPinned ? '取消置顶' : '置顶聊天'}</button>
+            <button class="more-menu-item" data-action="mute">🔕 ${conv.isMuted ? '取消免打扰' : '消息免打扰'}</button>
+            <button class="more-menu-item" data-action="search">🔍 搜索聊天记录</button>
+            <button class="more-menu-item" data-action="clear">🗑️ 清空聊天记录</button>
+            <button class="more-menu-item" data-action="block">🚫 拉黑</button>
+            <button class="more-menu-item more-menu-cancel">取消</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector(".more-menu-cancel").addEventListener("click", () => overlay.remove());
+
+    overlay.querySelectorAll(".more-menu-item[data-action]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const action = btn.dataset.action;
+            overlay.remove();
+            if (action === "pin") {
+                const d = loadChatData();
+                const c = d.conversations.find(c => c.withUserId === userId);
+                if (c) { c.isPinned = !c.isPinned; saveChatData(d); }
+                showToast(c && c.isPinned ? "已置顶" : "已取消置顶");
+            } else if (action === "mute") {
+                const d = loadChatData();
+                const c = d.conversations.find(c => c.withUserId === userId);
+                if (c) { c.isMuted = !c.isMuted; saveChatData(d); }
+                showToast(c && c.isMuted ? "已静音" : "已取消静音");
+            } else if (action === "search") {
+                const keyword = prompt("搜索关键词：");
+                if (keyword) showToast("搜索功能开发中");
+            } else if (action === "clear") {
+                if (confirm("确定清空与该好友的聊天记录？")) {
+                    const d = loadChatData();
+                    const c = d.conversations.find(c => c.withUserId === userId);
+                    if (c) d.messages[c.id] = [];
+                    saveChatData(d);
+                    showToast("已清空");
+                }
+            } else if (action === "block") {
+                if (confirm("确定拉黑该用户？拉黑后双方无法互动。")) {
+                    const d = loadFriendData();
+                    d.friends = d.friends.filter(f => f.userId !== userId);
+                    d.blocked.push({ userId, reason: "", createdAt: Date.now() });
+                    saveFriendData(d);
+                    closeChat();
+                    showToast("已拉黑");
+                }
+            }
+        });
+    });
+}

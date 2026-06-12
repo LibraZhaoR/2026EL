@@ -1,0 +1,73 @@
+package com.nju.travel.module.auth.controller;
+
+import com.nju.travel.common.result.ApiResult;
+import com.nju.travel.module.auth.dto.LoginRequest;
+import com.nju.travel.module.auth.dto.RegisterRequest;
+import com.nju.travel.module.auth.service.AuthService;
+import com.nju.travel.module.auth.vo.UserAccountVO;
+import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
+
+    @PostMapping("/register")
+    public ApiResult<UserAccountVO> register(@Valid @RequestBody RegisterRequest request, HttpSession session) {
+        UserAccountVO user = authService.register(request);
+        session.setAttribute("userId", user.id());
+        return ApiResult.success(user);
+    }
+
+    @PostMapping("/login")
+    public ApiResult<UserAccountVO> login(@Valid @RequestBody LoginRequest request, HttpSession session) {
+        UserAccountVO user = authService.login(request.email(), request.password());
+        session.setAttribute("userId", user.id());
+        return ApiResult.success(user);
+    }
+
+    @GetMapping("/me")
+    public ApiResult<?> me(HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            return ApiResult.fail(401, "未登录");
+        }
+        return ApiResult.success(authService.getCurrentUser(userId));
+    }
+
+    @PostMapping("/logout")
+    public ApiResult<Void> logout(HttpSession session) {
+        session.invalidate();
+        return ApiResult.success(null);
+    }
+
+    @PutMapping("/profile")
+    public ApiResult<UserAccountVO> updateProfile(@RequestBody Map<String, String> body, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) return ApiResult.fail(401, "未登录");
+        UserAccountVO user = authService.updateProfile(userId,
+                body.get("nickname"),
+                body.get("bio"),
+                body.get("interests"),
+                body.get("travelPersona")
+        );
+        return ApiResult.success(user);
+    }
+
+    @PostMapping("/change-password")
+    public ApiResult<Void> changePassword(@RequestBody Map<String, String> body, HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) return ApiResult.fail(401, "未登录");
+        authService.changePassword(userId, body.get("oldPassword"), body.get("newPassword"));
+        return ApiResult.success(null);
+    }
+}

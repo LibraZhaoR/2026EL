@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+
+    "sourceMap": true,
+    "inlineSources": true,
+    "outDir": "./dist",
+
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitThis": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+  }
+}

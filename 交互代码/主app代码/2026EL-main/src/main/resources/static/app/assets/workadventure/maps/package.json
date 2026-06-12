@@ -1,0 +1,32 @@
+{
+  "name": "workadventuremaps",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thecodingmachine/workadventure.git"
+  },
+  "contributors": [
+    {
+      "name": "Grégoire Parant",
+      "email": "g.parant@thecodingmachine.com"
+    },
+    {
+      "name": "David Négrier",
+      "email": "d.negrier@thecodingmachine.com"
+    },
+    {
+      "name": "Arthmaël Poly",
+      "email": "a.poly@thecodingmachine.com"
+    }
+  ],
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "bugs": {
+    "url": "https://github.com/thecodingmachine/workadventure/issues"
+  },
+  "homepage": "https://github.com/thecodingmachine/workadventure#readme",
+  "devDependencies": {
+    "@workadventure/iframe-api-typings": "^1.30.7"
+  }
+}

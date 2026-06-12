@@ -267,6 +267,40 @@
     <div class="sheet-body" id="sheet-body"></div>
 </div>
 
+<!-- ═══ 特别的你 · 人格专属礼包弹窗 ═══ -->
+<div class="special-you-overlay" id="special-you-overlay" aria-hidden="true">
+    <div class="special-you-scrim" id="special-you-scrim"></div>
+    <div class="special-you-card" id="special-you-card">
+        <div class="special-you-close" id="special-you-close">✕</div>
+        <div class="special-you-header">
+            <div class="special-you-persona-icon" id="special-you-persona-icon"></div>
+            <h2 class="special-you-title" id="special-you-title">特别的你</h2>
+            <p class="special-you-subtitle" id="special-you-subtitle"></p>
+        </div>
+        <div class="special-you-body" id="special-you-body">
+            <!-- Section: 路线推荐 -->
+            <div class="special-you-section">
+                <h3 class="special-you-section-title">🗺️ 专属路线推荐</h3>
+                <div id="special-you-routes"></div>
+            </div>
+            <!-- Section: 美团商户 -->
+            <div class="special-you-section">
+                <h3 class="special-you-section-title">🍜 附近美团商户</h3>
+                <div id="special-you-merchants"></div>
+            </div>
+            <!-- Section: 社区热评 -->
+            <div class="special-you-section">
+                <h3 class="special-you-section-title">💬 社区热评</h3>
+                <div id="special-you-reviews"></div>
+            </div>
+        </div>
+        <div class="special-you-footer">
+            <button class="special-you-btn primary" id="special-you-explore">开始探索</button>
+            <button class="special-you-btn secondary" id="special-you-close-btn">关闭</button>
+        </div>
+    </div>
+</div>
+
 <!-- ═══ 剧情节点弹窗 ═══ -->
 <div class="story-overlay" id="story-overlay">
     <div class="story-panel">
@@ -309,6 +343,24 @@
     <div class="ai-chat-input-row">
         <input type="text" class="ai-chat-input" id="ai-chat-input" placeholder="输入你的问题…" />
         <button class="ai-chat-send" id="ai-chat-send">发送</button>
+    </div>
+</div>
+
+<!-- ═══ 好友聊天面板 ═══ -->
+<div class="friend-chat-panel" id="friend-chat-panel">
+    <div class="friend-chat-header">
+        <button class="friend-chat-back" id="friend-chat-back">←</button>
+        <span class="friend-chat-avatar" id="friend-chat-avatar"></span>
+        <div class="friend-chat-header-text">
+            <span class="friend-chat-name" id="friend-chat-name"></span>
+            <span class="friend-chat-status" id="friend-chat-status">在线</span>
+        </div>
+        <button class="friend-chat-close" id="friend-chat-close">✕</button>
+    </div>
+    <div class="friend-chat-messages" id="friend-chat-messages"></div>
+    <div class="friend-chat-input-row">
+        <input type="text" class="friend-chat-input" id="friend-chat-input" placeholder="输入消息…" />
+        <button class="friend-chat-send" id="friend-chat-send">发送</button>
     </div>
 </div>
 

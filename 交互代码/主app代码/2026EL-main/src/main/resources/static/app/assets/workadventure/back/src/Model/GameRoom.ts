@@ -1,0 +1,1621 @@
+import path from "path";
+import * as Sentry from "@sentry/node";
+import { Metadata } from "@grpc/grpc-js";
+import type { WAMFileFormat, AreaData, AreaDataProperty } from "@workadventure/map-editor";
+import { GameMapProperties } from "@workadventure/map-editor";
+import { LocalUrlError } from "@workadventure/map-editor/src/LocalUrlError";
+import { mapFetcher } from "@workadventure/map-editor/src/MapFetcher";
+import type {
+    EditMapCommandMessage,
+    EmoteEventMessage,
+    JoinRoomMessage,
+    MapBbbData,
+    MapDetailsData,
+    MapJitsiData,
+    MapThirdPartyData,
+    ServerToClientMessage,
+    SetPlayerDetailsMessage,
+    SubToPusherRoomMessage,
+} from "@workadventure/messages";
+import { isMapDetailsData, RefreshRoomMessage, VariableWithTagMessage } from "@workadventure/messages";
+import { Jitsi, type Movable, SpatialMap } from "@workadventure/shared-utils";
+import type { ITiledMap, ITiledMapProperty, Json } from "@workadventure/tiled-map-type-guard";
+import { asError } from "catch-unknown";
+import { raceAbort } from "@workadventure/shared-utils/src/Abort/raceAbort";
+import { Subject } from "rxjs";
+import {
+    ADMIN_API_URL,
+    BBB_SECRET,
+    BBB_URL,
+    ENABLE_CHAT,
+    ENABLE_CHAT_UPLOAD,
+    INTERNAL_MAP_STORAGE_URL,
+    JITSI_ISS,
+    JITSI_URL,
+    PUBLIC_MAP_STORAGE_PREFIX,
+    PUBLIC_MAP_STORAGE_URL,
+    SECRET_JITSI_KEY,
+    STORE_VARIABLES_FOR_LOCAL_MAPS,
+} from "../Enum/EnvironmentVariable";
+import type { Admin } from "../Model/Admin";
+import type { PositionInterface } from "../Model/PositionInterface";
+import { ProtobufUtils } from "../Model/Websocket/ProtobufUtils";
+import type {
+    EmoteCallback,
+    EntersCallback,
+    GroupUsersUpdatedCallback,
+    LeavesCallback,
+    LockGroupCallback,
+    MovesCallback,
+    PlayerDetailsUpdatedCallback,
+} from "../Model/Zone";
+import type { EventSocket, RoomSocket, VariableSocket } from "../RoomManager";
+import { adminApi } from "../Services/AdminApi";
+import { MapLoadingError } from "../Services/MapLoadingError";
+import { getMapStorageClient } from "../Services/MapStorageClient";
+import { emitError, emitErrorOnRoomSocket, endUserConnectionWithReason } from "../Services/MessageHelpers";
+import { ModeratorTagFinder } from "../Services/ModeratorTagFinder";
+import { VariableError } from "../Services/VariableError";
+import { VariablesManager } from "../Services/VariablesManager";
+import type { AreaPropertyVariable } from "../Services/AreaPropertyVariablesManager";
+import { AreaPropertyVariablesManager } from "../Services/AreaPropertyVariablesManager";
+import { AreaZoneTracker } from "./AreaZoneTracker";
+import type { BrothersFinder } from "./BrothersFinder";
+import { Group } from "./Group";
+import { PositionNotifier } from "./PositionNotifier";
+import { WamManager } from "./Services/WamManager";
+import type { UserSocket } from "./User";
+import { User } from "./User";
+import type { PointInterface } from "./Websocket/PointInterface";
+import { LockableAreaManager } from "./AreaPropertyEvents/LockableAreaManager";
+import { MaxUsersInAreaManager } from "./AreaPropertyEvents/MaxUsersInAreaManager";
+
+export type ConnectCallback = (user: User, group: Group) => void;
+export type DisconnectCallback = (user: User, group: Group) => void;
+
+const MEETING_INVITATION_MAX_REQUESTS = 50;
+const MEETING_INVITATION_MAX_REQUESTS_PER_USER = 3;
+const MEETING_INVITATION_REQUEST_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+export class GameRoom implements BrothersFinder {
+    public readonly id: string;
+    // Users, sorted by ID
+    private readonly users: SpatialMap<number, User>;
+    private readonly usersByUuid = new Map<string, Set<User>>();
+    // Users indexed by composite key (userUuid + tabId), used to detect reconnections from the same tab
+    // and immediately kill stale connections instead of waiting for ping timeout
+    private readonly usersByTabKey = new Map<string, User>();
+    private readonly groups: SpatialMap<number, Group>;
+    private readonly admins = new Set<Admin>();
+
+    private itemsState = new Map<number, unknown>();
+
+    private readonly positionNotifier: PositionNotifier;
+
+    // Ephemeral variables attached to area properties (not persisted)
+    private readonly areaPropertyVariablesManager = new AreaPropertyVariablesManager();
+    private readonly wamManager?: WamManager;
+    private versionNumber = 1;
+    private nextUserId = 1;
+
+    private roomListeners: Set<RoomSocket> = new Set<RoomSocket>();
+    private variableListeners: Map<string, Set<VariableSocket>> = new Map<string, Set<VariableSocket>>();
+    // The key is the event name
+    private eventListeners: Map<string, Set<EventSocket>> = new Map<string, Set<EventSocket>>();
+    // They key to limit the number of meeting invitation requests per sender
+    private meetingInvitationRequestLogBySender = new Map<string, { at: Date; receiverUserUuid: string }[]>();
+
+    private readonly _userLeaveStream = new Subject<User>();
+    public readonly userLeaveStream = this._userLeaveStream.asObservable();
+
+    private readonly _userMoveStream = new Subject<{ user: User; oldPosition: PointInterface }>();
+    public readonly userMoveStream = this._userMoveStream.asObservable();
+
+    private readonly _destroyRoomStream = new Subject<void>();
+    public readonly destroyRoomStream = this._destroyRoomStream.asObservable();
+
+    private constructor(
+        public readonly _roomUrl: string,
+        private _roomGroup: string | null,
+        private readonly connectCallback: ConnectCallback,
+        private readonly disconnectCallback: DisconnectCallback,
+        private readonly minDistance: number,
+        private readonly groupRadius: number,
+        onEnters: EntersCallback,
+        onMoves: MovesCallback,
+        onLeaves: LeavesCallback,
+        onEmote: EmoteCallback,
+        onLockGroup: LockGroupCallback,
+        onPlayerDetailsUpdated: PlayerDetailsUpdatedCallback,
+        onGroupUsersUpdated: GroupUsersUpdatedCallback,
+        private thirdParty: MapThirdPartyData | undefined,
+        private editable: boolean,
+        private _mapUrl: string,
+        private _wamUrl?: string,
+        initialWam?: WAMFileFormat,
+    ) {
+        // uniq id for the room is timestamp
+        this.id = Date.now().toString();
+
+        if (initialWam) {
+            this.wamManager = new WamManager(initialWam);
+        }
+
+        // A zone is 10 sprites wide.
+        this.positionNotifier = new PositionNotifier(
+            320,
+            320,
+            onEnters,
+            onMoves,
+            onLeaves,
+            onEmote,
+            onLockGroup,
+            onPlayerDetailsUpdated,
+            onGroupUsersUpdated,
+        );
+
+        const spatialIndexCellSize = Math.max(this.minDistance, this.groupRadius, 1);
+        this.users = new SpatialMap<number, User>(spatialIndexCellSize);
+        this.groups = new SpatialMap<number, Group>(spatialIndexCellSize);
+    }
+
+    public static async create(
+        roomUrl: string,
+        connectCallback: ConnectCallback,
+        disconnectCallback: DisconnectCallback,
+        minDistance: number,
+        groupRadius: number,
+        onEnters: EntersCallback,
+        onMoves: MovesCallback,
+        onLeaves: LeavesCallback,
+        onEmote: EmoteCallback,
+        onLockGroup: LockGroupCallback,
+        onPlayerDetailsUpdated: PlayerDetailsUpdatedCallback,
+        onGroupUsersUpdated: GroupUsersUpdatedCallback,
+    ): Promise<GameRoom> {
+        const mapDetails = await GameRoom.getMapDetails(roomUrl);
+        const wamUrl = mapDetails.wamUrl;
+
+        let mapUrl: string;
+        let wamFile: WAMFileFormat | undefined = undefined;
+
+        if (!wamUrl && mapDetails.mapUrl) {
+            mapUrl = mapDetails.mapUrl;
+        } else if (wamUrl) {
+            wamFile = await mapFetcher.fetchWamFile(wamUrl, INTERNAL_MAP_STORAGE_URL, PUBLIC_MAP_STORAGE_PREFIX);
+            mapUrl = new URL(wamFile.mapUrl, wamUrl).toString();
+        } else {
+            throw new Error("No mapUrl or wamUrl");
+        }
+
+        const gameRoom = new GameRoom(
+            roomUrl,
+            mapDetails.group,
+            connectCallback,
+            disconnectCallback,
+            minDistance,
+            groupRadius,
+            onEnters,
+            onMoves,
+            onLeaves,
+            onEmote,
+            onLockGroup,
+            onPlayerDetailsUpdated,
+            onGroupUsersUpdated,
+            mapDetails.thirdParty ?? undefined,
+            mapDetails.editable ?? false,
+            mapUrl,
+            wamUrl,
+            wamFile,
+        );
+        const areaZoneTracker = new AreaZoneTracker(gameRoom);
+        // Let's instantiate the class that will track the lockable areas and set the variable to false when they are empty.
+        // This is automatically cleaned up when the room is destroyed since it listens to the destroyRoomStream.
+        new LockableAreaManager(gameRoom, areaZoneTracker);
+        // Let's instantiate the class that will track maxUsersInArea areas and keep the maxUsersReached variable updated.
+        // This is automatically cleaned up when the room is destroyed since it listens to the destroyRoomStream.
+        new MaxUsersInAreaManager(gameRoom, areaZoneTracker);
+
+        return gameRoom;
+    }
+
+    public getUsers(): ReadonlyMap<number, User> {
+        return this.users;
+    }
+
+    public dispatchRoomMessage(message: SubToPusherRoomMessage): void {
+        // Dispatch the message on the room listeners
+        for (const socket of this.roomListeners) {
+            socket.write({
+                payload: [message],
+            });
+        }
+    }
+
+    public sendRefreshRoomMessageToUsers(): void {
+        this.users.forEach((user) =>
+            user.write({
+                $case: "refreshRoomMessage",
+                refreshRoomMessage: RefreshRoomMessage.fromPartial({
+                    roomId: this._roomUrl,
+                    timeToRefresh: 30,
+                }),
+            }),
+        );
+    }
+
+    public sendMapDeletedMessageToUsers(): void {
+        this.users.forEach((user) => {
+            this.leave(user);
+            user.write({
+                $case: "deleteMapMessage",
+                deleteMapMessage: {},
+            });
+            endUserConnectionWithReason(user.socket, "Map was deleted.");
+        });
+    }
+
+    public getUserByUuid(uuid: string): User | undefined {
+        const users = this.usersByUuid.get(uuid);
+        if (users === undefined) {
+            return undefined;
+        }
+        const [user] = users;
+        return user;
+    }
+
+    public getUserById(id: number): User | undefined {
+        return this.users.get(id);
+    }
+
+    public getUsersByUuid(uuid: string): Set<User> {
+        return this.usersByUuid.get(uuid) ?? new Set();
+    }
+
+    public async join(socket: UserSocket, joinRoomMessage: JoinRoomMessage): Promise<User> {
+        const positionMessage = joinRoomMessage.positionMessage;
+        if (positionMessage === undefined) {
+            throw new Error("Missing position message");
+        }
+        const position = ProtobufUtils.toPointInterface(positionMessage);
+
+        // Check if there's a stale connection from the same browser tab and kill it immediately
+        // This prevents "ghost" users appearing when a user reconnects after a network disruption
+        const tabId = joinRoomMessage.tabId;
+        if (tabId) {
+            const tabKey = `${joinRoomMessage.userUuid}_${tabId}`;
+            const existingUser = this.usersByTabKey.get(tabKey);
+            if (existingUser) {
+                console.info(
+                    `Detected reconnection from same tab for user ${joinRoomMessage.userUuid}. Killing stale connection.`,
+                );
+                // Remove the stale user from the room
+                this.leave(existingUser);
+                endUserConnectionWithReason(
+                    existingUser.socket,
+                    `A new connection from the same browser tab replaced this connection for user ${joinRoomMessage.userUuid}.`,
+                );
+            }
+        }
+
+        // Same-tab reconnections should not be reported as duplicate sessions.
+        const sameUserAlreadyConnected = (this.getUsersByUuid(joinRoomMessage.userUuid)?.size ?? 0) >= 1;
+
+        this.nextUserId++;
+        const user = await User.create(
+            this.nextUserId,
+            joinRoomMessage.userUuid,
+            joinRoomMessage.isLogged,
+            joinRoomMessage.IPAddress,
+            position,
+            this.positionNotifier,
+            joinRoomMessage.availabilityStatus,
+            socket,
+            joinRoomMessage.tag,
+            joinRoomMessage.canEdit,
+            joinRoomMessage.visitCardUrl ?? null,
+            joinRoomMessage.name,
+            joinRoomMessage.characterTextures,
+            this._roomUrl,
+            this._roomGroup ?? undefined,
+            this,
+            joinRoomMessage.companionTexture,
+            undefined,
+            undefined,
+            joinRoomMessage.activatedInviteUser,
+            joinRoomMessage.applications,
+            joinRoomMessage.chatID,
+            undefined,
+            tabId,
+        );
+
+        this.users.set(user.id, user);
+        let set = this.usersByUuid.get(user.uuid);
+        if (set === undefined) {
+            set = new Set<User>();
+            this.usersByUuid.set(user.uuid, set);
+        }
+        set.add(user);
+
+        // Register user by tab key for reconnection detection
+        if (user.tabId) {
+            const tabKey = `${user.uuid}_${user.tabId}`;
+            this.usersByTabKey.set(tabKey, user);
+        }
+
+        this.updateUserGroup(user);
+
+        // Notify admins
+        for (const admin of this.admins) {
+            admin.sendUserJoin(user.uuid, user.name, user.IPAddress);
+        }
+
+        // If the same user was already connected before this join, notify this new (duplicate) connection
+        if (sameUserAlreadyConnected) {
+            user.write({
+                $case: "duplicateUserConnectedMessage",
+                duplicateUserConnectedMessage: {},
+            });
+        }
+
+        return user;
+    }
+
+    public leave(user: User) {
+        if (user.disconnected === true) {
+            console.warn("User ", user.id, "already disconnected!");
+            return;
+        }
+        user.disconnected = true;
+
+        if (!this.users.has(user.id)) {
+            console.warn("User ", user.id, "does not belong to this game room! It should!");
+        }
+
+        // If a user leaves the group, it cannot lead or follow anymore.
+        if (user.hasFollowers()) {
+            user.stopLeading();
+        }
+        if (user.following) {
+            user.following.delFollower(user);
+        }
+
+        if (user.group !== undefined) {
+            this.leaveGroup(user);
+        }
+
+        this.users.delete(user.id);
+
+        const set = this.usersByUuid.get(user.uuid);
+        if (set !== undefined) {
+            set.delete(user);
+            if (set.size === 0) {
+                this.usersByUuid.delete(user.uuid);
+            }
+        }
+
+        // Remove from tab key map used for reconnection detection
+        if (user.tabId) {
+            const tabKey = `${user.uuid}_${user.tabId}`;
+            this.usersByTabKey.delete(tabKey);
+        }
+
+        if (user !== undefined) {
+            this.positionNotifier.leave(user);
+        }
+
+        // Notify admins
+        for (const admin of this.admins) {
+            admin.sendUserLeft(user.uuid /*, user.name, user.IPAddress*/);
+        }
+
+        this._userLeaveStream.next(user);
+    }
+
+    public isEmpty(): boolean {
+        return (
+            this.users.size === 0 &&
+            this.admins.size === 0 &&
+            this.roomListeners.size === 0 &&
+            this.variableListeners.size === 0 &&
+            this.eventListeners.size === 0
+        );
+    }
+
+    public updatePosition(user: User, userPosition: PointInterface): void {
+        const oldPosition = user.getPosition();
+        user.setPosition(userPosition);
+        this.updateUserGroup(user);
+        this._userMoveStream.next({ user, oldPosition });
+    }
+
+    updatePlayerDetails(user: User, playerDetailsMessage: SetPlayerDetailsMessage) {
+        user.updateDetails(playerDetailsMessage);
+        if (user.group !== undefined && user.silent) {
+            this.leaveGroup(user);
+        }
+    }
+
+    private updateUserGroup(user: User): void {
+        if (user.silent) {
+            return;
+        }
+
+        const group = user.group;
+        const closestItem: User | Group | null = this.searchClosestAvailableUserOrGroup(user);
+
+        if (group === undefined) {
+            // If the user is not part of a group:
+            //  should he join a group?
+
+            // If the user is moving, don't try to join
+            if (user.getPosition().moving) {
+                return;
+            }
+
+            if (closestItem !== null) {
+                if (closestItem instanceof Group) {
+                    // Let's join the group!
+                    closestItem.join(user);
+                    closestItem.setOutOfBounds(false);
+                } else {
+                    const closestUser: User = closestItem;
+                    const group: Group = new Group(
+                        this._roomUrl,
+                        [user, closestUser],
+                        this.groupRadius,
+                        this.connectCallback,
+                        this.disconnectCallback,
+                        this.positionNotifier,
+                    );
+                    this.groups.set(group.getId(), group);
+                }
+            }
+        } else {
+            let hasKickOutSomeone = false;
+            let followingMembers: User[] = [];
+
+            const previewNewGroupPosition = group.previewGroupPosition();
+
+            if (!previewNewGroupPosition) {
+                this.leaveGroup(user);
+                return;
+            }
+
+            if (user.hasFollowers() || user.following) {
+                followingMembers = user.hasFollowers()
+                    ? group.getUsers().filter((currentUser) => currentUser.following === user)
+                    : group.getUsers().filter((currentUser) => currentUser.following === user.following);
+
+                // If all group members are part of the same follow group
+                if (group.getUsers().length - 1 === followingMembers.length) {
+                    let isOutOfBounds = false;
+
+                    // If a follower is far away from the leader, "outOfBounds" is set to true
+                    for (const member of followingMembers) {
+                        const distance = GameRoom.computeDistanceBetweenPositions(
+                            member.getPosition(),
+                            previewNewGroupPosition,
+                        );
+
+                        if (distance > this.groupRadius) {
+                            isOutOfBounds = true;
+                            break;
+                        }
+                    }
+                    group.setOutOfBounds(isOutOfBounds);
+                }
+            }
+
+            // Check if the moving user has kicked out another user
+            for (const headMember of group.getGroupHeads()) {
+                if (!headMember.group) {
+                    this.leaveGroup(headMember);
+                    continue;
+                }
+
+                const headPosition = headMember.getPosition();
+                const distance = GameRoom.computeDistanceBetweenPositions(headPosition, previewNewGroupPosition);
+
+                if (distance > this.groupRadius) {
+                    hasKickOutSomeone = true;
+                    break;
+                }
+            }
+
+            /**
+             * If the current moving user has kicked another user from the radius,
+             * the moving user leaves the group because he is too far away.
+             */
+            const userDistance = GameRoom.computeDistanceBetweenPositions(user.getPosition(), previewNewGroupPosition);
+
+            if (hasKickOutSomeone && userDistance > this.groupRadius) {
+                if (user.hasFollowers() && group.getUsers().length === 3 && followingMembers.length === 1) {
+                    const other = group
+                        .getUsers()
+                        .find((currentUser) => !currentUser.hasFollowers() && !currentUser.following);
+                    if (other) {
+                        this.leaveGroup(other);
+                    }
+                } else if (user.hasFollowers()) {
+                    this.leaveGroup(user);
+                    for (const member of followingMembers) {
+                        this.leaveGroup(member);
+                    }
+
+                    // Re-create a group with the followers
+                    const newGroup: Group = new Group(
+                        this._roomUrl,
+                        [user, ...followingMembers],
+                        this.groupRadius,
+                        this.connectCallback,
+                        this.disconnectCallback,
+                        this.positionNotifier,
+                    );
+                    this.groups.set(newGroup.getId(), newGroup);
+                } else {
+                    this.leaveGroup(user);
+                }
+            }
+        }
+
+        if (user.group) {
+            user.group.updatePosition();
+            user.group.searchForNearbyUsers();
+        }
+    }
+
+    public sendToOthersInGroupIncludingUser(user: User, message: ServerToClientMessage): void {
+        user.group?.getUsers().forEach((currentUser: User) => {
+            if (currentUser.id !== user.id) {
+                currentUser.socket.write(message);
+            }
+        });
+    }
+
+    /**
+     * Makes a user leave a group and closes and destroy the group if the group contains only one remaining person.
+     *
+     * @param user
+     */
+    private leaveGroup(user: User): void {
+        const group = user.group;
+        if (group === undefined) {
+            throw new Error("The user is part of no group");
+        }
+
+        group.leave(user);
+        if (group.isEmpty()) {
+            group.destroy();
+            if (!this.groups.has(group.getId())) {
+                throw new Error(`Could not find group ${group.getId()} referenced by user ${user.id} in World.`);
+            }
+            this.groups.delete(group.getId());
+            //todo: is the group garbage collected?
+        } else {
+            group.updatePosition();
+            //this.positionNotifier.updatePosition(group, group.getPosition(), oldPosition);
+        }
+    }
+
+    /**
+     * Looks for the closest user that is:
+     * - close enough (distance <= minDistance)
+     * - not in a group
+     * - not silent
+     * OR
+     * - close enough to a group (distance <= groupRadius)
+     */
+    private searchClosestAvailableUserOrGroup(user: User): User | Group | null {
+        let minimumDistanceFound: number = Math.max(this.minDistance, this.groupRadius);
+        let matchingItem: User | Group | null = null;
+        const userPosition = user.getPosition();
+        for (const currentUser of this.users.queryCircle(userPosition.x, userPosition.y, this.minDistance)) {
+            // Let's only check users that are not part of a group
+            if (typeof currentUser.group !== "undefined") {
+                continue;
+            }
+            if (currentUser === user) {
+                continue;
+            }
+            if (currentUser.silent) {
+                continue;
+            }
+
+            const distance = GameRoom.computeDistance(user, currentUser); // compute distance between peers.
+
+            if (distance <= minimumDistanceFound && distance <= this.minDistance) {
+                minimumDistanceFound = distance;
+                matchingItem = currentUser;
+            }
+        }
+
+        for (const group of this.groups.queryCircle(userPosition.x, userPosition.y, this.groupRadius)) {
+            if (group.isFull() || group.isLocked()) {
+                continue;
+            }
+            const distance = GameRoom.computeDistanceBetweenPositions(user.getPosition(), group.getPosition());
+            if (distance <= minimumDistanceFound && distance <= this.groupRadius) {
+                minimumDistanceFound = distance;
+                matchingItem = group;
+            }
+        }
+
+        return matchingItem;
+    }
+
+    public static computeDistance(user1: User, user2: User): number {
+        const user1Position = user1.getPosition();
+        const user2Position = user2.getPosition();
+        return Math.sqrt(
+            Math.pow(user2Position.x - user1Position.x, 2) + Math.pow(user2Position.y - user1Position.y, 2),
+        );
+    }
+
+    public static computeDistanceBetweenPositions(position1: PositionInterface, position2: PositionInterface): number {
+        return Math.sqrt(Math.pow(position2.x - position1.x, 2) + Math.pow(position2.y - position1.y, 2));
+    }
+
+    public setItemState(itemId: number, state: unknown) {
+        this.itemsState.set(itemId, state);
+    }
+
+    public getItemsState(): Map<number, unknown> {
+        return this.itemsState;
+    }
+
+    public async setVariable(name: string, value: string, user: User | "RoomApi"): Promise<void> {
+        // First, let's check if "user" is allowed to modify the variable.
+        const variableManager = await this.getVariableManager();
+
+        try {
+            const readableBy = variableManager.setVariable(name, value, user);
+
+            // If the variable was not changed, let's not dispatch anything.
+            if (readableBy === false) {
+                return;
+            }
+
+            // TODO: should we batch those every 100ms?
+            const variableMessage: Partial<VariableWithTagMessage> = {
+                name,
+                value,
+            };
+            if (readableBy) {
+                variableMessage.readableBy = readableBy;
+            }
+
+            // Dispatch the message on the room listeners
+            this.sendSubMessageToRoom({
+                message: {
+                    $case: "variableMessage",
+                    variableMessage: VariableWithTagMessage.fromPartial(variableMessage),
+                },
+            });
+
+            // Dispatch the variable update to variable listeners
+            const listeners = this.variableListeners.get(name);
+            for (const listener of listeners ?? []) {
+                listener.write(JSON.parse(value));
+            }
+        } catch (e) {
+            if (e instanceof VariableError) {
+                // Ok, we have an error setting a variable. Either the user is trying to hack the map... or the map
+                // is not up-to-date. So let's try to reload the map from scratch.
+                if (this.variableManagerLastLoad === undefined) {
+                    throw e;
+                }
+                const lastLoaded = new Date().getTime() - this.variableManagerLastLoad.getTime();
+                if (lastLoaded < 10000) {
+                    console.error(
+                        'An error occurred while setting the "' +
+                            name +
+                            "\" variable. But we tried to reload the map less than 10 seconds ago, so let's fail.",
+                    );
+                    // Do not try to reload if we tried to reload less than 10 seconds ago.
+                    throw e;
+                }
+
+                // Reset the variable manager
+                this.variableManagerPromise = undefined;
+                this.mapPromise = undefined;
+
+                console.error(
+                    'An error occurred while setting the "' + name + "\" variable. Let's reload the map and try again",
+                );
+                // Try to set the variable again!
+                await this.setVariable(name, value, user);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Gets an area property from the WAM file by areaId and propertyId.
+     *
+     * @param areaId - The ID of the area
+     * @param propertyId - The ID of the property within the area
+     * @returns The property data or undefined if not found
+     */
+    public getAreaProperty(areaId: string, propertyId: string): Promise<AreaDataProperty | undefined> {
+        const wam = this.getWam();
+        if (!wam) {
+            return Promise.resolve(undefined);
+        }
+
+        const area = wam.areas.find((a: AreaData) => a.id === areaId);
+        if (!area) {
+            return Promise.resolve(undefined);
+        }
+
+        return Promise.resolve(area.properties.find((p: AreaDataProperty) => p.id === propertyId));
+    }
+
+    /**
+     * Returns the normalized list of allowed tags for a lockable area property.
+     * Only a non-empty array of strings means "restricted"; undefined or [] means anyone can modify.
+     */
+    private static getLockableAllowedTags(property: { allowedTags?: unknown }): string[] {
+        const raw = property.allowedTags;
+        return Array.isArray(raw) ? raw.filter((t): t is string => typeof t === "string") : [];
+    }
+
+    /**
+     * Checks if a user has permission to modify an area property variable.
+     * For lockableAreaPropertyData, checks if the user has at least one of the allowedTags.
+     * If allowedTags is empty or undefined, any user can modify the variable.
+     *
+     * @param userTags - The tags of the user
+     * @param areaId - The ID of the area
+     * @param propertyId - The ID of the property within the area
+     * @returns true if the user has permission, false otherwise
+     */
+    public async hasAreaPropertyPermission(userTags: string[], areaId: string, propertyId: string): Promise<boolean> {
+        const property = await this.getAreaProperty(areaId, propertyId);
+
+        if (!property) {
+            // If property doesn't exist, deny access for safety
+            return false;
+        }
+
+        // Only check permissions for lockableAreaPropertyData
+        if (property.type === "lockableAreaPropertyData") {
+            const allowedTags = GameRoom.getLockableAllowedTags(property);
+
+            if (allowedTags.length === 0) {
+                return true;
+            }
+
+            // Check if user has at least one of the allowed tags
+            return userTags.some((tag) => allowedTags.includes(tag));
+        }
+
+        // For other property types, allow by default
+        return true;
+    }
+
+    /**
+     * Sets an area property variable and broadcasts the change to all users.
+     *
+     * @param areaId - The ID of the area
+     * @param propertyId - The ID of the property within the area
+     * @param key - The variable key (e.g., "lock")
+     * @param value - The value to set (JSON stringified)
+     * @returns true if the value was changed, false if it was the same
+     */
+    public setAreaPropertyVariable(areaId: string, propertyId: string, key: string, value: string): boolean {
+        const changed = this.areaPropertyVariablesManager.setVariable(areaId, propertyId, key, value);
+
+        if (!changed) {
+            return false;
+        }
+
+        // Broadcast the change to all room listeners
+        this.sendSubMessageToRoom({
+            message: {
+                $case: "areaPropertyVariableMessage",
+                areaPropertyVariableMessage: {
+                    areaId,
+                    propertyId,
+                    key,
+                    value,
+                },
+            },
+        });
+
+        return true;
+    }
+
+    /**
+     * Sets an area property variable with permission checking.
+     * Verifies the user has appropriate permissions based on the property's allowedTags.
+     *
+     * @param userTags - The tags of the user
+     * @param areaId - The ID of the area
+     * @param propertyId - The ID of the property within the area
+     * @param key - The variable key (e.g., "lock")
+     * @param value - The value to set (JSON stringified)
+     * @returns { success: true, changed: boolean } if permitted, { success: false, error: string } if denied
+     */
+    public async setAreaPropertyVariableWithPermissionCheck(
+        userTags: string[],
+        areaId: string,
+        propertyId: string,
+        key: string,
+        value: string,
+    ): Promise<{ success: true; changed: boolean } | { success: false; error: string }> {
+        const hasPermission = await this.hasAreaPropertyPermission(userTags, areaId, propertyId);
+
+        if (!hasPermission) {
+            return {
+                success: false,
+                error: "You don't have permission to modify this area property. Required tags not found.",
+            };
+        }
+
+        const changed = this.setAreaPropertyVariable(areaId, propertyId, key, value);
+        return { success: true, changed };
+    }
+
+    /**
+     * Gets all area property variables for the room.
+     * Used when a user joins the room to send the initial state.
+     */
+    public getAreaPropertyVariables(): AreaPropertyVariable[] {
+        return this.areaPropertyVariablesManager.getAllVariables();
+    }
+
+    /**
+     * Gets a specific area property variable.
+     */
+    public getAreaPropertyVariable(areaId: string, propertyId: string, key: string): string | undefined {
+        return this.areaPropertyVariablesManager.getVariable(areaId, propertyId, key);
+    }
+
+    /**
+     * Returns true if the given position is inside the area (rectangle).
+     */
+    private static isPositionInArea(position: { x: number; y: number }, area: AreaData): boolean {
+        return (
+            position.x >= area.x &&
+            position.x <= area.x + area.width &&
+            position.y >= area.y &&
+            position.y <= area.y + area.height
+        );
+    }
+
+    /**
+     * Returns areas from the WAM that contain the given position and have a property
+     * whose type is in the given list. Used by AreaPropertyEventManager.
+     */
+    public getAreasWithPropertyTypesContainingPosition(
+        position: PointInterface,
+        propertyTypes: string[],
+    ): Promise<Array<{ areaId: string; propertyId: string; propertyType: string }>> {
+        const wam = this.getWam();
+        if (!wam) {
+            return Promise.resolve([]);
+        }
+
+        const propertyTypesSet = new Set(propertyTypes);
+        const result: Array<{ areaId: string; propertyId: string; propertyType: string }> = [];
+
+        for (const area of wam.areas) {
+            if (!GameRoom.isPositionInArea(position, area)) {
+                continue;
+            }
+
+            for (const property of area.properties) {
+                const propertyType = property.type;
+                const propertyId = property.id;
+                if (propertyType && propertyTypesSet.has(propertyType)) {
+                    result.push({ areaId: area.id, propertyId, propertyType });
+                    break;
+                }
+            }
+        }
+
+        return Promise.resolve(result);
+    }
+
+    /**
+     * Returns true if at least one user in the room is inside the area, false otherwise.
+     * Stops as soon as one user is found. Used by AreaPropertyEventManager.
+     */
+    public hasUsersInArea(area: AreaData): boolean {
+        for (const user of this.users.values()) {
+            if (GameRoom.isPositionInArea(user.getPosition(), area)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public addZoneListener(call: RoomSocket, x: number, y: number): Set<Movable> {
+        return this.positionNotifier.addZoneListener(call, x, y);
+    }
+
+    public removeZoneListener(call: RoomSocket, x: number, y: number): void {
+        return this.positionNotifier.removeZoneListener(call, x, y);
+    }
+
+    public adminJoin(admin: Admin): void {
+        this.admins.add(admin);
+
+        // Let's send all connected users
+        for (const user of this.users.values()) {
+            admin.sendUserJoin(user.uuid, user.name, user.IPAddress);
+        }
+    }
+
+    public adminLeave(admin: Admin): void {
+        this.admins.delete(admin);
+    }
+
+    public async incrementVersion(): Promise<number> {
+        // Let's check if the mapUrl has changed
+        const mapDetails = await GameRoom.getMapDetails(this._roomUrl);
+        const mapUrl = await mapFetcher.getMapUrl(
+            mapDetails.mapUrl,
+            mapDetails.wamUrl,
+            INTERNAL_MAP_STORAGE_URL,
+            PUBLIC_MAP_STORAGE_PREFIX,
+        );
+        if (this._mapUrl !== mapUrl) {
+            this._mapUrl = mapUrl;
+            this.mapPromise = undefined;
+            // Reset the variable manager
+            this.variableManagerPromise = undefined;
+        }
+
+        this.versionNumber++;
+        return this.versionNumber;
+    }
+
+    public emitEmoteEvent(user: User, emoteEventMessage: EmoteEventMessage) {
+        this.positionNotifier.emitEmoteEvent(user, emoteEventMessage);
+    }
+
+    public emitLockGroupEvent(user: User, groupId: number) {
+        this.positionNotifier.emitLockGroupEvent(user, groupId);
+    }
+
+    public addRoomListener(socket: RoomSocket) {
+        this.roomListeners.add(socket);
+    }
+
+    public removeRoomListener(socket: RoomSocket) {
+        this.roomListeners.delete(socket);
+    }
+
+    public addVariableListener(socket: VariableSocket) {
+        let listenersSet = this.variableListeners.get(socket.request.name);
+        if (!listenersSet) {
+            listenersSet = new Set<VariableSocket>();
+            this.variableListeners.set(socket.request.name, listenersSet);
+        }
+        listenersSet.add(socket);
+    }
+
+    public removeVariableListener(socket: VariableSocket) {
+        let listenersSet = this.variableListeners.get(socket.request.name);
+        if (!listenersSet) {
+            listenersSet = new Set<VariableSocket>();
+            this.variableListeners.set(socket.request.name, listenersSet);
+        }
+        listenersSet.add(socket);
+    }
+
+    public addEventListener(socket: EventSocket) {
+        let listenersSet = this.eventListeners.get(socket.request.name);
+        if (!listenersSet) {
+            listenersSet = new Set<EventSocket>();
+            this.eventListeners.set(socket.request.name, listenersSet);
+        }
+        listenersSet.add(socket);
+    }
+
+    public removeEventListener(socket: EventSocket) {
+        const listenersSet = this.eventListeners.get(socket.request.name);
+        if (listenersSet) {
+            listenersSet.delete(socket);
+            if (listenersSet.size === 0) {
+                this.eventListeners.delete(socket.request.name);
+            }
+        }
+    }
+
+    /**
+     * Connects to the admin server to fetch map details.
+     * If there is no admin server, the map details are generated by analysing the map URL (that must be in the form: /_/instance/map_url)
+     */
+    private static async getMapDetails(roomUrl: string): Promise<MapDetailsData> {
+        if (!ADMIN_API_URL) {
+            const roomUrlObj = new URL(roomUrl);
+
+            let mapUrl = undefined;
+            let wamUrl = undefined;
+            let canEdit = false;
+            const match = /\/~\/(.+)/.exec(roomUrlObj.pathname);
+            if (match && PUBLIC_MAP_STORAGE_URL) {
+                if (path.extname(roomUrlObj.pathname) === ".tmj") {
+                    mapUrl = `${PUBLIC_MAP_STORAGE_URL}/${match[1]}`;
+                } else {
+                    wamUrl = `${PUBLIC_MAP_STORAGE_URL}/${match[1]}`;
+                }
+                canEdit = true;
+            } else {
+                const match = /\/_\/[^/]+\/(.+)/.exec(roomUrlObj.pathname);
+                if (!match) {
+                    console.error("Unexpected room URL", roomUrl);
+                    Sentry.captureException(`Unexpected room URL ${roomUrl}`);
+                    throw new Error('Unexpected room URL "' + roomUrl + '"');
+                }
+
+                mapUrl = roomUrlObj.protocol + "//" + match[1];
+            }
+            return {
+                mapUrl,
+                wamUrl,
+                editable: canEdit,
+                authenticationMandatory: null,
+                group: null,
+                showPoweredBy: true,
+                enableChat: ENABLE_CHAT,
+                enableChatUpload: ENABLE_CHAT_UPLOAD,
+            };
+        }
+
+        const result = isMapDetailsData.safeParse(await adminApi.fetchMapDetails(roomUrl));
+
+        if (result.success) {
+            return result.data;
+        }
+
+        console.error(result.error.issues);
+        console.error("Unexpected room redirect or error received while querying map details", result);
+        Sentry.captureException(result.error.issues);
+        Sentry.captureException(
+            `Unexpected room redirect or error received while querying map details ${JSON.stringify(result)}`,
+        );
+        throw new Error("Unexpected room redirect received or error while querying map details");
+    }
+
+    private mapPromise: Promise<ITiledMap> | undefined;
+
+    /**
+     * Returns a promise to the map file.
+     * @throws LocalUrlError if the map we are trying to load is hosted on a local network
+     * @throws Error
+     */
+    private getMap(canLoadLocalUrl = false): Promise<ITiledMap> {
+        if (!this.mapPromise) {
+            this.mapPromise = mapFetcher.fetchMap(
+                this._mapUrl,
+                this._wamUrl,
+                canLoadLocalUrl,
+                STORE_VARIABLES_FOR_LOCAL_MAPS,
+                INTERNAL_MAP_STORAGE_URL,
+                PUBLIC_MAP_STORAGE_PREFIX,
+            );
+        }
+
+        return this.mapPromise;
+    }
+
+    /**
+     * Returns a promise to the WAM file.
+     * @throws LocalUrlError if the map we are trying to load is hosted on a local network
+     * @throws Error
+     */
+    public getWam(): WAMFileFormat | undefined {
+        if (!this.wamManager) {
+            return undefined;
+        }
+        return this.wamManager.getWam();
+    }
+
+    public getWamManager(): WamManager | undefined {
+        return this.wamManager;
+    }
+
+    private variableManagerPromise: Promise<VariablesManager> | undefined;
+    private variableManagerLastLoad: Date | undefined;
+
+    private getVariableManager(): Promise<VariablesManager> {
+        if (!this.variableManagerPromise) {
+            this.variableManagerLastLoad = new Date();
+            this.variableManagerPromise = this.getMap()
+                .then(async (map) => {
+                    const variablesManager = await VariablesManager.create(this._roomUrl, map);
+                    return variablesManager.init();
+                })
+                .catch(async (e) => {
+                    if (e instanceof LocalUrlError) {
+                        // If we are trying to load a local URL, we are probably in test mode.
+                        // In this case, let's bypass the server-side checks completely.
+
+                        // Note: we run this message inside a setTimeout so that the room listeners can have time to connect.
+                        setTimeout(() => {
+                            for (const roomListener of this.roomListeners) {
+                                emitErrorOnRoomSocket(
+                                    roomListener,
+                                    "You are loading a local map. If you use the scripting API in this map, please be aware that server-side checks and variable persistence is disabled.",
+                                );
+                            }
+                        }, 1000);
+
+                        const variablesManager = await VariablesManager.create(this._roomUrl, null);
+                        return variablesManager.init();
+                    } else {
+                        // An error occurred while loading the map
+                        // Right now, let's bypass the error. In the future, we should make sure the user is aware of that
+                        // and that he/she will act on it to fix the problem.
+
+                        // Note: we run this message inside a setTimeout so that the room listeners can have time to connect.
+                        setTimeout(() => {
+                            for (const roomListener of this.roomListeners) {
+                                emitErrorOnRoomSocket(
+                                    roomListener,
+                                    "Your map does not seem accessible from the WorkAdventure servers. Is it behind a firewall or a proxy? Your map should be accessible from the WorkAdventure servers. If you use the scripting API in this map, please be aware that server-side checks and variable persistence is disabled.",
+                                );
+                            }
+                        }, 1000);
+
+                        const variablesManager = await VariablesManager.create(this._roomUrl, null);
+                        return variablesManager.init();
+                    }
+                });
+        }
+        return this.variableManagerPromise;
+    }
+
+    public async getVariablesForTags(tags: string[] | undefined): Promise<Map<string, string>> {
+        const variablesManager = await this.getVariableManager();
+        return variablesManager.getVariablesForTags(tags);
+    }
+
+    public getGroupById(id: number): Group | undefined {
+        return this.groups.get(id);
+    }
+
+    private jitsiModeratorTagFinderPromise: Promise<ModeratorTagFinder> | undefined;
+
+    /**
+     * Returns the moderator tag associated with jitsiRoom
+     */
+    public async getModeratorTagForJitsiRoom(jitsiRoom: string): Promise<string | undefined> {
+        if (this.jitsiModeratorTagFinderPromise === undefined) {
+            this.jitsiModeratorTagFinderPromise = this.getMap()
+                .then((map) => {
+                    const wam = this.getWam();
+                    return new ModeratorTagFinder(
+                        map,
+                        (properties: ITiledMapProperty[]): { mainValue: string; tagValue: string } | undefined => {
+                            // We need to detect the "jitsiRoom" and "jitsiRoomAdminTag" properties AND to slugify the "jitsiRoom" in the same way
+                            // as we do on the front.
+                            let mainValue: string | undefined = undefined;
+                            let tagValue: string | undefined = undefined;
+                            for (const property of properties ?? []) {
+                                if (property.name === "jitsiRoom" && typeof property.value === "string") {
+                                    mainValue = property.value;
+                                } else if (
+                                    property.name === "jitsiRoomAdminTag" &&
+                                    typeof property.value === "string"
+                                ) {
+                                    tagValue = property.value;
+                                }
+                            }
+                            if (mainValue !== undefined && tagValue !== undefined) {
+                                // Compute allprops (needed for utility function)
+                                const allProps = new Map<string, string | number | boolean | Json>();
+                                for (const property of properties ?? []) {
+                                    if (property.value !== undefined) {
+                                        allProps.set(property.name, property.value);
+                                    }
+                                }
+                                return {
+                                    mainValue: Jitsi.slugifyJitsiRoomName(
+                                        mainValue,
+                                        this._roomUrl,
+                                        allProps.has(GameMapProperties.JITSI_NO_PREFIX),
+                                    ),
+                                    tagValue,
+                                };
+                            }
+                            return undefined;
+                        },
+                        this._roomUrl,
+                        wam,
+                    );
+                })
+                .catch((e) => {
+                    if (e instanceof LocalUrlError) {
+                        // If we are trying to load a local URL, we are probably in test mode.
+                        // In this case, let's bypass the server-side checks completely.
+
+                        for (const roomListener of this.roomListeners) {
+                            emitErrorOnRoomSocket(
+                                roomListener,
+                                "You are loading a local map. The 'jitsiRoomAdminTag' property cannot be read from local maps.",
+                            );
+                        }
+                    } else {
+                        // An error occurred while loading the map
+                        // Right now, let's bypass the error. In the future, we should make sure the user is aware of that
+                        // and that he/she will act on it to fix the problem.
+
+                        for (const roomListener of this.roomListeners) {
+                            emitErrorOnRoomSocket(
+                                roomListener,
+                                "Your map does not seem accessible from the WorkAdventure servers. Is it behind a firewall or a proxy? Your map should be accessible from the WorkAdventure servers. The 'jitsiRoomAdminTag' property cannot be read from local maps.",
+                            );
+                        }
+                    }
+                    throw new MapLoadingError(
+                        e instanceof Error ? e.message : typeof e === "string" ? e : "unknown_error",
+                    );
+                });
+        }
+
+        try {
+            const jitsiModeratorTagFinder = await this.jitsiModeratorTagFinderPromise;
+            return jitsiModeratorTagFinder.getModeratorTag(jitsiRoom);
+        } catch (e) {
+            console.warn("Could not access map file.", e);
+            if (e instanceof MapLoadingError) {
+                return undefined;
+            }
+            throw e;
+        }
+    }
+
+    private bbbModeratorTagFinderPromise: Promise<ModeratorTagFinder> | undefined;
+
+    /**
+     * Returns the moderator tag associated with bbbMeeting
+     */
+    public async getModeratorTagForBbbMeeting(bbbRoom: string): Promise<string | undefined> {
+        if (this.bbbModeratorTagFinderPromise === undefined) {
+            this.bbbModeratorTagFinderPromise = this.getMap()
+                .then((map) => {
+                    return new ModeratorTagFinder(
+                        map,
+                        (properties: ITiledMapProperty[]): { mainValue: string; tagValue: string } | undefined => {
+                            let mainValue: string | undefined = undefined;
+                            let tagValue: string | undefined = undefined;
+                            for (const property of properties ?? []) {
+                                if (property.name === "bbbMeeting" && typeof property.value === "string") {
+                                    mainValue = property.value;
+                                } else if (
+                                    property.name === "bbbMeetingAdminTag" &&
+                                    typeof property.value === "string"
+                                ) {
+                                    tagValue = property.value;
+                                }
+                            }
+                            if (mainValue !== undefined && tagValue !== undefined) {
+                                return {
+                                    mainValue,
+                                    tagValue,
+                                };
+                            }
+                            return undefined;
+                        },
+                    );
+                })
+                .catch((e) => {
+                    if (e instanceof LocalUrlError) {
+                        // If we are trying to load a local URL, we are probably in test mode.
+                        // In this case, let's bypass the server-side checks completely.
+
+                        for (const roomListener of this.roomListeners) {
+                            emitErrorOnRoomSocket(
+                                roomListener,
+                                "You are loading a local map. The 'bbbMeetingAdminTag' property cannot be read from local maps.",
+                            );
+                        }
+                    } else {
+                        // An error occurred while loading the map
+                        // Right now, let's bypass the error. In the future, we should make sure the user is aware of that
+                        // and that he/she will act on it to fix the problem.
+
+                        for (const roomListener of this.roomListeners) {
+                            emitErrorOnRoomSocket(
+                                roomListener,
+                                "Your map does not seem accessible from the WorkAdventure servers. Is it behind a firewall or a proxy? Your map should be accessible from the WorkAdventure servers. The 'bbbMeetingAdminTag' property cannot be read from local maps.",
+                            );
+                        }
+                    }
+                    throw new MapLoadingError(
+                        e instanceof Error ? e.message : typeof e === "string" ? e : "unknown_error",
+                    );
+                });
+        }
+
+        try {
+            const bbbModeratorTagFinder = await this.bbbModeratorTagFinderPromise;
+            return bbbModeratorTagFinder.getModeratorTag(bbbRoom);
+        } catch (e) {
+            console.warn("Could not access map file.", e);
+            if (e instanceof MapLoadingError) {
+                return undefined;
+            }
+            throw e;
+        }
+    }
+
+    public getJitsiSettings(): MapJitsiData | undefined {
+        const jitsi = this.thirdParty?.jitsi;
+
+        if (jitsi) {
+            return jitsi;
+        }
+        if (JITSI_URL) {
+            return {
+                url: JITSI_URL,
+                iss: JITSI_ISS,
+                secret: SECRET_JITSI_KEY,
+            };
+        }
+        return undefined;
+    }
+
+    public getBbbSettings(): MapBbbData | undefined {
+        const bbb = this.thirdParty?.bbb;
+        if (bbb) {
+            return bbb;
+        }
+        if (BBB_URL && BBB_SECRET) {
+            return {
+                url: BBB_URL,
+                secret: BBB_SECRET,
+            };
+        }
+        return undefined;
+    }
+
+    /**
+     * Returns the list of users in this room that share the same UUID
+     */
+    public getBrothers(user: User): Array<User> {
+        const family = this.usersByUuid.get(user.uuid);
+        if (family === undefined) {
+            return [];
+        }
+        return [...family].filter((theUser) => theUser !== user);
+    }
+
+    public sendSubMessageToRoom(subMessage: SubToPusherRoomMessage) {
+        // Dispatch the message on the room listeners
+        for (const socket of this.roomListeners) {
+            socket.write({
+                payload: [subMessage],
+            });
+        }
+    }
+
+    private async applyMapStorageCommandToLocalState(editMapCommandMessage: EditMapCommandMessage): Promise<void> {
+        const editMapMessage = editMapCommandMessage.editMapMessage?.message;
+        if (!editMapMessage) {
+            return;
+        }
+        if (!this.wamManager) {
+            throw new Error("WAM manager is undefined while applying a map storage command.");
+        }
+
+        await this.wamManager.applyCommand(editMapCommandMessage);
+
+        if (GameRoom.commandInvalidatesJitsiModeratorTagFinder(editMapMessage.$case)) {
+            this.jitsiModeratorTagFinderPromise = undefined;
+        }
+    }
+
+    private static commandInvalidatesJitsiModeratorTagFinder(
+        editMapMessageCase: NonNullable<NonNullable<EditMapCommandMessage["editMapMessage"]>["message"]>["$case"],
+    ): boolean {
+        return (
+            editMapMessageCase === "modifyAreaMessage" ||
+            editMapMessageCase === "createAreaMessage" ||
+            editMapMessageCase === "deleteAreaMessage" ||
+            editMapMessageCase === "modifyEntityMessage" ||
+            editMapMessageCase === "createEntityMessage" ||
+            editMapMessageCase === "deleteEntityMessage" ||
+            editMapMessageCase === "deleteCustomEntityMessage" ||
+            editMapMessageCase === "modifiyWAMMetadataMessage"
+        );
+    }
+
+    private mapStorageLock: Promise<void> = Promise.resolve();
+
+    forwardEditMapCommandMessage(user: User, message: EditMapCommandMessage) {
+        // We chain the map storage operations to avoid race conditions. Each operation will wait for the previous one to complete.
+        // We also set a timeout of 20 seconds to avoid blocking the room forever in case of map storage issues.
+        this.mapStorageLock = this.mapStorageLock.then(() => {
+            const timeoutSignal = AbortSignal.timeout(20000);
+            return raceAbort(
+                new Promise<void>((resolve, reject) => {
+                    if (!this._wamUrl) {
+                        const error = new Error("WAM file url is undefined. Cannot edit map without WAM file.");
+                        emitError(user.socket, error.message);
+                        reject(error);
+                        return;
+                    }
+
+                    const call = getMapStorageClient().handleEditMapCommandWithKeyMessage(
+                        {
+                            mapKey: this._wamUrl,
+                            editMapCommandMessage: message,
+                            connectedUserTags: user.tags,
+                            userCanEdit: user.canEdit,
+                            userUUID: user.uuid,
+                        },
+                        new Metadata(),
+                        { deadline: Date.now() + 20000 },
+                        (err: unknown, editMapCommandMessage: EditMapCommandMessage) => {
+                            timeoutSignal.removeEventListener("abort", onTimeout);
+                            if (timeoutSignal.aborted) {
+                                resolve();
+                                return;
+                            }
+                            if (err) {
+                                reject(asError(err));
+                                return;
+                            }
+                            if (editMapCommandMessage.editMapMessage?.message?.$case === "errorCommandMessage") {
+                                // Return the error message to the sender and don't dispatch it to the room
+                                user.write({
+                                    $case: "batchMessage",
+                                    batchMessage: {
+                                        event: "",
+                                        payload: [
+                                            {
+                                                message: {
+                                                    $case: "editMapCommandMessage",
+                                                    editMapCommandMessage,
+                                                },
+                                            },
+                                        ],
+                                    },
+                                });
+                                resolve();
+                                return;
+                            }
+
+                            this.applyMapStorageCommandToLocalState(editMapCommandMessage)
+                                .then(() => {
+                                    this.dispatchRoomMessage({
+                                        message: {
+                                            $case: "editMapCommandMessage",
+                                            editMapCommandMessage,
+                                        },
+                                    });
+                                    resolve();
+                                })
+                                .catch((localError: unknown) => {
+                                    reject(asError(localError));
+                                });
+                        },
+                    );
+
+                    const onTimeout = () => {
+                        call?.cancel();
+                    };
+                    timeoutSignal.addEventListener("abort", onTimeout, { once: true });
+                }),
+                timeoutSignal,
+            ).catch((err) => {
+                const error = asError(err);
+                Sentry.captureException(error);
+                try {
+                    emitError(user.socket, error.message);
+                } catch (err2) {
+                    Sentry.captureException(err2);
+                    console.error("Could not emit error on user socket", err2);
+                }
+            });
+        });
+    }
+
+    public dispatchEvent(name: string, data: unknown, senderId: number | "RoomApi", targetUserIds: number[]): void {
+        if (targetUserIds.length === 0) {
+            // Dispatch to all users
+            this.sendSubMessageToRoom({
+                message: {
+                    $case: "receivedEventMessage",
+                    receivedEventMessage: {
+                        name,
+                        data,
+                        senderId: senderId === "RoomApi" ? undefined : senderId,
+                    },
+                },
+            });
+
+            // Dispatch to RoomApi listeners
+            const listeners = this.eventListeners.get(name);
+            for (const eventListener of listeners ?? []) {
+                eventListener.write({
+                    senderId: senderId === "RoomApi" ? undefined : senderId,
+                    data,
+                });
+            }
+        } else {
+            for (const targetUserId of targetUserIds) {
+                const targetUser = this.getUserById(targetUserId);
+                if (targetUser) {
+                    targetUser.emitInBatch({
+                        message: {
+                            $case: "receivedEventMessage",
+                            receivedEventMessage: {
+                                name,
+                                data,
+                                senderId: senderId === "RoomApi" ? undefined : senderId,
+                            },
+                        },
+                    });
+                }
+            }
+        }
+    }
+
+    // Antispam: log a meeting invitation request
+    public logMeetingInvitationRequest(senderUserUuid: string, receiverUserUuid: string): void {
+        const log = this.meetingInvitationRequestLogBySender.get(senderUserUuid);
+        if (log) {
+            log.push({ at: new Date(), receiverUserUuid });
+        } else {
+            this.meetingInvitationRequestLogBySender.set(senderUserUuid, [{ at: new Date(), receiverUserUuid }]);
+        }
+    }
+
+    // Antispam: clear the meeting invitation request log for a sender (e.g. when an invite is accepted)
+    public clearMeetingInvitationRequestLog(senderUserUuid: string): void {
+        this.meetingInvitationRequestLogBySender.delete(senderUserUuid);
+    }
+
+    // Antispam: check if the number of meeting invitation requests per sender is too high
+    public isMeetingInvitationRequestTooHigh(senderUserUuid: string, receiverUserUuid: string): boolean {
+        const log = this.meetingInvitationRequestLogBySender.get(senderUserUuid);
+        if (log) {
+            // Calculate the number of request for the receiver in the last 10 minutes
+            const nbRequests = log
+                .filter(
+                    (request) =>
+                        request.at > new Date(Date.now() - MEETING_INVITATION_REQUEST_WINDOW_MS) &&
+                        request.receiverUserUuid === receiverUserUuid,
+                )
+                .reduce((acc, _) => (acc += 1), 0);
+            let isTooHigh = nbRequests > MEETING_INVITATION_MAX_REQUESTS_PER_USER;
+
+            // Calculate the total number of requests in the last 10 minutes
+            const totalRequests = log
+                .filter((request) => request.at > new Date(Date.now() - MEETING_INVITATION_REQUEST_WINDOW_MS))
+                .reduce((acc, _) => (acc += 1), 0);
+            console.log("totalRequests", totalRequests);
+            isTooHigh = isTooHigh || totalRequests > MEETING_INVITATION_MAX_REQUESTS;
+            return isTooHigh;
+        }
+        return false;
+    }
+
+    get mapUrl(): string {
+        return this._mapUrl;
+    }
+
+    get wamUrl(): string | undefined {
+        return this._wamUrl;
+    }
+
+    get roomUrl(): string {
+        return this._roomUrl;
+    }
+
+    public destroy(): void {
+        this._destroyRoomStream.next();
+        this.wamManager?.destroy();
+        this._userMoveStream.complete();
+        this._userLeaveStream.complete();
+        this._destroyRoomStream.complete();
+    }
+}
