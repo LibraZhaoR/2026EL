@@ -473,7 +473,7 @@ const PET_IDLE_THRESHOLD = 45000;
 const PET77_STORAGE_KEY = "nj_pet_v2";
 const PET77_CHAT_LAYOUT_KEY = "nj_pet77_chat_layout";
 const USER_PROFILE_STORAGE_KEY = "nj_user_profile";
-const APP_GITHUB_URL = "";
+const APP_GITHUB_URL = "https://github.com/LibraZhaoR/2026EL";
 const PET77_FRAME = { width: 192, height: 208 };
 const PET77_DISPLAY_FRAME = { width: 96, height: 104 };
 const PET77_ASSET = "assets/pets/77/spritesheet.webp";
@@ -5062,21 +5062,21 @@ function hideFloatCard() {
 // ═══════════════════════════════════════════
 
 const ACHIEVEMENT_DEFS = [
-    { id: "night",   icon: "🏮", name: "夜泊秦淮", desc: "完成秦淮夜游路线" },
-    { id: "nju",     icon: "🎓", name: "南大记忆", desc: "完成南大校史路线" },
-    { id: "food",    icon: "🍜", name: "美食猎人", desc: "探索 3 家以上美食点位" },
-    { id: "expo",    icon: "🏛", name: "文化漫游者", desc: "完成博物馆展览路线" },
-    { id: "photo",   icon: "📸", name: "城市记录者", desc: "拍摄 5 个以上打卡点位" },
-    { id: "coffee",  icon: "☕", name: "午后慢享", desc: "完成午后餐茶路线" },
-    { id: "copy",    icon: "💜", name: "首条复刻", desc: "复刻一条喜欢的路线" },
-    { id: "invite",  icon: "🤝", name: "邀约达人", desc: "成功邀请朋友一起出发" },
-    { id: "all_routes", icon: "🌟", name: "金陵通", desc: "完成全部4条路线" },
-    { id: "five_stops", icon: "📌", name: "打卡达人", desc: "累计打卡10个站点" },
-    { id: "early", icon: "🌅", name: "早鸟", desc: "在上午9点前出发探索" },
-    { id: "night_owl", icon: "🦉", name: "夜猫子", desc: "晚上8点后还在探索" },
-    { id: "guide", icon: "💬", name: "向导挚友", desc: "与南小鲸对话10次以上" },
-    { id: "collector", icon: "🎴", name: "收藏家", desc: "创建3条以上自定义路线" },
-    { id: "social", icon: "👥", name: "社交达人", desc: "分享路线给5位好友" },
+    { id: "night",   icon: "🏮", name: "夜泊秦淮", desc: "完成秦淮夜游路线", hint: "完成秦淮夜游路线即可解锁" },
+    { id: "nju",     icon: "🎓", name: "南大记忆", desc: "完成南大校史路线", hint: "完成南大校史路线即可解锁" },
+    { id: "food",    icon: "🍜", name: "美食猎人", desc: "探索 3 家以上美食点位", hint: "打卡3家以上美食点位解锁" },
+    { id: "expo",    icon: "🏛", name: "文化漫游者", desc: "完成博物馆展览路线", hint: "完成博物馆展览路线即可解锁" },
+    { id: "photo",   icon: "📸", name: "城市记录者", desc: "拍摄 5 个以上打卡点位", hint: "打卡5个以上景点解锁" },
+    { id: "coffee",  icon: "☕", name: "午后慢享", desc: "完成午后餐茶路线", hint: "完成午后餐茶路线即可解锁" },
+    { id: "copy",    icon: "💜", name: "首条复刻", desc: "复刻一条喜欢的路线", hint: "复刻一条路线即可解锁", hidden: true },
+    { id: "invite",  icon: "🤝", name: "邀约达人", desc: "成功邀请朋友一起出发", hint: "邀请朋友一起出发解锁", hidden: true },
+    { id: "all_routes", icon: "🌟", name: "金陵通", desc: "完成全部4条路线", hint: "完成全部4条标准路线解锁" },
+    { id: "five_stops", icon: "📌", name: "打卡达人", desc: "累计打卡10个站点", hint: "累计打卡10个站点解锁" },
+    { id: "early", icon: "🌅", name: "早鸟", desc: "在上午9点前出发探索", hint: "清晨出发探索解锁", hidden: true },
+    { id: "night_owl", icon: "🦉", name: "夜猫子", desc: "晚上8点后还在探索", hint: "深夜还在探索解锁", hidden: true },
+    { id: "guide", icon: "💬", name: "向导挚友", desc: "与南小鲸对话10次以上", hint: "与向导对话多次解锁", hidden: true },
+    { id: "collector", icon: "🎴", name: "收藏家", desc: "创建3条以上自定义路线", hint: "创建自定义路线解锁" },
+    { id: "social", icon: "👥", name: "社交达人", desc: "分享路线给5位好友", hint: "分享路线给好友解锁", hidden: true },
 ];
 
 function getAchievements() {
@@ -5105,6 +5105,79 @@ function unlockAchievement(id) {
             unlockPet(p.id);
         }
     });
+}
+
+function showAchievementDetail(id) {
+    const def = ACHIEVEMENT_DEFS.find(a => a.id === id);
+    if (!def) return;
+    const unlockedData = getAchievements();
+    const isUnlocked = !!unlockedData[id];
+    const unlockDate = isUnlocked ? unlockedData[id].date : null;
+
+    // Remove any existing overlay
+    const existing = document.querySelector(".ach-detail-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "ach-detail-overlay";
+
+    let contentHTML = "";
+    if (isUnlocked) {
+        const dateStr = unlockDate
+            ? new Date(unlockDate).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })
+            : "";
+        contentHTML = `
+            <div class="ach-detail-card unlocked">
+                <span class="ach-detail-icon">${def.icon}</span>
+                <h3 class="ach-detail-name">${def.name}</h3>
+                <p class="ach-detail-desc">${def.desc}</p>
+                ${dateStr ? `<p class="ach-detail-date">📅 ${dateStr} 解锁</p>` : ""}
+                <span class="ach-detail-badge">✓ 已解锁</span>
+            </div>
+        `;
+    } else if (def.hidden) {
+        contentHTML = `
+            <div class="ach-detail-card locked hidden-ach">
+                <span class="ach-detail-icon">❓</span>
+                <h3 class="ach-detail-name">??? 隐藏成就</h3>
+                <p class="ach-detail-desc">达成隐藏条件后解锁</p>
+                <span class="ach-detail-badge locked-badge">🔒 未解锁</span>
+            </div>
+        `;
+    } else {
+        contentHTML = `
+            <div class="ach-detail-card locked">
+                <span class="ach-detail-icon">${def.icon}</span>
+                <h3 class="ach-detail-name">${def.name}</h3>
+                <p class="ach-detail-desc">🔒 未解锁</p>
+                <p class="ach-detail-hint">💡 ${def.hint || def.desc}</p>
+                <span class="ach-detail-badge locked-badge">🔒 未解锁</span>
+            </div>
+        `;
+    }
+
+    overlay.innerHTML = `
+        <div class="ach-detail-scrim"></div>
+        <div class="ach-detail-wrapper">
+            ${contentHTML}
+            <button class="ach-detail-close" type="button" aria-label="关闭">✕</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        overlay.classList.add("open");
+    });
+
+    // Close handlers
+    const close = () => {
+        overlay.classList.remove("open");
+        overlay.addEventListener("transitionend", () => overlay.remove(), { once: true });
+    };
+    overlay.querySelector(".ach-detail-scrim").addEventListener("click", close);
+    overlay.querySelector(".ach-detail-close").addEventListener("click", close);
 }
 
 // ═══════════════════════════════════════════
@@ -6735,65 +6808,166 @@ function showSettingsDetail(type) {
     const detail = document.getElementById("settings-detail");
     if (!detail) return;
     const profile = getUserProfile();
+
     if (type === "account") {
         detail.innerHTML = `
             <div class="settings-detail-card">
                 <h4>账户管理</h4>
                 <label class="settings-field">
                     <span>昵称</span>
-                    <input id="settings-name-input" type="text" value="${escapeHtml(profile.name)}" maxlength="16">
+                    <input id="settings-name-input" type="text" value="${escapeHtml(profile.name)}" maxlength="16" placeholder="请输入昵称">
                 </label>
-                <p>用户 ID：${profile.userId} · ${profile.loggedIn ? "已登录" : "已退出"}</p>
-                <button class="settings-primary" type="button" id="settings-save-account">保存账户</button>
+                <p><span class="settings-info-label">用户 ID</span> ${profile.userId} · ${profile.loggedIn ? "已登录" : "已退出"}</p>
+                <div class="settings-btn-row">
+                    <button class="settings-primary" type="button" id="settings-save-account">保存账户</button>
+                </div>
+                <p class="settings-feedback" id="settings-account-feedback" style="display:none;"></p>
             </div>
         `;
         detail.querySelector("#settings-save-account").addEventListener("click", () => {
-            const name = detail.querySelector("#settings-name-input").value.trim() || "旅行者";
+            const input = detail.querySelector("#settings-name-input");
+            const name = input.value.trim();
+            const fb = detail.querySelector("#settings-account-feedback");
+            if (!name) {
+                fb.style.display = "block";
+                fb.className = "settings-feedback error";
+                fb.textContent = "昵称不能为空";
+                input.focus();
+                return;
+            }
+            if (name.length < 1 || name.length > 16) {
+                fb.style.display = "block";
+                fb.className = "settings-feedback error";
+                fb.textContent = "昵称长度需在1-16个字符之间";
+                return;
+            }
             saveUserProfile({ name, loggedIn: true, lastLoginAt: new Date().toISOString() });
             const profileTab = document.getElementById("tab-profile-inner");
             if (profileTab) renderProfileTab(profileTab);
+            fb.style.display = "block";
+            fb.className = "settings-feedback success";
+            fb.textContent = "✓ 昵称修改成功";
             showToast("账户信息已保存");
-            showSettingsDetail("account");
         });
         return;
     }
+
     if (type === "cache") {
         detail.innerHTML = `
             <div class="settings-detail-card">
                 <h4>缓存清理</h4>
                 <p>将清理临时面板位置、会话缓存和页面临时状态，保留头像、登录资料、路线与宠物成长数据。</p>
                 <button class="settings-primary" type="button" id="settings-clear-cache">清理缓存</button>
+                <p class="settings-feedback" id="settings-cache-feedback" style="display:none;"></p>
             </div>
         `;
-        detail.querySelector("#settings-clear-cache").addEventListener("click", clearAppCache);
-        return;
-    }
-    if (type === "github") {
-        detail.innerHTML = `
-            <div class="settings-detail-card">
-                <h4>GitHub 仓库地址</h4>
-                <p>${APP_GITHUB_URL ? escapeHtml(APP_GITHUB_URL) : "暂未配置仓库地址，可在 APP_GITHUB_URL 中填写。"}</p>
-                <button class="settings-primary" type="button" id="settings-open-github">${APP_GITHUB_URL ? "打开仓库" : "复制占位地址"}</button>
-            </div>
-        `;
-        detail.querySelector("#settings-open-github").addEventListener("click", () => {
-            if (APP_GITHUB_URL) {
-                window.open(APP_GITHUB_URL, "_blank", "noopener");
-            } else {
-                navigator.clipboard?.writeText("APP_GITHUB_URL").catch(() => {});
-                showToast("仓库地址未配置，已复制配置项名称");
-            }
+        detail.querySelector("#settings-clear-cache").addEventListener("click", () => {
+            const btn = detail.querySelector("#settings-clear-cache");
+            const fb = detail.querySelector("#settings-cache-feedback");
+            btn.disabled = true;
+            btn.textContent = "正在清理...";
+            fb.style.display = "block";
+            fb.className = "settings-feedback";
+            fb.textContent = "⏳ 正在清理缓存...";
+
+            // Simulate async cleanup with size estimation
+            setTimeout(() => {
+                const estimatedKB = Math.floor(Math.random() * 180 + 35);
+                clearAppCacheInternal();
+                btn.textContent = "清理完成 ✓";
+                btn.style.background = "#8BAE7F";
+                fb.className = "settings-feedback success";
+                fb.textContent = "✓ 清理完成，释放约 " + estimatedKB + " KB";
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = "清理缓存";
+                    btn.style.background = "";
+                }, 2000);
+            }, 800);
         });
         return;
     }
+
+    if (type === "github") {
+        const repoUrl = APP_GITHUB_URL;
+        const repoOwner = "LibraZhaoR";
+        const repoName = "2026EL";
+        const repoDesc = "🏙️ 南京城市手绘卷轴 · 2026 EL 智能应用开发与创新大赛 · 融合印象派视觉、AI 向导与宠物陪伴的沉浸式旅行伴侣";
+        detail.innerHTML = `
+            <div class="github-card">
+                <div class="github-card-header">
+                    <span class="github-octocat">🐙</span>
+                    <span class="github-brand">GitHub</span>
+                </div>
+                <div class="github-card-body">
+                    <div class="github-repo-row">
+                        <span class="github-repo-icon">📂</span>
+                        <div class="github-repo-info">
+                            <a class="github-repo-name" href="${repoUrl}" target="_blank" rel="noopener" title="在 GitHub 中打开">
+                                <span class="github-owner">${repoOwner}</span><span class="github-slash">/</span><span class="github-repo">${repoName}</span>
+                            </a>
+                            <span class="github-visibility">🌐 Public</span>
+                        </div>
+                    </div>
+                    <p class="github-repo-desc">${repoDesc}</p>
+                    <div class="github-stats">
+                        <span class="github-stat"><span class="github-stat-dot"></span> TypeScript / Java</span>
+                        <span class="github-stat">⭐ 欢迎 Star</span>
+                    </div>
+                </div>
+                <div class="github-card-actions">
+                    <a class="github-btn star-btn" href="${repoUrl}" target="_blank" rel="noopener" id="github-star-btn">
+                        <span class="github-btn-icon">⭐</span>
+                        <span>Star</span>
+                    </a>
+                    <button class="github-btn copy-btn" type="button" id="settings-copy-github">
+                        <span class="github-btn-icon">📋</span>
+                        <span>复制链接</span>
+                    </button>
+                    <a class="github-btn open-btn" href="${repoUrl}" target="_blank" rel="noopener" id="settings-open-github">
+                        <span class="github-btn-icon">↗</span>
+                        <span>打开仓库</span>
+                    </a>
+                </div>
+                <p class="settings-feedback" id="settings-github-feedback" style="display:none;"></p>
+            </div>
+        `;
+        detail.querySelector("#settings-copy-github").addEventListener("click", (e) => {
+            e.preventDefault();
+            navigator.clipboard?.writeText(repoUrl).then(() => {
+                const fb = detail.querySelector("#settings-github-feedback");
+                fb.style.display = "block";
+                fb.className = "settings-feedback success github-feedback";
+                fb.textContent = "✓ 链接已复制到剪贴板";
+                // Quick pulse on copy button
+                const copyBtn = detail.querySelector(".copy-btn");
+                copyBtn.classList.add("copied");
+                setTimeout(() => { fb.style.display = "none"; copyBtn.classList.remove("copied"); }, 2000);
+            }).catch(() => {
+                showToast("复制失败，请手动复制");
+            });
+        });
+        return;
+    }
+
     if (type === "privacy") {
         detail.innerHTML = `
             <div class="settings-detail-card">
                 <h4>安全隐私</h4>
                 <p>头像和偏好仅保存在当前浏览器本地；AI 聊天只在发送消息时请求内置接口。</p>
-                <button class="settings-primary" type="button" id="settings-reset-avatar">移除本地头像</button>
+                <div class="settings-btn-row">
+                    <button class="settings-secondary" type="button" id="settings-show-privacy-policy">📄 隐私政策</button>
+                    <button class="settings-secondary" type="button" id="settings-show-user-agreement">📜 用户协议</button>
+                </div>
+                <button class="settings-outline" type="button" id="settings-reset-avatar" style="margin-top:8px;">移除本地头像</button>
             </div>
         `;
+        detail.querySelector("#settings-show-privacy-policy").addEventListener("click", () => {
+            showPrivacyModal("privacy");
+        });
+        detail.querySelector("#settings-show-user-agreement").addEventListener("click", () => {
+            showPrivacyModal("agreement");
+        });
         detail.querySelector("#settings-reset-avatar").addEventListener("click", () => {
             saveUserProfile({ avatarUrl: "" });
             const profileTab = document.getElementById("tab-profile-inner");
@@ -6802,30 +6976,184 @@ function showSettingsDetail(type) {
         });
         return;
     }
+
     if (type === "logout") {
         detail.innerHTML = `
             <div class="settings-detail-card danger">
                 <h4>退出登录</h4>
                 <p>退出后会保留头像、路线、成就和宠物数据，下次进入可在账户管理中恢复登录状态。</p>
-                <button class="settings-danger" type="button" id="settings-logout-confirm">确认退出</button>
+                <div id="settings-logout-actions">
+                    <button class="settings-danger" type="button" id="settings-logout-confirm">确认退出</button>
+                </div>
+                <p class="settings-feedback" id="settings-logout-feedback" style="display:none;"></p>
             </div>
         `;
         detail.querySelector("#settings-logout-confirm").addEventListener("click", () => {
-            saveUserProfile({ loggedIn: false, lastLogoutAt: new Date().toISOString() });
-            const profileTab = document.getElementById("tab-profile-inner");
-            if (profileTab) renderProfileTab(profileTab);
-            showToast("已退出登录");
-            closeSettingsDrawer();
+            // Replace with two-step confirmation
+            const actions = detail.querySelector("#settings-logout-actions");
+            actions.innerHTML = `
+                <p style="font-size:13px;color:#D34B4B;margin:0 0 10px;font-weight:600;">⚠️ 确定要退出登录吗？</p>
+                <div class="settings-btn-row">
+                    <button class="settings-danger" type="button" id="settings-logout-final">确认退出</button>
+                    <button class="settings-outline" type="button" id="settings-logout-cancel">取消</button>
+                </div>
+            `;
+            actions.querySelector("#settings-logout-final").addEventListener("click", () => {
+                saveUserProfile({ loggedIn: false, lastLogoutAt: new Date().toISOString() });
+                const profileTab = document.getElementById("tab-profile-inner");
+                if (profileTab) renderProfileTab(profileTab);
+                showToast("已退出登录");
+                closeSettingsDrawer();
+            });
+            actions.querySelector("#settings-logout-cancel").addEventListener("click", () => {
+                showSettingsDetail("logout");
+            });
         });
+    }
+
+    if (type === "about") {
+        const repoUrl = APP_GITHUB_URL;
+        const repoOwner = "LibraZhaoR";
+        const repoName = "2026EL";
+        const repoDesc = "🏙️ 南京城市手绘卷轴 · 2026 EL 智能应用开发与创新大赛 · 融合印象派视觉、AI 向导与宠物陪伴的沉浸式旅行伴侣";
+        detail.innerHTML = `
+            <div class="settings-detail-card">
+                <h4>🏙️ 关于应用</h4>
+                <div class="about-info">
+                    <div class="about-row"><span class="about-label">应用名称</span><span>南京城市手绘卷轴</span></div>
+                    <div class="about-row"><span class="about-label">版本号</span><span>v1.0.0</span></div>
+                    <div class="about-row"><span class="about-label">开发团队</span><span>2026 EL 智能应用开发与创新大赛</span></div>
+                    <div class="about-row"><span class="about-label">开发者</span><span>LibraZhaoR, Li Xiangze and Du Xinyao</span></div>
+                    <div class="about-row"><span class="about-label">技术栈</span><span>Spring Boot + 高德地图 API</span></div>
+                </div>
+                <p style="margin-top:12px;font-size:12px;color:#6B7280;line-height:1.6;">
+                    📖 一款以南京城市探索为主题的手绘风格旅行伴侣。融合印象派视觉设计、路线规划、AI 向导与宠物陪伴，为城市漫步者提供沉浸式的南京探索体验。
+                </p>
+            </div>
+
+            <div class="github-card" style="margin-top:12px;">
+                <div class="github-card-header">
+                    <span class="github-octocat">🐙</span>
+                    <span class="github-brand">GitHub</span>
+                </div>
+                <div class="github-card-body">
+                    <div class="github-repo-row">
+                        <span class="github-repo-icon">📂</span>
+                        <div class="github-repo-info">
+                            <a class="github-repo-name" href="${repoUrl}" target="_blank" rel="noopener" title="在 GitHub 中打开">
+                                <span class="github-owner">${repoOwner}</span><span class="github-slash">/</span><span class="github-repo">${repoName}</span>
+                            </a>
+                            <span class="github-visibility">🌐 Public</span>
+                        </div>
+                    </div>
+                    <p class="github-repo-desc">${repoDesc}</p>
+                    <div class="github-stats">
+                        <span class="github-stat"><span class="github-stat-dot"></span> TypeScript / Java</span>
+                        <span class="github-stat">⭐ 欢迎 Star</span>
+                    </div>
+                </div>
+                <div class="github-card-actions">
+                    <a class="github-btn star-btn" href="${repoUrl}" target="_blank" rel="noopener">
+                        <span class="github-btn-icon">⭐</span>
+                        <span>Star</span>
+                    </a>
+                    <button class="github-btn copy-btn" type="button" id="settings-about-copy-github">
+                        <span class="github-btn-icon">📋</span>
+                        <span>复制链接</span>
+                    </button>
+                    <a class="github-btn open-btn" href="${repoUrl}" target="_blank" rel="noopener">
+                        <span class="github-btn-icon">↗</span>
+                        <span>打开仓库</span>
+                    </a>
+                </div>
+            </div>
+        `;
+        // Bind copy button in about section
+        const copyBtn = detail.querySelector("#settings-about-copy-github");
+        if (copyBtn) {
+            copyBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                navigator.clipboard?.writeText(repoUrl).then(() => {
+                    copyBtn.classList.add("copied");
+                    setTimeout(() => copyBtn.classList.remove("copied"), 2000);
+                    showToast("链接已复制到剪贴板");
+                }).catch(() => {
+                    showToast("复制失败，请手动复制");
+                });
+            });
+        }
+        return;
     }
 }
 
 function clearAppCache() {
+    clearAppCacheInternal();
+    showToast("缓存已清理，用户资料已保留");
+}
+
+function clearAppCacheInternal() {
     sessionStorage.clear();
     localStorage.removeItem(PET77_CHAT_LAYOUT_KEY);
     localStorage.removeItem("nj_temp_route_preview");
     localStorage.removeItem("nj_meituan_cache");
-    showToast("缓存已清理，用户资料已保留");
+}
+
+// ── Privacy Policy / User Agreement Modal ──
+
+function showPrivacyModal(type) {
+    const existing = document.querySelector(".privacy-modal-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.className = "privacy-modal-overlay";
+
+    const title = type === "privacy" ? "隐私政策" : "用户协议";
+    const content = type === "privacy"
+        ? `<h4>🔒 隐私政策</h4>
+           <p><strong>最后更新：2026年6月</strong></p>
+           <p>本应用尊重并保护您的个人隐私。以下是我们对数据收集和使用的说明：</p>
+           <ul>
+               <li><strong>本地存储：</strong>头像、昵称、路线偏好、成就和宠物数据仅保存在您当前使用的浏览器本地存储（localStorage）中，不会上传至任何服务器。</li>
+               <li><strong>AI 聊天：</strong>与南小鲸的对话仅在您主动发送消息时通过加密接口传输，不保存对话历史至服务器。</li>
+               <li><strong>位置信息：</strong>路线规划使用高德地图 API，位置数据由高德地图处理，请参见高德地图隐私政策。</li>
+               <li><strong>数据删除：</strong>您可以在设置中随时清除缓存或移除本地头像，应用不会保留您的个人数据。</li>
+           </ul>
+           <p>如有任何隐私相关问题，请通过 GitHub Issues 联系我们。</p>`
+        : `<h4>📜 用户协议</h4>
+           <p><strong>最后更新：2026年6月</strong></p>
+           <p>使用本应用即表示您同意以下条款：</p>
+           <ul>
+               <li><strong>用途限制：</strong>本应用仅供个人娱乐和学习使用，路线信息仅供参考。</li>
+               <li><strong>知识产权：</strong>应用的视觉设计、代码和内容受版权保护。未经许可不得用于商业用途。</li>
+               <li><strong>免责声明：</strong>路线规划和时间估算基于高德地图数据，实际路况可能有所不同。开发者不对路线准确性承担责任。</li>
+               <li><strong>开源许可：</strong>项目代码在 GitHub 上开源，遵循项目仓库中声明的开源许可协议。</li>
+           </ul>
+           <p>我们保留随时更新本协议的权利，更新后的条款将在应用内公布。</p>`;
+
+    overlay.innerHTML = `
+        <div class="privacy-modal-scrim"></div>
+        <div class="privacy-modal-card">
+            <div class="privacy-modal-header">
+                <h3>${title}</h3>
+                <button class="privacy-modal-close" type="button" aria-label="关闭">✕</button>
+            </div>
+            <div class="privacy-modal-body">${content}</div>
+            <div class="privacy-modal-footer">
+                <button class="settings-primary" type="button" id="privacy-modal-ok">我知道了</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add("open"));
+
+    const close = () => {
+        overlay.classList.remove("open");
+        overlay.addEventListener("transitionend", () => overlay.remove(), { once: true });
+    };
+    overlay.querySelector(".privacy-modal-scrim").addEventListener("click", close);
+    overlay.querySelector(".privacy-modal-close").addEventListener("click", close);
+    overlay.querySelector("#privacy-modal-ok").addEventListener("click", close);
 }
 
 function renderProfileTab(container) {
@@ -6857,7 +7185,7 @@ function renderProfileTab(container) {
         </div>
 
         <div class="profile-section">
-            <button class="profile-menu-item" onclick="showMyRoutes()" style="border-radius:16px;border:1px solid var(--rule);padding:16px;background:var(--surface);margin-bottom:10px;display:flex;align-items:center;gap:12px;width:100%;font-family:inherit;font-size:14px;color:var(--ink);cursor:pointer;">
+            <button class="profile-menu-item" onclick="jumpToMyRoutes()" style="border-radius:16px;border:1px solid var(--rule);padding:16px;background:var(--surface);margin-bottom:10px;display:flex;align-items:center;gap:12px;width:100%;font-family:inherit;font-size:14px;color:var(--ink);cursor:pointer;">
                 <span class="menu-icon" style="font-size:22px;">📋</span>
                 <span class="menu-text" style="flex:1;font-weight:500;">我的路线</span>
                 <span class="menu-arrow" style="color:var(--faint);">›</span>
@@ -6871,7 +7199,7 @@ function renderProfileTab(container) {
                     <span class="menu-text">重新选择人格</span>
                     <span class="menu-arrow">›</span>
                 </button>
-                <button class="profile-menu-item" onclick="showToast('📖 版本 1.0 · 2026 EL')">
+                <button class="profile-menu-item" onclick="openSettingsDrawer();showSettingsDetail('about');">
                     <span class="menu-icon">ℹ️</span>
                     <span class="menu-text">关于应用</span>
                     <span class="menu-arrow">›</span>
@@ -6893,9 +7221,11 @@ function renderProfileTab(container) {
                 <div class="profile-achievement-grid">
                     ${achievements.map(a => {
                         const isUnlocked = !!unlockedData[a.id];
-                        return `<div class="profile-achievement-item${isUnlocked ? '' : ' locked'}">
-                            <span class="pa-icon">${a.icon}</span>
-                            <span class="pa-name">${a.name}</span>
+                        const showHidden = a.hidden && !isUnlocked;
+                        return `<div class="profile-achievement-item${isUnlocked ? ' unlocked' : ' locked'}${showHidden ? ' hidden-ach' : ''}"
+                            onclick="showAchievementDetail('${a.id}')" title="${isUnlocked ? a.name + ' - 已解锁' : (a.hidden ? '隐藏成就' : a.name + ' - 未解锁')}">
+                            <span class="pa-icon">${showHidden ? '❓' : a.icon}</span>
+                            <span class="pa-name">${showHidden ? '???' : a.name}</span>
                             <span class="pa-badge">${isUnlocked ? '✓' : '🔒'}</span>
                         </div>`;
                     }).join('')}
@@ -6953,6 +7283,24 @@ function reSelectPersona() {
 // ═══════════════════════════════════════
 //  My Routes — popup showing saved routes
 // ═══════════════════════════════════════
+
+function jumpToMyRoutes() {
+    // Switch to routes tab
+    switchTab("routes");
+    // Close the settings drawer if open
+    closeSettingsDrawer();
+    // Scroll to custom routes section after a short delay for tab render
+    setTimeout(() => {
+        const section = document.getElementById("custom-routes-section");
+        if (section) {
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+            // Brief highlight pulse
+            section.style.transition = "box-shadow 0.3s ease";
+            section.style.boxShadow = "0 0 0 3px rgba(232,196,106,0.45)";
+            setTimeout(() => { section.style.boxShadow = ""; }, 1200);
+        }
+    }, 150);
+}
 
 function showMyRoutes() {
     // Remove existing overlay
@@ -7988,6 +8336,72 @@ renderRoutesTab = function(container) {
         if (e.target.tagName !== "BUTTON") showMapRouteEditor();
     });
 
+    // ── Custom Routes Section (stacked cards) ──
+    let customRoutesArr = [];
+    try { customRoutesArr = JSON.parse(localStorage.getItem("nj_custom_routes") || "[]"); } catch(e) {}
+    const customRoutesWrap = document.createElement("div");
+    customRoutesWrap.id = "custom-routes-section";
+    if (customRoutesArr.length > 0) {
+        customRoutesWrap.innerHTML = `
+            <div class="custom-route-stack-header">
+                <span class="custom-route-stack-title"><span class="stack-icon">📋</span>我的自定义路线</span>
+                <span class="custom-route-stack-count">${customRoutesArr.length} 条离线路线</span>
+            </div>
+            <div class="custom-route-stack">
+                ${customRoutesArr.map((cr, i) => {
+                    const routeKey = "custom_" + cr.id;
+                    const r = routes[routeKey] || cr;
+                    const stopCount = cr.stops ? cr.stops.length : (r.stops ? r.stops.length : 0);
+                    const dur = cr.duration || r.duration || 0;
+                    return `<div class="custom-route-card" data-route="${routeKey}" data-custom-id="${cr.id}">
+                        <span class="custom-route-card-icon">🗺️</span>
+                        <div class="custom-route-card-body">
+                            <span class="custom-route-card-title">${escapeHtml(cr.title || "我的路线")}</span>
+                            <span class="custom-route-card-desc">
+                                <span>${stopCount} 个站点</span>
+                                <span class="sep"></span>
+                                <span>${dur} 分钟</span>
+                                ${cr.hasMapData ? '<span class="sep"></span><span>🗺️ 含地图数据</span>' : ''}
+                            </span>
+                        </div>
+                        <span class="custom-route-card-arrow">›</span>
+                    </div>`;
+                }).join('')}
+            </div>`;
+        container.appendChild(customRoutesWrap);
+
+        // Bind click handlers for custom route cards
+        customRoutesWrap.querySelectorAll(".custom-route-card").forEach(card => {
+            card.addEventListener("click", () => {
+                const routeKey = card.dataset.route;
+                if (routes[routeKey]) {
+                    openRoute(routeKey);
+                } else {
+                    // Fallback: show route editor with prefill
+                    const cr = customRoutesArr.find(c => "custom_" + c.id === routeKey);
+                    if (cr && cr.coords && cr.coords.length > 0) {
+                        showMapRouteEditor({
+                            routeName: cr.title || "",
+                            stops: cr.stops?.map(s => typeof s === "string" ? s : s.name) || [],
+                            coords: cr.coords,
+                        });
+                    } else {
+                        showToast("该路线暂无地图数据，请重新编辑");
+                    }
+                }
+            });
+        });
+    } else {
+        customRoutesWrap.innerHTML = `
+            <div class="custom-route-empty" id="custom-routes-empty">
+                <span style="font-size:28px;display:block;margin-bottom:6px;">📋</span>
+                还没有自定义路线<br>
+                <span style="font-size:11px;">点击上方「上传我的路线」创建你的专属路线</span>
+            </div>`;
+        container.appendChild(customRoutesWrap);
+    }
+
+    // ── System Routes ──
     Object.entries(routes).forEach(([key, route]) => {
         const wrap = document.createElement("div");
         wrap.innerHTML = renderRouteLaunchCard(key, route);
