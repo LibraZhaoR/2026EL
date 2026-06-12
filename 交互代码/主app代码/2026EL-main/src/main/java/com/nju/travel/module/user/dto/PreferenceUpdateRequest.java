@@ -5,6 +5,7 @@ import java.util.List;
 public record PreferenceUpdateRequest(
         String roleType,
         String mood,
-        List<String> interestTags
+        List<String> interestTags,
+        String persona
 ) {
 }

@@ -28,6 +28,7 @@ public class UserService {
                 "NJU_FRESHMAN",
                 "CURIOUS",
                 new ArrayList<>(List.of("南京", "校史", "展览")),
+                null,
                 LocalDateTime.now()
         );
         users.put(userId, user);
@@ -42,6 +43,17 @@ public class UserService {
         return user;
     }
 
+    public UserVO updatePersona(Long userId, String persona) {
+        UserVO old = getUser(userId);
+        UserVO updated = new UserVO(
+                old.userId(), old.nickname(), old.avatarUrl(),
+                old.roleType(), old.mood(), old.interestTags(),
+                persona, old.createdAt()
+        );
+        users.put(userId, updated);
+        return updated;
+    }
+
     public UserVO updatePreferences(Long userId, PreferenceUpdateRequest request) {
         UserVO old = getUser(userId);
         UserVO updated = new UserVO(
@@ -51,6 +63,7 @@ public class UserService {
                 request.roleType(),
                 request.mood(),
                 request.interestTags() == null ? List.of() : request.interestTags(),
+                request.persona() != null ? request.persona() : old.persona(),
                 old.createdAt()
         );
         users.put(userId, updated);

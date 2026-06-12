@@ -10,6 +10,7 @@ public record UserVO(
         String roleType,
         String mood,
         List<String> interestTags,
+        String persona,
         LocalDateTime createdAt
 ) {
 }

@@ -82,7 +82,7 @@ const personaCards = [
             { emoji: "🏮", x: 88, y: 62, size: 30, floatY: 8, dur: 4.4 },
             { emoji: "🍡", x: 22, y: 65, size: 26, floatY: 11, dur: 3.7 }
         ],
-        routeKey: "food",
+        routeKey: "shiguang_canyin",
         bgImage: "assets/persona/1.png"
     },
     {
@@ -103,7 +103,7 @@ const personaCards = [
             { emoji: "🌿", x: 75, y: 66, size: 26, floatY: 9, dur: 4.0 },
             { emoji: "📝", x: 24, y: 68, size: 28, floatY: 11, dur: 3.4 }
         ],
-        routeKey: "food",
+        routeKey: "xuelin_shuxiang",
         bgImage: "assets/persona/2.png"
     },
     {
@@ -124,7 +124,7 @@ const personaCards = [
             { emoji: "🌤️", x: 88, y: 60, size: 32, floatY: 8, dur: 4.0 },
             { emoji: "💦", x: 20, y: 66, size: 24, floatY: 12, dur: 3.8 }
         ],
-        routeKey: "nju",
+        routeKey: "qingnian_yundong",
         bgImage: "assets/persona/3.png"
     },
     {
@@ -145,7 +145,7 @@ const personaCards = [
             { emoji: "🪑", x: 86, y: 58, size: 32, floatY: 9, dur: 4.1 },
             { emoji: "📷", x: 20, y: 64, size: 28, floatY: 11, dur: 3.3 }
         ],
-        routeKey: "food",
+        routeKey: "banfang_zhilv",
         bgImage: "assets/persona/4.png"
     },
     {
@@ -166,7 +166,7 @@ const personaCards = [
             { emoji: "🔍", x: 78, y: 62, size: 30, floatY: 9, dur: 4.2 },
             { emoji: "🗝️", x: 24, y: 66, size: 26, floatY: 11, dur: 3.6 }
         ],
-        routeKey: "expo",
+        routeKey: "mingfeng_guyun",
         bgImage: "assets/persona/5.png"
     },
     {
@@ -187,7 +187,7 @@ const personaCards = [
             { emoji: "🪞", x: 88, y: 56, size: 26, floatY: 9, dur: 4.3 },
             { emoji: "☁️", x: 22, y: 64, size: 28, floatY: 12, dur: 3.7 }
         ],
-        routeKey: "nju",
+        routeKey: "yejing_denghuo",
         bgImage: "assets/persona/6.png"
     },
     {
@@ -208,7 +208,7 @@ const personaCards = [
             { emoji: "🌉", x: 78, y: 60, size: 30, floatY: 9, dur: 4.1 },
             { emoji: "🎐", x: 22, y: 66, size: 26, floatY: 11, dur: 3.5 }
         ],
-        routeKey: "night",
+        routeKey: "yejing_denghuo",
         bgImage: "assets/persona/7.png"
     },
     {
@@ -229,7 +229,7 @@ const personaCards = [
             { emoji: "💜", x: 88, y: 58, size: 26, floatY: 9, dur: 4.2 },
             { emoji: "📍", x: 22, y: 62, size: 28, floatY: 11, dur: 3.7 }
         ],
-        routeKey: "nju",
+        routeKey: "gulou_xiaoyuan",
         bgImage: "assets/persona/8.png"
     }
 ];
@@ -1848,6 +1848,11 @@ const routes = {
     }
 };
 
+// ── Merge extra routes from routes-data.js ──
+if (window.CITYGO_EXTRA_ROUTES) {
+    Object.assign(routes, window.CITYGO_EXTRA_ROUTES);
+}
+
 // ── Custom Routes Management ──
 let customRoutes = {};
 let CUSTOM_ROUTE_COUNTER = 0;
@@ -2613,6 +2618,8 @@ function onSelectClick() {
 }
 
 function getRouteName(routeKey) {
+    const route = routes[routeKey];
+    if (route) return route.title.split(/[：:]/)[0] || route.title;
     const names = { food: "南京味道线", nju: "南大校园探索线", night: "秦淮夜游线", expo: "博物馆展览线" };
     return names[routeKey] || "城市探索线";
 }
@@ -3038,24 +3045,133 @@ function showMainPage() {
 
 // ═══ Swiss Layout Renderers ═══
 
-const CAROUSEL_ROUTES = ["night", "nju", "food", "expo"];
+const CAROUSEL_ROUTES = ["night", "nju", "food", "expo", "qinhuai_wenmai", "laomendong_manyou", "mingfeng_guyun", "modeng_nanjing", "gulou_xiaoyuan", "hexi_xincheng"];
 const ROUTE_ACCENT = {
     nju: "#2E8B57",
     night: "#1A6B5E",
     food: "#F4A261",
     expo: "#5B9BD5",
+    qinhuai_wenmai: "#C41E3A",
+    laomendong_manyou: "#8B4513",
+    mingfeng_guyun: "#DAA520",
+    chengqiang_xunli: "#708090",
+    liuchao_yimeng: "#6B3FA0",
+    minguo_fenghua: "#4A7C59",
+    zongtongfu_zhoubian: "#B22222",
+    nantang_jiushi: "#CD853F",
+    jiangnan_yuanlin: "#2E8B57",
+    bowu_jinghua: "#4682B4",
+    hongse_jiyi: "#DC143C",
+    yishu_manbu: "#9370DB",
+    minsu_jiyi: "#D2691E",
+    fosi_xunli: "#FFD700",
+    jiaotang_jianzhu: "#87CEEB",
+    jiulong_qifu: "#FF8C00",
+    modeng_nanjing: "#4169E1",
+    hexi_xincheng: "#20B2AA",
+    binjiang_fengguang: "#5F9EA0",
+    banfang_zhilv: "#FF7F50",
+    yejing_denghuo: "#191970",
+    gulou_xiaoyuan: "#228B22",
+    xuelin_shuxiang: "#8B0000",
+    qingnian_yundong: "#32CD32",
+    qinzi_yanxue: "#FF69B4",
+    shiguang_canyin: "#FF4500",
+    qinglv_langman: "#FF1493",
+    yige_ren_xian_guang: "#778899",
+    qixia_shangqiu: "#FF6347",
+    gaochun_guxiang: "#556B2F",
+    pukou_xungen: "#BDB76B",
+    keju_wenmai: "#8B4513",
+    jinian_diantang: "#A52A2A",
+    chancha_xiuxing: "#6B8E23",
 };
 const ROUTE_ICON = {
     nju: "🏛️",
     night: "🌙",
     food: "🍜",
     expo: "🏺",
+    qinhuai_wenmai: "📜",
+    laomendong_manyou: "🏘️",
+    mingfeng_guyun: "👑",
+    chengqiang_xunli: "🧱",
+    liuchao_yimeng: "🏯",
+    minguo_fenghua: "🕰️",
+    zongtongfu_zhoubian: "🏛️",
+    nantang_jiushi: "⛩️",
+    jiangnan_yuanlin: "🌿",
+    bowu_jinghua: "🏺",
+    hongse_jiyi: "🕊️",
+    yishu_manbu: "🎨",
+    minsu_jiyi: "🧶",
+    fosi_xunli: "🛕",
+    jiaotang_jianzhu: "⛪",
+    jiulong_qifu: "🙏",
+    modeng_nanjing: "🏙️",
+    hexi_xincheng: "🌉",
+    binjiang_fengguang: "🚢",
+    banfang_zhilv: "☕",
+    yejing_denghuo: "✨",
+    gulou_xiaoyuan: "🎓",
+    xuelin_shuxiang: "📚",
+    qingnian_yundong: "⚽",
+    qinzi_yanxue: "👨‍👩‍👧",
+    shiguang_canyin: "🥢",
+    qinglv_langman: "💕",
+    yige_ren_xian_guang: "🚶",
+    qixia_shangqiu: "🍁",
+    gaochun_guxiang: "🏡",
+    pukou_xungen: "🚂",
+    keju_wenmai: "✒️",
+    jinian_diantang: "🏅",
+    chancha_xiuxing: "🍵",
 };
 const ROUTE_IMAGE = {
+    // ── 原有4条 ──
     night: "assets/persona/8.png",
     nju: "assets/persona/5.png",
     food: "assets/persona/2.png",
     expo: "assets/persona/3.png",
+    // ── 文化历史 (12条) ──
+    qinhuai_wenmai:    "assets/building-points/瞻园.webp",
+    laomendong_manyou: "assets/building-points/⽼⻔东.webp",
+    mingfeng_guyun:    "assets/building-points/明孝陵.jpg",
+    chengqiang_xunli:  "assets/building-points/明城墙全线.webp",
+    liuchao_yimeng:    "assets/building-points/六朝建康城遗址.webp",
+    minguo_fenghua:    "assets/building-points/颐和路民国公馆区.webp",
+    zongtongfu_zhoubian: "assets/building-points/煦园(总统府内).webp",
+    nantang_jiushi:    "assets/building-points/牛首山佛顶宫.jpg",
+    jiangnan_yuanlin:  "assets/building-points/愚园(胡家花园).webp",
+    gaochun_guxiang:   "assets/building-points/gaochun-old-street.webp",
+    pukou_xungen:      "assets/building-points/下关街道.webp",
+    qixia_shangqiu:    "assets/building-points/南唐二陵.webp",
+    // ── 博物艺术 (7条) ──
+    bowu_jinghua:      "assets/building-points/南京博物院.png",
+    hongse_jiyi:       "assets/building-points/侵华日军南京大屠杀遇难同胞纪念馆.jpg",
+    yishu_manbu:       "assets/building-points/金陵美术馆.jpg",
+    minsu_jiyi:        "assets/building-points/南京民俗博物馆.jpg",
+    jinian_diantang:   "assets/building-points/雨花台烈士纪念馆.jpg",
+    keju_wenmai:       "assets/building-points/科举博物馆.jpg",
+    // ── 宗教禅意 (4条) ──
+    fosi_xunli:        "assets/building-points/灵谷寺.webp",
+    jiaotang_jianzhu:  "assets/building-points/台城（解放⻔段）.webp",
+    jiulong_qifu:      "assets/building-points/中山陵.jpg",
+    chancha_xiuxing:   "assets/building-points/石头城遗址.webp",
+    // ── 城市探索 (5条) ──
+    modeng_nanjing:    "assets/building-points/紫峰大厦.webp",
+    hexi_xincheng:     "assets/building-points/青奥中心(双子塔).webp",
+    binjiang_fengguang:"assets/building-points/南京长江大桥.jpg",
+    banfang_zhilv:     "assets/building-points/nanjing-1912.jpg",
+    yejing_denghuo:    "assets/building-points/南京眼步行桥.jpg",
+    // ── 校园巡礼 (3条) ──
+    gulou_xiaoyuan:    "assets/building-points/nju-beidalou.jpg",
+    xuelin_shuxiang:   "assets/building-points/nanjing-library.webp",
+    qingnian_yundong:  "assets/building-points/jiangsu-grand-theatre.webp",
+    // ── 休闲生活 (4条) ──
+    qinzi_yanxue:      "assets/building-points/南京地质博物馆.jpg",
+    shiguang_canyin:   "assets/building-points/laomendong.webp",
+    qinglv_langman:    "assets/building-points/玄武湖公园(五洲).webp",
+    yige_ren_xian_guang: "assets/building-points/yihe-road.webp",
 };
 
 function getRouteDisplayTitle(route) {
@@ -3435,6 +3551,11 @@ const ROUTE_MAP_DATA = {
         plannedDist: 2191, plannedDur: 1800
     }
 };
+
+// Merge extra route map data
+if (window.CITYGO_EXTRA_ROUTE_MAP_DATA) {
+    Object.assign(ROUTE_MAP_DATA, window.CITYGO_EXTRA_ROUTE_MAP_DATA);
+}
 
 function getCitygoBuildingPoints() {
     const points = Array.isArray(window.CITYGO_BUILDING_POINTS) ? window.CITYGO_BUILDING_POINTS : [];
@@ -7545,7 +7666,7 @@ renderRouteGrid = function() {
     const grid = document.getElementById("route-grid");
     if (!grid) return;
 
-    const builtinKeys = ["night", "nju", "food", "expo"];
+    const builtinKeys = Object.keys(routes).filter(k => !k.startsWith("custom_") && !k.startsWith("rdb_"));
     const customKeys = Object.keys(customRoutes);
     const allKeys = [...builtinKeys, ...customKeys];
 
