@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>南京城市手绘卷轴</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./apple-refresh.css">
+</head>
+<body>
+
+<!-- ═══ 主 App · 路线探索界面 ═══ -->
+<div class="app-root" id="app-root">
+    <!-- Opening overlay — click to dismiss -->
+    <section class="opening" id="opening">
+        <h1>南京，<br>今天去哪儿？</h1>
+        <p>从一幅水墨开始。</p>
+        <span class="opening-tap-hint">点击进入</span>
+    </section>
+
+    <div class="stage" id="stage">
+        <canvas id="landscape-canvas"></canvas>
+        <div class="poem-stage" id="poem-stage">
+            <div class="poem poem-left-top" data-scene="0">
+                <h2>南京从这里开始</h2>
+            </div>
+            <div class="poem poem-left-top" data-scene="1">
+                <h2>南京从这里开始</h2>
+                <button class="enter" data-route="nju">南大校史线</button>
+            </div>
+            <div class="poem poem-left-top" data-scene="2">
+                <h2>南京从这里开始</h2>
+                <button class="enter" data-route="night">秦淮夜游</button>
+            </div>
+            <div class="poem poem-left-top" data-scene="3">
+                <h2>南京从这里开始</h2>
+                <button class="enter" data-route="food">美食路线</button>
+            </div>
+            <div class="poem poem-left-top" data-scene="4">
+                <h2>南京从这里开始</h2>
+                <button class="enter" data-route="expo">展览路线</button>
+            </div>
+        </div>
+        <div class="dots" id="dots">
+            <i data-dot="0"></i>
+            <i data-dot="1"></i>
+            <i data-dot="2"></i>
+            <i data-dot="3"></i>
+            <i data-dot="4"></i>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ 人格选择页 · Full-Screen Vertical Swipe ═══ -->
+<section class="persona-swiper" id="persona-swiper">
+    <!-- Fixed top bar -->
+    <div class="swiper-header">
+        <span class="swiper-header-label">人格选择</span>
+        <div class="swiper-progress" id="swiper-progress"></div>
+    </div>
+
+    <!-- Scroll-snap container -->
+    <div class="swiper-container" id="swiper-container"></div>
+
+    <!-- ═══ 手指上滑教程覆盖层 ═══ -->
+    <div class="swiper-tutorial" id="swiper-tutorial">
+        <div class="swipe-indicator"></div>
+        <div class="tutorial-text">上滑探索更多人格</div>
+    </div>
+
+    <!-- Fixed bottom area -->
+    <div class="swiper-bottom" id="swiper-bottom">
+        <div class="swiper-glass-card" id="swiper-glass-card">
+            <span class="glass-label">你将解锁</span>
+            <span class="glass-text" id="glass-text">选一个最像今天的你，开始这场城市漫游</span>
+        </div>
+        <button class="swiper-select-btn" id="swiper-select-btn">
+            <span class="select-btn-text">选择这个人格</span>
+            <span class="select-btn-check">✓</span>
+        </button>
+        <div class="swiper-swipe-hint">
+            <span class="hint-arrow">↑</span>
+            <span class="hint-text">上滑探索更多人格</span>
+        </div>
+    </div>
+
+    <!-- Skip button -->
+    <button class="swiper-skip" id="swiper-skip">立即退出</button>
+</section>
+
+<!-- ═══ 主页面 · Swiss Minimal ═══ -->
+<div class="main-page" id="main-page">
+
+    <!-- 地图舞台 · Map Stage -->
+    <div class="impressionist-map-stage" id="map-stage">
+        <div class="main-map-container" id="main-map-container">
+            <header class="main-header">
+                <div class="header-left">
+                    <span class="header-weather">22° 晴</span>
+                    <span class="header-location">南京 · 周末探索中</span>
+                </div>
+                <div class="header-right">
+                    <button class="map-mode-toggle" id="map-mode-toggle" title="切换首页功能模式和纯地图模式" aria-pressed="false">
+                        <span class="map-mode-option map-mode-home active">首页功能</span>
+                        <span class="map-mode-option map-mode-map">纯地图</span>
+                    </button>
+                    <span class="header-budget">¥100</span>
+                </div>
+            </header>
+        </div>
+        <canvas class="main-map-canvas" id="main-map-canvas"></canvas>
+        <div class="map-canvas-overlay" id="map-canvas-overlay"></div>
+        <canvas class="map-route-canvas" id="map-route-canvas"></canvas>
+        <div class="graffiti-markers-layer" id="graffiti-markers"></div>
+    </div>
+
+    <!-- 调暗覆盖层 -->
+    <div class="map-dim-overlay" id="map-dim-overlay"></div>
+
+    <!-- ═══ 吸附滚动区 · Snap Scroll ═══ -->
+    <div class="snap-scroll" id="snap-scroll">
+
+        <!-- Section 1: Hero + 横向轮播 -->
+        <section class="snap-section hero-section" id="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title">南京<br>今天去哪儿</h1>
+                <p class="hero-desc">选一条路线，开始城市探索</p>
+            </div>
+            <div class="route-carousel" id="route-carousel">
+                <div class="carousel-track" id="carousel-track">
+                    <!-- JS 动态生成 -->
+                </div>
+            </div>
+            <div class="carousel-dots" id="carousel-dots"></div>
+            <div class="scroll-hint">
+                <span class="scroll-hint-arrow">↓</span>
+                <span class="scroll-hint-text">向下探索</span>
+            </div>
+        </section>
+
+        <!-- Section 2: 推荐路线详情 -->
+        <section class="snap-section feature-section" id="feature-section">
+            <!-- JS 动态填充 -->
+        </section>
+
+        <!-- Section 3: 更多路线 + 向导 -->
+        <section class="snap-section more-section" id="more-section">
+            <h2 class="section-heading">更多路线</h2>
+            <div class="route-grid" id="route-grid">
+                <!-- JS 动态生成 -->
+            </div>
+            <div class="guide-block" id="guide-block">
+                <div class="guide-block-card">
+                    <span class="guide-block-mark">?</span>
+                    <div class="guide-block-text">
+                        <p class="guide-block-title">不知道去哪？</p>
+                        <p class="guide-block-hint">让我帮你抽一条今天的南京路线</p>
+                    </div>
+                    <button class="guide-block-btn" id="guide-block-btn">拆开看看</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="snap-bottom-spacer"></div>
+    </div>
+
+    <!-- ═══ Tab: 路线列表 ═══ -->
+    <div class="main-tab-content" id="tab-routes" data-tab="routes">
+        <div class="tab-content-inner" id="tab-routes-inner"></div>
+    </div>
+
+    <!-- ═══ Tab: 周边 ═══ -->
+    <div class="main-tab-content" id="tab-nearby" data-tab="nearby">
+        <div class="tab-content-inner" id="tab-nearby-inner"></div>
+    </div>
+
+    <!-- ═══ Tab: 宠物 ═══ -->
+    <div class="main-tab-content" id="tab-pet" data-tab="pet">
+        <div class="tab-content-inner" id="tab-pet-inner"></div>
+    </div>
+
+    <!-- ═══ Tab: 我的 ═══ -->
+    <div class="main-tab-content" id="tab-profile" data-tab="profile">
+        <div class="tab-content-inner" id="tab-profile-inner"></div>
+    </div>
+
+    <!-- 底部导航 · Wheel Nav -->
+    <nav class="wheel-nav" id="wheel-nav">
+        <div class="wheel-bg"></div>
+        <div class="wheel-track" id="wheel-track">
+            <div class="wheel-item" data-tab="routes" style="--wheel-hue:4;--wheel-color:#FF6B6B;">
+                <span class="wheel-icon">🗺️</span>
+                <span class="wheel-label">路线</span>
+                <span class="wheel-dot"></span>
+            </div>
+            <div class="wheel-item" data-tab="nearby" style="--wheel-hue:35;--wheel-color:#FFB347;">
+                <span class="wheel-icon">聊</span>
+                <span class="wheel-label">社区</span>
+                <span class="wheel-dot"></span>
+            </div>
+            <div class="wheel-item center active" data-tab="home" style="--wheel-hue:140;--wheel-color:#4ECB71;">
+                <span class="wheel-icon">🏠</span>
+                <span class="wheel-label">首页</span>
+                <span class="wheel-dot"></span>
+                <div class="wheel-ring"></div>
+            </div>
+            <div class="wheel-item" data-tab="pet" style="--wheel-hue:220;--wheel-color:#6B8EFF;">
+                <span class="wheel-icon">🐾</span>
+                <span class="wheel-label">宠物</span>
+                <span class="wheel-dot"></span>
+            </div>
+            <div class="wheel-item" data-tab="profile" style="--wheel-hue:275;--wheel-color:#C67BFF;">
+                <span class="wheel-icon">👤</span>
+                <span class="wheel-label">我的</span>
+                <span class="wheel-dot"></span>
+            </div>
+        </div>
+        <div class="wheel-active-indicator" id="wheel-indicator"></div>
+    </nav>
+</div>
+
+<!-- ═══ 浮动路线卡片（地图全屏模式） ═══ -->
+<div class="route-float-card" id="route-float-card">
+    <button class="float-card-close" id="float-card-close">✕</button>
+    <div class="float-card-header">
+        <div class="float-card-icon" id="float-card-icon"></div>
+        <div>
+            <div class="float-card-title" id="float-card-title">路线名称</div>
+            <div class="float-card-sub" id="float-card-sub">路线描述</div>
+        </div>
+    </div>
+    <div class="float-card-info" id="float-card-info">
+        <span class="float-card-time" id="float-card-time">⏱ 计算中…</span>
+        <span class="float-card-stops-count" id="float-card-stops-count"></span>
+    </div>
+    <div class="float-card-stops" id="float-card-stops"></div>
+    <div class="float-card-actions">
+        <button class="float-card-btn primary" id="float-card-start">开始路线</button>
+        <button class="float-card-btn secondary" id="float-card-invite">邀朋友</button>
+    </div>
+</div>
+
+<!-- ═══ 地图加载进度条 ═══ -->
+<div class="map-loading-overlay" id="map-loading-overlay" style="display:none;">
+    <div class="map-loading-bg"></div>
+    <div class="map-loading-box">
+        <div class="map-loading-spinner"></div>
+        <div class="map-loading-text" id="map-loading-text">地图加载中…</div>
+        <div class="map-loading-bar">
+            <div class="map-loading-bar-fill" id="map-loading-bar-fill"></div>
+        </div>
+        <div class="map-loading-pct" id="map-loading-pct">0%</div>
+    </div>
+</div>
+
+<!-- ═══ 地图恢复路线面板按钮 ═══ -->
+<button class="map-restore-btn" id="map-restore-btn" style="display:none;">
+    <span>↑</span> 查看路线
+</button>
+
+<!-- ═══ 路线详情弹窗 ═══ -->
+<div class="route-sheet" id="route-sheet">
+    <div class="sheet-mask"></div>
+    <div class="sheet-body" id="sheet-body"></div>
+</div>
+
+<!-- ═══ 剧情节点弹窗 ═══ -->
+<div class="story-overlay" id="story-overlay">
+    <div class="story-panel">
+        <div class="story-badge" id="story-badge">站点故事</div>
+        <div class="story-stop-name" id="story-stop-name">站名</div>
+        <div class="story-text" id="story-text">故事内容</div>
+        <div class="story-actions">
+            <button class="story-btn primary" id="story-close">知道了</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Toast 通知容器 ═══ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══ 漫游社区弹层 ═══ -->
+<div class="community-overlay" id="community-overlay" aria-hidden="true">
+    <div class="community-overlay-shell">
+        <button class="community-overlay-close" id="community-overlay-close" type="button">关闭</button>
+        <div class="tab-content-inner" id="community-overlay-inner"></div>
+    </div>
+</div>
+
+<!-- ═══ AI 助手聊天面板 ═══ -->
+<div class="ai-chat-panel" id="ai-chat-panel">
+    <div class="ai-chat-header">
+        <span class="ai-chat-avatar">AI</span>
+        <div class="ai-chat-header-text">
+            <span class="ai-chat-title">AI 助手</span>
+            <span class="ai-chat-subtitle">你的南京漫游向导</span>
+        </div>
+        <button class="ai-chat-close" id="ai-chat-close">✕</button>
+    </div>
+    <div class="ai-chat-messages" id="ai-chat-messages">
+        <div class="ai-msg ai-msg-bot">
+            <span class="ai-msg-avatar">AI</span>
+            <div class="ai-msg-bubble">嗨！想找什么路线？或者问我南京哪里好玩！</div>
+        </div>
+    </div>
+    <div class="ai-chat-input-row">
+        <input type="text" class="ai-chat-input" id="ai-chat-input" placeholder="输入你的问题…" />
+        <button class="ai-chat-send" id="ai-chat-send">发送</button>
+    </div>
+</div>
+
+<!-- ═══ 邀约表单弹窗 ═══ -->
+<div class="invite-overlay" id="invite-overlay">
+    <div class="invite-sheet">
+        <p class="title">生成路线邀约卡</p>
+        <p class="subtitle">填好信息，发给朋友一起走</p>
+        <div class="invite-form" id="invite-form">
+            <input type="hidden" id="invite-route-id" />
+            <label>集合地点</label>
+            <input type="text" id="invite-place" placeholder="如：南京大学鼓楼校区正门" />
+
+            <div class="form-row">
+                <div>
+                    <label>见面日期</label>
+                    <input type="date" id="invite-date" />
+                </div>
+                <div>
+                    <label>见面时间</label>
+                    <input type="time" id="invite-time" />
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div>
+                    <label>预估花费 (¥)</label>
+                    <input type="number" id="invite-cost" placeholder="如：50" />
+                </div>
+                <div>
+                    <label>适合人数</label>
+                    <input type="number" id="invite-people" placeholder="如：4" />
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn-primary" id="invite-submit">生成邀约卡</button>
+                <button class="btn-cancel" id="invite-cancel">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ 邀约卡展示弹窗 ═══ -->
+<div class="invite-result-overlay" id="invite-result-overlay">
+    <div class="invite-result-body" id="invite-result-body"></div>
+</div>
+
+<!-- ═══ 高德地图 JS API 2.0 ═══ -->
+<script>
+    window._AMapSecurityConfig = {
+        securityJsCode: "94113a476eff771948c5234624bb9179",
+    };
+</script>
+<script src="https://webapi.amap.com/loader.js"></script>
+
+<!-- ═══ 人格地图样式配置 ═══ -->
+<script src="./persona-map-styles.js"></script>
+<script src="./supply-data.js"></script>
+<script src="./building-points.js"></script>
+<script src="./landmarks-data.js"></script>
+
+<script src="./gsap.min.js"></script>
+<script src="./ScrollTrigger.min.js"></script>
+<script src="./app.js"></script>
+
+</body>
+</html>

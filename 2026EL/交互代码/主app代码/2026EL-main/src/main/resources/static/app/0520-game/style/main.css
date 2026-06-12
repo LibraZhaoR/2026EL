@@ -1,0 +1,252 @@
+/* ============================================
+   视觉小说样式 — 适配 16:9 全屏 + WebView 嵌入
+   ============================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ==================== 启动画面 ==================== */
+#vn-start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a14;
+  cursor: pointer;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+#vn-start-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#vn-start-inner {
+  text-align: center;
+}
+
+#vn-start-title {
+  font-size: 42px;
+  color: #ffffff;
+  letter-spacing: 0.12em;
+  margin-bottom: 14px;
+  text-shadow: 0 0 40px rgba(100, 160, 240, 0.5);
+}
+
+#vn-start-subtitle {
+  font-size: 17px;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 50px;
+  letter-spacing: 0.06em;
+}
+
+#vn-start-hint {
+  font-size: 15px;
+  color: rgba(255,255,255,0.4);
+  animation: blink 1.6s ease-in-out infinite;
+  letter-spacing: 0.08em;
+}
+
+/* ==================== 舞台 ==================== */
+#vn-stage {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* ==================== 背景图层 ==================== */
+#vn-background {
+  position: absolute;
+  inset: 0;
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #000000;
+  transition: opacity 0.6s ease;
+  opacity: 0;
+}
+#vn-background.visible {
+  opacity: 1;
+}
+
+/* ==================== 立绘图层 ==================== */
+#vn-sprites {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 65%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sprite-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.5));
+  transition: opacity 0.4s ease;
+  opacity: 0;
+}
+.sprite-img.visible {
+  opacity: 1;
+}
+
+/* 立绘浮动动画（避免遮挡背景文字） */
+.sprite-sway {
+  animation: spriteSway 5s ease-in-out infinite;
+}
+
+@keyframes spriteSway {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(3%); }
+}
+
+/* 路面位置：底部偏右，不遮挡背景文字 */
+.sprite-road {
+  position: relative;
+  align-self: flex-end !important;
+  margin-bottom: -2%;
+  margin-left: auto;
+  margin-right: 2%;
+  max-width: 35% !important;
+  max-height: 60% !important;
+}
+
+/* 小立绘：右上角，较小尺寸 */
+.sprite-small {
+  max-width: 28% !important;
+  max-height: 40% !important;
+  position: relative;
+  align-self: flex-start;
+  margin-top: 5%;
+  margin-left: auto;
+  margin-right: 8%;
+}
+
+/* ==================== 对话框 ==================== */
+#vn-dialog-box {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 32px 48px 28px;
+  background: linear-gradient(
+    0deg,
+    rgba(0,0,0,0.85) 0%,
+    rgba(0,0,0,0.70) 60%,
+    rgba(0,0,0,0.00) 100%
+  );
+  z-index: 20;
+  min-height: 180px;
+}
+
+#vn-speaker-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+
+#vn-dialog-text {
+  font-size: 19px;
+  line-height: 1.85;
+  color: #eee;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  max-width: 860px;
+}
+
+#vn-click-hint {
+  position: absolute;
+  bottom: 12px;
+  right: 32px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.45);
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
+/* ==================== 选项菜单 ==================== */
+#vn-choices {
+  position: absolute;
+  bottom: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  width: 420px;
+  max-width: 85vw;
+}
+
+.choice-btn {
+  display: block;
+  width: 100%;
+  padding: 16px 28px;
+  font-size: 18px;
+  font-family: inherit;
+  color: #fff;
+  background: rgba(30, 40, 80, 0.82);
+  border: 1px solid rgba(140, 170, 230, 0.45);
+  border-radius: 10px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-align: center;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.choice-btn:hover {
+  background: rgba(50, 70, 130, 0.88);
+  border-color: rgba(170, 200, 255, 0.7);
+  transform: scale(1.025);
+}
+
+.choice-btn:active {
+  transform: scale(0.985);
+}
+
+/* ==================== 响应式 ==================== */
+@media (max-width: 768px) {
+  #vn-dialog-box {
+    padding: 22px 22px 20px;
+    min-height: 150px;
+  }
+  #vn-speaker-name { font-size: 18px; }
+  #vn-dialog-text { font-size: 16px; max-width: 100%; }
+  #vn-sprites { width: 55%; height: 55%; bottom: 22%; }
+  .choice-btn { padding: 14px 20px; font-size: 16px; }
+}
+
+@media (min-width: 1920px) {
+  #vn-dialog-box { padding: 40px 72px 34px; }
+  #vn-speaker-name { font-size: 26px; }
+  #vn-dialog-text { font-size: 21px; max-width: 1000px; }
+  .choice-btn { font-size: 20px; }
+}

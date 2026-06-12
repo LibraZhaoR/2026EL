@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>路线编辑器</title>
+    <style>
+        :root {
+            --primary: #0066CC; --success: #248A3D; --danger: #D70015; --warning: #BF6A02;
+            --panel-bg: #FFFFFF; --text: #1D1D1F; --text2: #6E6E73;
+            --shadow: 0 1px 0 rgba(0,0,0,0.05);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; display:flex; height:100vh; overflow:hidden; background:#F5F5F7; }
+        .sidebar { width:360px; background:var(--panel-bg); box-shadow:var(--shadow); z-index:10; display:flex; flex-direction:column; border-right:1px solid rgba(0,0,0,0.05); }
+        .sidebar-header { padding:20px 24px; border-bottom:1px solid rgba(0,0,0,0.05); display:flex; align-items:center; gap:10px; }
+        .sidebar-header h1 { font-size:20px; font-weight:700; color:var(--primary); flex:1; }
+        .btn-back { padding:6px 12px; border-radius:8px; border:1px solid #ddd; background:#fff; font-size:13px; cursor:pointer; }
+        .sidebar-content { flex:1; overflow-y:auto; padding:16px 20px; }
+        .input-card { background:#F5F5F7; border-radius:12px; padding:14px 16px; margin-bottom:12px; border:1px solid transparent; transition:all 0.2s; cursor:pointer; }
+        .input-card.active { border-color:rgba(0,102,204,0.34); background:#fff; box-shadow:0 0 0 3px rgba(0,102,204,0.10); }
+        .input-card label { display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; margin-bottom:8px; }
+        .input-card input, .input-card select { width:100%; border:1px solid #E5E5EA; border-radius:8px; padding:10px; font-size:14px; outline:none; }
+        .point-badge { width:22px; height:22px; border-radius:50%; color:#fff; font-size:11px; display:grid; place-items:center; font-weight:bold; flex-shrink:0; }
+        .waypoint-item { display:flex; align-items:center; gap:8px; margin-top:6px; animation:slideIn 0.3s; }
+        @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .waypoint-item input { flex:1; }
+        .waypoint-item.sorting { opacity:0.4; }
+        .waypoint-item.drag-over { border-top:2px solid var(--primary); }
+        .waypoint-item .drag-handle { cursor:grab; font-size:16px; color:#AEAEB2; padding:0 2px; user-select:none; }
+        .waypoint-item .drag-handle:active { cursor:grabbing; }
+        .waypoint-sort-hint { font-size:11px; color:#AEAEB2; text-align:center; padding:2px 0 6px; }
+        .btn-row { display:flex; gap:6px; }
+        .btn-row button { flex:1; }
+        .btn-group { padding:16px 20px; background:#fff; border-top:1px solid rgba(0,0,0,0.05); display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        button { border:none; border-radius:10px; padding:11px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+        .btn-primary { background:var(--primary); color:#fff; grid-column:span 2; }
+        .btn-primary:hover { filter:brightness(0.9); }
+        .btn-primary:disabled { background:#AEAEB2; cursor:not-allowed; }
+        .btn-success { background:var(--success); color:#fff; grid-column:span 2; display:none; }
+        .btn-secondary { background:#E5E5EA; color:var(--text); }
+        .btn-danger { background:rgba(182,66,54,0.1); color:var(--danger); font-size:12px; padding:6px 10px; }
+        .map-container { flex:1; position:relative; }
+        #map { width:100%; height:100%; }
+        .map-tip { position:absolute; top:16px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.94); backdrop-filter:blur(12px); padding:8px 18px; border-radius:20px; font-size:13px; font-weight:600; box-shadow:var(--shadow); z-index:5; }
+        .results { margin-top:16px; padding:14px; background:#F5F5F7; border-radius:12px; font-size:13px; }
+        .route-stat { display:flex; justify-content:space-around; margin-bottom:12px; text-align:center; }
+        .route-stat b { font-size:18px; color:var(--primary); }
+        .route-stat span { display:block; font-size:11px; color:var(--text2); }
+        .step-list { max-height:180px; overflow-y:auto; }
+        .step-item { padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.03); color:#48484A; font-size:12px; }
+        ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-thumb { background:#D1D1D6; border-radius:10px; }
+        @media (max-width: 720px) {
+            body { flex-direction:column; background:#F5F5F7; }
+            .sidebar {
+                width:100%;
+                height:58dvh;
+                min-height:430px;
+                border-right:0;
+                border-bottom:1px solid #EBEBEB;
+                box-shadow:0 1px 0 rgba(0,0,0,0.05);
+            }
+            .sidebar-header { padding:16px 20px; gap:8px; }
+            .sidebar-header h1 { font-size:18px; }
+            .btn-back { border-radius:999px; padding:7px 14px; }
+            .sidebar-content { padding:14px 20px; }
+            .input-card { border-radius:16px; background:#FFFFFF; border:1px solid #EBEBEB; }
+            .input-card.active { border-color:rgba(0,102,204,0.34); box-shadow:0 0 0 3px rgba(0,102,204,0.10); }
+            .btn-group { padding:12px 20px 16px; gap:8px; }
+            button { border-radius:999px; }
+            .map-container {
+                flex:1;
+                min-height:260px;
+                width:100%;
+            }
+            .map-tip {
+                left:16px;
+                right:16px;
+                top:12px;
+                transform:none;
+                width:auto;
+                white-space:normal;
+                text-align:center;
+                line-height:1.35;
+                border:1px solid #EBEBEB;
+            }
+        }
+        .re-loading { position:absolute; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#F5F5F7; gap:12px; }
+        .re-loading.hide { display:none; }
+        .re-loading-spinner { width:32px; height:32px; border-radius:50%; border:3px solid rgba(0,102,204,0.15); border-top-color:var(--primary); animation:reSpin 0.8s linear infinite; }
+        @keyframes reSpin { to { transform:rotate(360deg); } }
+        .re-loading-text { font-size:13px; color:#6E6E73; font-weight:500; }
+        /* ── 规划完成后折叠输入卡片 ── */
+        .sidebar-content.planned .input-card { display:none; }
+        .sidebar-content.planned .route-planned-summary { display:flex; }
+        .route-planned-summary { display:none; align-items:center; gap:8px; padding:10px 16px; background:#F5F5F7; border-radius:10px; margin-bottom:10px; flex-wrap:wrap; font-size:13px; }
+        .route-planned-summary .badge { padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; color:#fff; }
+        .route-planned-summary .badge.green { background:var(--success); }
+        .route-planned-summary .badge.yellow { background:var(--warning); }
+        .route-planned-summary .badge.red { background:var(--danger); }
+        .route-planned-summary .btn-edit { margin-left:auto; font-size:11px; padding:4px 10px; border-radius:8px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h1>🗺️ 路线编辑器</h1>
+        <button class="btn-back" onclick="parent.postMessage({type:'close-editor'},'*')">← 返回</button>
+    </div>
+    <div class="sidebar-content">
+        <div class="input-card active" id="card-origin" onclick="setEditMode('origin')">
+            <label><div class="point-badge" style="background:var(--success)">起</div>起点设置</label>
+            <input type="text" id="origin-name" value="我的位置" onchange="handleNameChange('origin')">
+        </div>
+        <div class="input-card" id="card-waypoint" onclick="setEditMode('waypoint')">
+            <label>
+                <div class="point-badge" style="background:var(--warning)">途</div>途径点
+                <button class="btn-danger" onclick="event.stopPropagation();resetPoints('waypoint')">清空</button>
+            </label>
+            <div id="waypoints-container"><div style="text-align:center;color:var(--text2);font-size:13px;padding:8px;">点击地图添加</div></div>
+        </div>
+        <div class="input-card" id="card-destination" onclick="setEditMode('destination')">
+            <label><div class="point-badge" style="background:var(--danger)">终</div>终点设置</label>
+            <input type="text" id="destination-name" value="目的地" onchange="handleNameChange('destination')">
+        </div>
+        <div class="input-card" style="cursor:default;">
+            <label>出行偏好</label>
+            <select id="transport-mode">
+                <option value="walking">🚶 步行模式</option>
+                <option value="driving">🚗 驾车模式</option>
+            </select>
+            <input type="text" id="route-name" placeholder="路线方案名称" style="margin-top:10px;" value="我的金陵探索路线">
+        </div>
+        <div id="result-area"></div>
+    </div>
+    <div class="btn-group">
+        <button class="btn-secondary" onclick="clearAll()">全部重置</button>
+        <button class="btn-danger" onclick="undoLast()">撤销一步</button>
+        <button class="btn-primary" id="plan-btn" onclick="executePlanning()">🚀 生成规划方案</button>
+        <button class="btn-success" id="save-btn" onclick="handleSave()">💾 同步至灵动金陵</button>
+    </div>
+</div>
+<div class="map-container">
+    <div class="map-tip" id="mode-tip">📍 请点击地图设置【起点】</div>
+    <div class="re-loading" id="re-loading">
+        <div class="re-loading-spinner"></div>
+        <div class="re-loading-text">地图加载中…</div>
+    </div>
+    <div id="map"></div>
+</div>
+<script>
+    window._AMapSecurityConfig = { securityJsCode: '' };
+    const AMAP_KEY = '5427cfbccb2209b756af7fc782e8105b';
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=5427cfbccb2209b756af7fc782e8105b&plugin=AMap.Walking,AMap.Driving,AMap.PlaceSearch"></script>
+<script>
+const state = { map:null, editMode:'origin', points:[], polyline:null, lastResult:null, pathCoords:[], pathStops:[] };
+
+function init() {
+    state.map = new AMap.Map('map', { zoom:14, center:[118.796,32.060], mapStyle:'amap://styles/normal' });
+    state.map.on('click', handleMapClick);
+    var loadingEl = document.getElementById('re-loading');
+    var hideLoading = function() {
+        if (loadingEl) loadingEl.classList.add('hide');
+        state.map.off('complete', hideLoading);
+    };
+    state.map.on('complete', hideLoading);
+    setTimeout(hideLoading, 5000);
+    setEditMode('origin');
+
+    // Read prefill data from URL hash (set by parent before iframe loads)
+    var hash = window.location.hash;
+    if (hash.indexOf('#prefill=') === 0) {
+        try {
+            var prefill = JSON.parse(decodeURIComponent(hash.substring(9)));
+            document.getElementById('mode-tip').innerText = '📍 正在搜索途经点位置…';
+            applyPrefill(prefill);
+            // Clean URL
+            history.replaceState(null, '', window.location.pathname);
+        } catch(e) {}
+    }
+}
+
+// Apply existing route waypoints to the editor
+function applyPrefill(data) {
+    var stopNames = data.stops || [];
+    if (!stopNames.length) return;
+
+    state.points.forEach(function(p) { if (p.marker) state.map.remove(p.marker); });
+    state.points = [];
+    state.pathCoords = [];
+    state.pathStops = [];
+
+    var ps = new AMap.PlaceSearch({ city: "南京", pageSize: 1 });
+    var found = [];
+
+    function searchNext(i) {
+        if (i >= stopNames.length) { finishPrefill(found, data); return; }
+        var name = stopNames[i];
+        ps.search(name, function(status, result) {
+            if (status === "complete" && result.poiList && result.poiList.pois.length) {
+                var p = result.poiList.pois[0];
+                var type = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+                found.push({ name: name, lng: p.location.lng, lat: p.location.lat, type: type });
+            } else {
+                ps.search(name + " 南京", function(s2, r2) {
+                    if (s2 === "complete" && r2.poiList && r2.poiList.pois.length) {
+                        var p2 = r2.poiList.pois[0];
+                        var type2 = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+                        found.push({ name: name, lng: p2.location.lng, lat: p2.location.lat, type: type2 });
+                    }
+                    setTimeout(function() { searchNext(i + 1); }, 100);
+                });
+                return;
+            }
+            // Both searches failed — fall back to hardcoded coords if available
+            if (data.coords && data.coords[i]) {
+                var lng2 = data.coords[i][1], lat2 = data.coords[i][0];
+                var type3 = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+                found.push({ name: name, lng: lng2, lat: lat2, type: type3 });
+            }
+            setTimeout(function() { searchNext(i + 1); }, 100);
+        });
+    }
+
+    function finishPrefill(points, data) {
+        if (!points.length) {
+            document.getElementById('mode-tip').innerText = '⚠️ 未找到途经点，请手动点击地图添加';
+            return;
+        }
+        document.getElementById('mode-tip').innerText = '✅ 已加载 ' + points.length + ' 个途经点';
+        setTimeout(function() { document.getElementById('mode-tip').innerText = '➕ 点击地图添加【途径点】'; }, 3000);
+        points.forEach(function(p) {
+            var lnglat = p.lng.toFixed(6) + "," + p.lat.toFixed(6);
+            var point = { type: p.type, lnglat: lnglat, customNamed: true, name: p.name };
+            point.marker = createMarker(new AMap.LngLat(p.lng, p.lat), point);
+            state.points.push(point);
+        });
+        var originName = document.getElementById("origin-name");
+        var destName = document.getElementById("destination-name");
+        var routeName = document.getElementById("route-name");
+        if (originName && points.length > 0) originName.value = points[0].name;
+        if (destName && points.length > 0) destName.value = points[points.length - 1].name;
+        if (routeName && data.routeName) routeName.value = data.routeName;
+        syncUI();
+        setEditMode("waypoint");
+        var allLngLats = points.map(function(p) { return new AMap.LngLat(p.lng, p.lat); });
+        if (allLngLats.length === 1) {
+            state.map.setZoomAndCenter(16, allLngLats[0]);
+        } else {
+            state.map.setFitView(allLngLats, false, [60, 60, 60, 60]);
+        }
+    }
+
+    searchNext(0);
+}
+
+
+function setEditMode(mode) {
+    state.editMode = mode;
+    document.querySelectorAll('.input-card').forEach(c => c.classList.remove('active'));
+    document.getElementById('card-' + mode)?.classList.add('active');
+    const tips = { origin:'📍 请点击地图设置【起点】', waypoint:'➕ 点击地图添加【途径点】', destination:'🏁 请点击地图设置【终点】' };
+    document.getElementById('mode-tip').innerText = tips[mode];
+}
+
+function handleMapClick(e) {
+    const lnglat = e.lnglat.getLng().toFixed(6)+','+e.lnglat.getLat().toFixed(6);
+    if (state.editMode === 'origin' || state.editMode === 'destination') removeExistingPoint(state.editMode);
+    const point = { type:state.editMode, lnglat, customNamed:false, name:getDefaultName(state.editMode) };
+    point.marker = createMarker(e.lnglat, point);
+    state.points.push(point);
+    if (state.editMode === 'origin') setEditMode('waypoint');
+    syncUI(); clearRoute();
+}
+
+function getDefaultName(type) {
+    if (type==='origin') return '起点';
+    if (type==='destination') return '终点';
+    return '途径点'+(state.points.filter(p=>p.type==='waypoint').length+1);
+}
+
+function createMarker(pos, point) {
+    const colors = { origin:'#2ecc71', waypoint:'#f1c40f', destination:'#e74c3c' };
+    const text = point.type==='origin'?'起':(point.type==='destination'?'终':state.points.filter(p=>p.type==='waypoint').length+1);
+    const m = new AMap.Marker({ position:pos,
+        content:'<div style="background:'+colors[point.type]+';color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:12px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.2);font-weight:bold;">'+text+'</div>',
+        offset:new AMap.Pixel(-13,-13) });
+    m.setMap(state.map);
+    return m;
+}
+
+function syncUI() {
+    const o = state.points.find(p=>p.type==='origin');
+    if (o) document.getElementById('origin-name').value = o.name;
+    const d = state.points.find(p=>p.type==='destination');
+    if (d) document.getElementById('destination-name').value = d.name;
+    const wps = state.points.filter(p=>p.type==='waypoint');
+    const c = document.getElementById('waypoints-container');
+    if (!wps.length) { c.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:8px;">点击地图添加</div>'; }
+    else {
+        c.innerHTML = '<div class="waypoint-sort-hint">≡ 拖动 ↔ 调整顺序</div>'
+            + wps.map((p,i)=>'<div class="waypoint-item" draggable="true" data-wp-index="'+i+'"><span class="drag-handle">≡</span><div class="point-badge" style="background:var(--warning)">'+(i+1)+'</div><input value="'+p.name+'" onchange="handleWPName('+i+',this.value)"><button class="btn-danger" onclick="event.stopPropagation();removeWP('+i+')">✕</button></div>').join('');
+        // Attach drag events via delegation
+        setupWaypointDrag(c);
+    }
+}
+
+function handleNameChange(type) { const p = state.points.find(p=>p.type===type); if(p){ p.name=document.getElementById(type+'-name').value; p.customNamed=true; } }
+function handleWPName(i,v) { const w=state.points.filter(p=>p.type==='waypoint'); if(w[i]){ w[i].name=v; w[i].customNamed=true; } }
+function removeExistingPoint(type) { const i=state.points.findIndex(p=>p.type===type); if(i>-1){ state.points[i].marker.setMap(null); state.points.splice(i,1); } }
+function removeWP(i) { const w=state.points.filter(p=>p.type==='waypoint'); w[i].marker.setMap(null); state.points=state.points.filter(p=>p!==w[i]); syncUI(); clearRoute(); }
+
+// ── Drag-to-reorder waypoints ──
+var _dragWpIdx = null;
+function setupWaypointDrag(container) {
+    // Use event delegation instead of per-item listeners
+    container.ondragstart = function(e) {
+        var item = e.target.closest('.waypoint-item');
+        if (!item) return;
+        _dragWpIdx = parseInt(item.dataset.wpIndex);
+        item.classList.add('sorting');
+        e.dataTransfer.effectAllowed = 'move';
+    };
+    container.ondragend = function(e) {
+        var item = e.target.closest('.waypoint-item');
+        if (item) item.classList.remove('sorting');
+        container.querySelectorAll('.waypoint-item').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+        _dragWpIdx = null;
+    };
+    container.ondragover = function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var target = e.target.closest('.waypoint-item');
+        if (!target) return;
+        container.querySelectorAll('.waypoint-item').forEach(function(el) {
+            el.classList.remove('drag-over');
+        });
+        target.classList.add('drag-over');
+    };
+    container.ondrop = function(e) {
+        e.preventDefault();
+        container.querySelectorAll('.waypoint-item').forEach(function(el) {
+            el.classList.remove('drag-over', 'sorting');
+        });
+        if (_dragWpIdx === null) return;
+        var target = e.target.closest('.waypoint-item');
+        if (!target) return;
+        var toIdx = parseInt(target.dataset.wpIndex);
+        if (_dragWpIdx === toIdx) return;
+        // Get current waypoints in order
+        var wps = state.points.filter(function(p) { return p.type === 'waypoint'; });
+        if (_dragWpIdx >= wps.length || toIdx >= wps.length) return;
+        // Remove dragged waypoint from array, re-insert at new position
+        var moved = wps.splice(_dragWpIdx, 1)[0];
+        wps.splice(toIdx, 0, moved);
+        // Rebuild state.points: origin + reordered waypoints + destination
+        var origin = state.points.find(function(p) { return p.type === 'origin'; });
+        var dest = state.points.find(function(p) { return p.type === 'destination'; });
+        state.points = [origin].concat(wps).concat(dest ? [dest] : []);
+        // Re-number markers to reflect new order
+        var colors = { origin:'#2ecc71', waypoint:'#f1c40f', destination:'#e74c3c' };
+        wps.forEach(function(p, i) {
+            p.marker.setContent('<div style="background:'+colors.waypoint+';color:#fff;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:12px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.2);font-weight:bold;">'+(i+1)+'</div>');
+        });
+        syncUI();
+        clearRoute();
+    };
+}
+function resetPoints(type) { state.points.filter(p=>p.type===type).forEach(p=>p.marker.setMap(null)); state.points=state.points.filter(p=>p.type!==type); syncUI(); clearRoute(); }
+function undoLast() { if(!state.points.length) return; state.points.pop().marker.setMap(null); syncUI(); clearRoute(); }
+function clearAll() { state.points.forEach(p=>p.marker.setMap(null)); state.points=[]; clearRoute(); syncUI(); setEditMode('origin'); }
+function expandRouteCards() { document.querySelector('.sidebar-content')?.classList.remove('planned'); }
+function clearRoute() { if(state.polyline){ state.polyline.setMap(null); state.polyline=null; } state.lastResult=null; document.getElementById('result-area').innerHTML=''; document.getElementById('save-btn').style.display='none'; document.querySelector('.sidebar-content')?.classList.remove('planned'); }
+
+async function executePlanning() {
+    const origin = state.points.find(p=>p.type==='origin');
+    let dest = state.points.find(p=>p.type==='destination');
+    let wps = state.points.filter(p=>p.type==='waypoint');
+    // Auto-promote last waypoint to destination if none set
+    if (!dest && wps.length > 0) {
+        const last = wps[wps.length - 1];
+        last.type = 'destination';
+        last.marker._editType = 'destination';
+        dest = last;
+        wps = state.points.filter(p=>p.type==='waypoint');
+        syncUI();
+    }
+    if(!origin) return alert('请先设置起点！');
+    if(!dest) return alert('请设置终点，或添加途经点后自动识别最后一个为终点');
+
+    const btn = document.getElementById('plan-btn');
+    btn.disabled = true; btn.innerText = '正在计算最佳路径...';
+
+    try {
+        const mode = document.getElementById('transport-mode').value;
+
+        if (mode === 'driving') {
+            // ── 驾车模式：使用 JS API 插件，支持途经点，单次调用 ──
+            await planWithDriving(origin, dest, wps);
+        } else {
+            // ── 步行模式：分段调用 Walking 插件 ──
+            await planWithWalking(origin, dest, wps);
+        }
+    } catch(e) {
+        alert('规划失败: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.innerText = '🚀 生成规划方案';
+    }
+}
+
+function planWithDriving(origin, dest, wps) {
+    return new Promise((resolve, reject) => {
+        const driving = new AMap.Driving({ policy: AMap.DrivingPolicy.LEAST_TIME });
+        const originLngLat = parseLngLat(origin.lnglat);
+        const destLngLat = parseLngLat(dest.lnglat);
+        const waypoints = wps.map(w => ({ keyword: w.name, position: parseLngLat(w.lnglat) }));
+
+        driving.search(originLngLat, destLngLat, { waypoints: waypoints.length ? waypoints : undefined }, function(status, result) {
+            if (status !== 'complete') return reject(new Error(result.info || '驾车规划失败'));
+            const routes = result.routes;
+            if (!routes || !routes.length) return reject(new Error('无可用驾车路线'));
+            const route = routes[0];
+            let allSteps = [], pathCoords = [];
+            route.steps.forEach(step => {
+                allSteps.push({ instruction: step.instruction });
+                step.path.forEach(p => pathCoords.push(p));
+            });
+            renderRoute(pathCoords, parseInt(route.distance), parseInt(route.time) * 60, allSteps);
+            state.lastResult = { distance: parseInt(route.distance), duration: parseInt(route.time) * 60 };
+            document.getElementById('save-btn').style.display = 'block';
+            resolve();
+        });
+    });
+}
+
+function planWithWalking(origin, dest, wps) {
+    return new Promise((resolve, reject) => {
+        const allPts = [origin, ...wps, dest];
+        let totalDist = 0, totalDur = 0, allSteps = [], pathCoords = [];
+        let idx = 0;
+
+        function searchNext() {
+            if (idx >= allPts.length - 1) {
+                renderRoute(pathCoords, totalDist, totalDur, allSteps);
+                state.lastResult = { distance: totalDist, duration: totalDur };
+                document.getElementById('save-btn').style.display = 'block';
+                return resolve();
+            }
+            const from = allPts[idx].lnglat;
+            const to = allPts[idx + 1].lnglat;
+
+            const mode = document.getElementById('transport-mode').value;
+            const url = 'https://restapi.amap.com/v5/direction/' + mode + '?key=' + AMAP_KEY + '&origin=' + from + '&destination=' + to + '&show_fields=polyline';
+
+            fetch(url).then(r => r.json()).then(res => {
+                if (res.status !== '1') throw new Error(res.info || '规划失败(状态码:'+res.status+')');
+                const path = res.route.paths[0];
+                totalDist += parseInt(path.distance);
+                totalDur += parseInt(path.duration);
+                path.steps.forEach(s => {
+                    allSteps.push({ instruction: s.instruction });
+                    s.polyline.split(';').forEach(p => {
+                        const [lng, lat] = p.split(',');
+                        pathCoords.push(new AMap.LngLat(parseFloat(lng), parseFloat(lat)));
+                    });
+                });
+                idx++;
+                // ── Delay 1.5s between requests to stay under QPS limit ──
+                setTimeout(searchNext, 1500);
+            }).catch(e => reject(new Error('步行分段'+(idx+1)+'失败: '+e.message)));
+        }
+        searchNext();
+    });
+}
+
+function parseLngLat(s) {
+    const parts = s.split(',');
+    return new AMap.LngLat(parseFloat(parts[0]), parseFloat(parts[1]));
+}
+
+function renderRoute(coords, dist, dur, steps) {
+    if(state.polyline) state.polyline.setMap(null);
+    state.polyline=new AMap.Polyline({ path:coords, strokeColor:'#E07A5F', strokeWeight:6, strokeOpacity:0.85, lineJoin:'round', showDir:true });
+    state.polyline.setMap(state.map);
+    state.map.setFitView([state.polyline,...state.points.map(p=>p.marker)]);
+    // Store path coords as [lng, lat] pairs for saving
+    state.pathCoords = coords.map(c => [c.getLng(), c.getLat()]);
+    state.pathStops = state.points.map(p => ({name: p.name, lnglat: p.lnglat}));
+    document.getElementById('result-area').innerHTML='<div class="results"><div class="route-stat"><div><b>'+(dist/1000).toFixed(1)+'</b><span>公里</span></div><div><b>'+Math.ceil(dur/60)+'</b><span>预计分钟</span></div><div><b>'+steps.length+'</b><span>段路程</span></div></div><div class="step-list">'+steps.map((s,i)=>'<div class="step-item">'+(i+1)+'. '+s.instruction+'</div>').join('')+'</div></div>';
+    // Collapse origin/waypoint/destination cards into a compact summary
+    var sidebar = document.querySelector('.sidebar-content');
+    if (sidebar) sidebar.classList.add('planned');
+    var summary = sidebar ? sidebar.querySelector('.route-planned-summary') : null;
+    if (!summary) {
+        summary = document.createElement('div');
+        summary.className = 'route-planned-summary';
+        sidebar.insertBefore(summary, document.getElementById('result-area'));
+    }
+    var origin = state.points.find(function(p) { return p.type === 'origin'; });
+    var dest = state.points.find(function(p) { return p.type === 'destination'; });
+    var wpCount = state.points.filter(function(p) { return p.type === 'waypoint'; }).length;
+    summary.innerHTML = '<span class="badge green">起:'+(origin?origin.name:'?')+'</span>'
+        + (wpCount ? '<span class="badge yellow">'+wpCount+'途经</span>' : '')
+        + '<span class="badge red">终:'+(dest?dest.name:'?')+'</span>'
+        + '<span style="color:var(--text2);font-size:11px;">'+(dist/1000).toFixed(1)+'km · '+Math.ceil(dur/60)+'min</span>'
+        + '<button class="btn-edit" onclick="expandRouteCards()">✎ 修改</button>';
+}
+
+async function handleSave() {
+    const origin=state.points.find(p=>p.type==='origin'), dest=state.points.find(p=>p.type==='destination');
+    const wps=state.points.filter(p=>p.type==='waypoint');
+    if(!origin||!dest) return alert('请先完成路径规划');
+    const allStops = [origin, ...wps, dest].filter(Boolean).map(p => ({
+        name: p.name, lnglat: p.lnglat
+    }));
+    const payload={
+        routeName:document.getElementById('route-name').value,
+        origin:origin.name+'|'+origin.lnglat,
+        destination:dest.name+'|'+dest.lnglat,
+        waypoints:wps.map(p=>p.name+'|'+p.lnglat).join(';'),
+        transportMode:document.getElementById('transport-mode').value,
+        totalDistance:state.lastResult.distance,
+        totalDuration:state.lastResult.duration,
+        pathCoords: state.pathCoords || [],
+        stops: allStops
+    };
+    const btn=document.getElementById('save-btn'); btn.innerText='正在同步...';
+    let savedToLegacy = false, savedToRouteDb = false;
+    // 1. 保存到原有系统 (H2)
+    try {
+        const res=await fetch('/api/custom-route/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());
+        if(res.code===200) savedToLegacy = true;
+    } catch(e) { console.warn('原有存储失败:', e.message); }
+    // 2. 同步到路线数据库 (带起点/终点/途径点经纬度)
+    try {
+        const allPts = [origin, ...wps, dest].filter(Boolean);
+        const routeDbPoints = allPts.map((p, i) => {
+            const [lng, lat] = p.lnglat.split(',').map(Number);
+            return { name: p.name, address: '', latitude: lat, longitude: lng, sort_order: i,
+                point_type: i === 0 ? 'start' : (i === allPts.length - 1 ? 'end' : 'waypoint'),
+                description: '', stay_minutes: 30 };
+        });
+        const dbPayload = { title: document.getElementById('route-name').value,
+            description: state.lastResult ? (state.lastResult.distance/1000).toFixed(1)+'km - '+Math.ceil(state.lastResult.duration/60)+'min' : '',
+            category: '自定义', duration_min: state.lastResult ? Math.ceil(state.lastResult.duration/60) : 0,
+            budget_min: 0, budget_max: 0, crowd_tags: [], interest_tags: [],
+            user_id: 'local-user', is_public: false, points: routeDbPoints };
+        const dbRes = await fetch('/api/route-db/routes',
+            {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dbPayload)}).then(r=>r.json());
+        if(dbRes.id) savedToRouteDb = true;
+    } catch(e) { console.warn('路线数据库同步失败:', e.message); }
+    // 反馈结果
+    if (savedToRouteDb) { btn.innerText='已同步至路线数据库'; btn.style.background='#2E8B57'; }
+    else if (savedToLegacy) { btn.innerText='已同步(原有系统)'; btn.style.background='#F0AD4E'; }
+    else { btn.innerText='同步失败，请检查网络'; btn.style.background='#D70015'; }
+    if(parent!==window) parent.postMessage({type:'route-saved',data:payload},'*');
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
