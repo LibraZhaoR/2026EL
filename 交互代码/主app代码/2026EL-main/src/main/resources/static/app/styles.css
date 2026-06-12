@@ -2951,7 +2951,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 70;
+    z-index: 200;
     display: flex;
     flex-direction: column;
     align-items: center;

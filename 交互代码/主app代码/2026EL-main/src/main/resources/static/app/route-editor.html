@@ -126,8 +126,8 @@
         <div class="input-card" style="cursor:default;">
             <label>出行偏好</label>
             <select id="transport-mode">
-                <option value="walking">🚶 步行模式</option>
                 <option value="driving">🚗 驾车模式</option>
+                <option value="walking">🚶 步行模式</option>
             </select>
             <input type="text" id="route-name" placeholder="路线方案名称" style="margin-top:10px;" value="我的金陵探索路线">
         </div>
@@ -149,10 +149,10 @@
     <div id="map"></div>
 </div>
 <script>
-    window._AMapSecurityConfig = { securityJsCode: '' };
-    const AMAP_KEY = '5427cfbccb2209b756af7fc782e8105b';
+    window._AMapSecurityConfig = { securityJsCode: '94113a476eff771948c5234624bb9179' };
+    const AMAP_KEY = 'acbce3442afa6bf6251bc8014a1594b8';
 </script>
-<script src="https://webapi.amap.com/maps?v=2.0&key=5427cfbccb2209b756af7fc782e8105b&plugin=AMap.Walking,AMap.Driving,AMap.PlaceSearch"></script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=acbce3442afa6bf6251bc8014a1594b8&plugin=AMap.Walking,AMap.Driving,AMap.PlaceSearch"></script>
 <script>
 const state = { map:null, editMode:'origin', points:[], polyline:null, lastResult:null, pathCoords:[], pathStops:[] };
 
@@ -170,89 +170,172 @@ function init() {
 
     // Read prefill data from URL hash (set by parent before iframe loads)
     var hash = window.location.hash;
+    console.log('[route-editor] init hash:', hash);
     if (hash.indexOf('#prefill=') === 0) {
         try {
             var prefill = JSON.parse(decodeURIComponent(hash.substring(9)));
-            document.getElementById('mode-tip').innerText = '📍 正在搜索途经点位置…';
+            console.log('[route-editor] prefill data:', JSON.stringify(prefill));
+            document.getElementById('mode-tip').innerText = '📍 正在加载路线站点…';
             applyPrefill(prefill);
             // Clean URL
             history.replaceState(null, '', window.location.pathname);
-        } catch(e) {}
+        } catch(e) { console.error('[route-editor] prefill parse error:', e); }
     }
 }
 
-// Apply existing route waypoints to the editor
+// Apply existing route waypoints to the editor — instant via hardcoded coords + plannedPath
 function applyPrefill(data) {
     var stopNames = data.stops || [];
+    var coords = data.coords || [];
     if (!stopNames.length) return;
 
+    // Clear existing points
     state.points.forEach(function(p) { if (p.marker) state.map.remove(p.marker); });
     state.points = [];
     state.pathCoords = [];
     state.pathStops = [];
 
-    var ps = new AMap.PlaceSearch({ city: "南京", pageSize: 1 });
+    // Build points directly from coords
     var found = [];
-
-    function searchNext(i) {
-        if (i >= stopNames.length) { finishPrefill(found, data); return; }
-        var name = stopNames[i];
-        ps.search(name, function(status, result) {
-            if (status === "complete" && result.poiList && result.poiList.pois.length) {
-                var p = result.poiList.pois[0];
-                var type = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
-                found.push({ name: name, lng: p.location.lng, lat: p.location.lat, type: type });
-            } else {
-                ps.search(name + " 南京", function(s2, r2) {
-                    if (s2 === "complete" && r2.poiList && r2.poiList.pois.length) {
-                        var p2 = r2.poiList.pois[0];
-                        var type2 = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
-                        found.push({ name: name, lng: p2.location.lng, lat: p2.location.lat, type: type2 });
-                    }
-                    setTimeout(function() { searchNext(i + 1); }, 100);
-                });
-                return;
-            }
-            // Both searches failed — fall back to hardcoded coords if available
-            if (data.coords && data.coords[i]) {
-                var lng2 = data.coords[i][1], lat2 = data.coords[i][0];
-                var type3 = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
-                found.push({ name: name, lng: lng2, lat: lat2, type: type3 });
-            }
-            setTimeout(function() { searchNext(i + 1); }, 100);
-        });
+    for (var i = 0; i < stopNames.length; i++) {
+        var type = i === 0 ? "origin" : (i === stopNames.length - 1 ? "destination" : "waypoint");
+        if (coords[i]) {
+            var lng = coords[i][1];
+            var lat = coords[i][0];
+            found.push({ name: stopNames[i], lng: lng, lat: lat, type: type });
+        }
     }
 
-    function finishPrefill(points, data) {
-        if (!points.length) {
-            document.getElementById('mode-tip').innerText = '⚠️ 未找到途经点，请手动点击地图添加';
-            return;
-        }
-        document.getElementById('mode-tip').innerText = '✅ 已加载 ' + points.length + ' 个途经点';
-        setTimeout(function() { document.getElementById('mode-tip').innerText = '➕ 点击地图添加【途径点】'; }, 3000);
-        points.forEach(function(p) {
-            var lnglat = p.lng.toFixed(6) + "," + p.lat.toFixed(6);
-            var point = { type: p.type, lnglat: lnglat, customNamed: true, name: p.name };
-            point.marker = createMarker(new AMap.LngLat(p.lng, p.lat), point);
-            state.points.push(point);
+    if (!found.length) {
+        document.getElementById('mode-tip').innerText = '⚠️ 无可用坐标，请手动点击地图添加';
+        return;
+    }
+
+    // Place markers on map
+    found.forEach(function(p) {
+        var lnglat = p.lng.toFixed(6) + "," + p.lat.toFixed(6);
+        var point = { type: p.type, lnglat: lnglat, customNamed: true, name: p.name };
+        point.marker = createMarker(new AMap.LngLat(p.lng, p.lat), point);
+        state.points.push(point);
+    });
+
+    // Fill sidebar inputs
+    var originName = document.getElementById("origin-name");
+    var destName = document.getElementById("destination-name");
+    var routeNameEl = document.getElementById("route-name");
+    if (originName && found.length > 0) originName.value = found[0].name;
+    if (destName && found.length > 0) destName.value = found[found.length - 1].name;
+    if (routeNameEl && data.routeName) routeNameEl.value = data.routeName;
+    syncUI();
+    setEditMode("waypoint");
+
+    // ── Use pre-computed plannedPath for INSTANT display ──
+    if (data.plannedPath && data.plannedPath.length >= 2) {
+        // Convert [[lat,lng],...] → AMap.LngLat objects
+        var pathCoords = data.plannedPath.map(function(c) {
+            return new AMap.LngLat(c[1], c[0]);
         });
-        var originName = document.getElementById("origin-name");
-        var destName = document.getElementById("destination-name");
-        var routeName = document.getElementById("route-name");
-        if (originName && points.length > 0) originName.value = points[0].name;
-        if (destName && points.length > 0) destName.value = points[points.length - 1].name;
-        if (routeName && data.routeName) routeName.value = data.routeName;
-        syncUI();
-        setEditMode("waypoint");
-        var allLngLats = points.map(function(p) { return new AMap.LngLat(p.lng, p.lat); });
+        var dist = data.plannedDist || 0;
+        var dur = data.plannedDur || 0;
+
+        // Draw polyline directly (no API call)
+        if (state.polyline) state.polyline.setMap(null);
+        state.polyline = new AMap.Polyline({
+            path: pathCoords,
+            strokeColor: '#E07A5F',
+            strokeWeight: 6,
+            strokeOpacity: 0.85,
+            lineJoin: 'round',
+            showDir: true
+        });
+        state.polyline.setMap(state.map);
+        state.map.setFitView([state.polyline].concat(state.points.map(function(p) { return p.marker; })));
+
+        // Store for save
+        state.pathCoords = data.plannedPath.map(function(c) { return [c[1], c[0]]; });
+        state.pathStops = state.points.map(function(p) { return { name: p.name, lnglat: p.lnglat }; });
+        state.lastResult = { distance: dist, duration: dur };
+
+        // Render stats in result area
+        var distKm = (dist / 1000).toFixed(1);
+        var durMin = Math.ceil(dur / 60);
+        document.getElementById('result-area').innerHTML =
+            '<div class="results"><div class="route-stat">' +
+            '<div><b>' + distKm + '</b><span>公里</span></div>' +
+            '<div><b>' + durMin + '</b><span>预计分钟</span></div>' +
+            '<div><b>' + data.plannedPath.length + '</b><span>路径点</span></div>' +
+            '</div></div>';
+
+        // Build summary bar
+        var sidebar = document.querySelector('.sidebar-content');
+        if (sidebar) sidebar.classList.add('planned');
+        var summary = sidebar ? sidebar.querySelector('.route-planned-summary') : null;
+        if (!summary) {
+            summary = document.createElement('div');
+            summary.className = 'route-planned-summary';
+            var resultArea = document.getElementById('result-area');
+            sidebar.insertBefore(summary, resultArea);
+        }
+        var origin = state.points.find(function(p) { return p.type === 'origin'; });
+        var dest = state.points.find(function(p) { return p.type === 'destination'; });
+        var wpCount = state.points.filter(function(p) { return p.type === 'waypoint'; }).length;
+        summary.innerHTML =
+            '<span class="badge green">起:' + (origin ? origin.name : '?') + '</span>' +
+            (wpCount ? '<span class="badge yellow">' + wpCount + '途经</span>' : '') +
+            '<span class="badge red">终:' + (dest ? dest.name : '?') + '</span>' +
+            '<span style="color:var(--text2);font-size:11px;">' + distKm + 'km · ' + durMin + 'min</span>' +
+            '<button class="btn-edit" onclick="expandRouteCards()">✎ 更改此路线</button>';
+
+        document.getElementById('mode-tip').innerText = '✅ 路线已就绪 · ' + durMin + '分钟';
+        document.getElementById('save-btn').style.display = 'block';
+        state._viewerMode = true;
+        enterViewerMode();
+    } else {
+        // No plannedPath — fall back to API-based planning
+        var allLngLats = found.map(function(p) { return new AMap.LngLat(p.lng, p.lat); });
         if (allLngLats.length === 1) {
             state.map.setZoomAndCenter(16, allLngLats[0]);
         } else {
             state.map.setFitView(allLngLats, false, [60, 60, 60, 60]);
         }
+        state._viewerMode = true;
+        document.getElementById('mode-tip').innerText = '🔍 正在规划最佳路径…';
+        setTimeout(function() {
+            executePlanning().then(function() {
+                var durText = state.lastResult ? Math.ceil(state.lastResult.duration / 60) + '分钟' : '';
+                document.getElementById('mode-tip').innerText = '✅ 路线已就绪 · ' + durText;
+                enterViewerMode();
+            }).catch(function(e) {
+                document.getElementById('mode-tip').innerText = '⚠️ 自动规划失败，请手动点击「生成规划方案」';
+            });
+        }, 400);
     }
+}
 
-    searchNext(0);
+function enterViewerMode() {
+    var sidebar = document.querySelector('.sidebar-content');
+    if (sidebar) sidebar.classList.add('planned');
+    // Hide action buttons
+    document.getElementById('plan-btn').style.display = 'none';
+    var secBtn = document.querySelector('.btn-secondary');
+    if (secBtn) secBtn.style.display = 'none';
+    var dangerBtns = document.querySelectorAll('.btn-danger');
+    dangerBtns.forEach(function(b) { b.style.display = 'none'; });
+    document.getElementById('save-btn').style.display = 'block';
+    document.getElementById('mode-tip').style.opacity = '0.6';
+    var h1 = document.querySelector('.sidebar-header h1');
+    if (h1) h1.textContent = '🗺️ 路线查看';
+    // Add "更改此路线" button in the summary bar
+    ensureEditRouteBtn();
+}
+
+function ensureEditRouteBtn() {
+    // Just make sure the existing .btn-edit stays visible and wired up
+    var btn = document.querySelector('.route-planned-summary .btn-edit');
+    if (btn) {
+        btn.style.display = '';
+        btn.onclick = function(e) { e.stopPropagation(); expandRouteCards(); };
+    }
 }
 
 
@@ -372,7 +455,20 @@ function setupWaypointDrag(container) {
 function resetPoints(type) { state.points.filter(p=>p.type===type).forEach(p=>p.marker.setMap(null)); state.points=state.points.filter(p=>p.type!==type); syncUI(); clearRoute(); }
 function undoLast() { if(!state.points.length) return; state.points.pop().marker.setMap(null); syncUI(); clearRoute(); }
 function clearAll() { state.points.forEach(p=>p.marker.setMap(null)); state.points=[]; clearRoute(); syncUI(); setEditMode('origin'); }
-function expandRouteCards() { document.querySelector('.sidebar-content')?.classList.remove('planned'); }
+function expandRouteCards() {
+    document.querySelector('.sidebar-content')?.classList.remove('planned');
+    // Restore editing buttons
+    document.getElementById('plan-btn').style.display = '';
+    var secBtn = document.querySelector('.btn-secondary');
+    if (secBtn) secBtn.style.display = '';
+    var dangerBtns = document.querySelectorAll('.btn-danger');
+    dangerBtns.forEach(function(b) { b.style.display = ''; });
+    document.getElementById('mode-tip').style.opacity = '1';
+    // Restore header
+    var h1 = document.querySelector('.sidebar-header h1');
+    if (h1) h1.textContent = '🗺️ 路线编辑器';
+    setEditMode('waypoint');
+}
 function clearRoute() { if(state.polyline){ state.polyline.setMap(null); state.polyline=null; } state.lastResult=null; document.getElementById('result-area').innerHTML=''; document.getElementById('save-btn').style.display='none'; document.querySelector('.sidebar-content')?.classList.remove('planned'); }
 
 async function executePlanning() {
@@ -438,41 +534,26 @@ function planWithDriving(origin, dest, wps) {
 
 function planWithWalking(origin, dest, wps) {
     return new Promise((resolve, reject) => {
-        const allPts = [origin, ...wps, dest];
-        let totalDist = 0, totalDur = 0, allSteps = [], pathCoords = [];
-        let idx = 0;
+        var walking = new AMap.Walking({ policy: 0 });
+        var originLngLat = parseLngLat(origin.lnglat);
+        var destLngLat = parseLngLat(dest.lnglat);
+        var waypoints = wps.map(function(w) { return parseLngLat(w.lnglat); });
 
-        function searchNext() {
-            if (idx >= allPts.length - 1) {
-                renderRoute(pathCoords, totalDist, totalDur, allSteps);
-                state.lastResult = { distance: totalDist, duration: totalDur };
-                document.getElementById('save-btn').style.display = 'block';
-                return resolve();
-            }
-            const from = allPts[idx].lnglat;
-            const to = allPts[idx + 1].lnglat;
-
-            const mode = document.getElementById('transport-mode').value;
-            const url = 'https://restapi.amap.com/v5/direction/' + mode + '?key=' + AMAP_KEY + '&origin=' + from + '&destination=' + to + '&show_fields=polyline';
-
-            fetch(url).then(r => r.json()).then(res => {
-                if (res.status !== '1') throw new Error(res.info || '规划失败(状态码:'+res.status+')');
-                const path = res.route.paths[0];
-                totalDist += parseInt(path.distance);
-                totalDur += parseInt(path.duration);
-                path.steps.forEach(s => {
-                    allSteps.push({ instruction: s.instruction });
-                    s.polyline.split(';').forEach(p => {
-                        const [lng, lat] = p.split(',');
-                        pathCoords.push(new AMap.LngLat(parseFloat(lng), parseFloat(lat)));
-                    });
-                });
-                idx++;
-                // ── Delay 1.5s between requests to stay under QPS limit ──
-                setTimeout(searchNext, 1500);
-            }).catch(e => reject(new Error('步行分段'+(idx+1)+'失败: '+e.message)));
-        }
-        searchNext();
+        walking.search(originLngLat, destLngLat, { waypoints: waypoints }, function(status, result) {
+            if (status !== 'complete') return reject(new Error(result.info || '步行规划失败'));
+            var routes = result.routes;
+            if (!routes || !routes.length) return reject(new Error('无可用步行路线'));
+            var route = routes[0];
+            var allSteps = [], pathCoords = [];
+            route.steps.forEach(function(step) {
+                allSteps.push({ instruction: step.instruction });
+                step.path.forEach(function(p) { pathCoords.push(p); });
+            });
+            renderRoute(pathCoords, parseInt(route.distance), parseInt(route.time) * 60, allSteps);
+            state.lastResult = { distance: parseInt(route.distance), duration: parseInt(route.time) * 60 };
+            document.getElementById('save-btn').style.display = 'block';
+            resolve();
+        });
     });
 }
 
@@ -506,7 +587,7 @@ function renderRoute(coords, dist, dur, steps) {
         + (wpCount ? '<span class="badge yellow">'+wpCount+'途经</span>' : '')
         + '<span class="badge red">终:'+(dest?dest.name:'?')+'</span>'
         + '<span style="color:var(--text2);font-size:11px;">'+(dist/1000).toFixed(1)+'km · '+Math.ceil(dur/60)+'min</span>'
-        + '<button class="btn-edit" onclick="expandRouteCards()">✎ 修改</button>';
+        + '<button class="btn-edit" onclick="expandRouteCards()">✎ 更改此路线</button>';
 }
 
 async function handleSave() {
