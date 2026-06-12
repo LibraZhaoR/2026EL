@@ -3886,7 +3886,7 @@ function initAMap() {
         AMapLoader.load({
             key: "acbce3442afa6bf6251bc8014a1594b8",
             version: "2.0",
-            plugins: ["AMap.ToolBar", "AMap.Scale"],
+            plugins: ["AMap.ToolBar", "AMap.Scale", "AMap.PlaceSearch"],
         }).then((AMap) => {
             amapInstance = new AMap.Map(container, {
                 zoom: personaStyle.zoom,
@@ -3928,23 +3928,30 @@ function initAMap() {
             }
 
             // Trigger resize after a frame
-            setTimeout(() => amapInstance.resize(), 100);
-            // Wait for map tiles to fully render before hiding loading bar
+            setTimeout(function() { amapInstance.resize(); }, 100);
+
+            // ── 地图瓦片加载完成 → 隐藏加载条 + 触发标点校准 ──
             var _tilesDone = false;
             var mapTilesDone = function() {
                 if (_tilesDone) return;
                 _tilesDone = true;
                 amapInstance.off("complete", mapTilesDone);
-                updateLoadingBar(90); // Jump to 90% immediately
-        setTimeout(function() { hideMapLoading(); }, 500);
-        // Calibrate landmark coords via AMap after tiles settle
-        setTimeout(function() { calibrateLandmarkCoords(AMap); }, 2500);
+                updateLoadingBar(90);
+                setTimeout(function() { hideMapLoading(); }, 500);
+                // 标点坐标校准（高德 PlaceSearch 批量查询 → 对齐地图位置）
+                setTimeout(function() { calibrateLandmarkCoords(AMap); }, 2500);
             };
             amapInstance.on("complete", mapTilesDone);
-            // Safety: hide after 8s even if complete never fires
+
+            // 安全兜底: 8s后强制触发（防止 complete 事件永不触发）
             setTimeout(function() {
-                hideMapLoading();
-                amapInstance.off("complete", mapTilesDone);
+                if (!_tilesDone) {
+                    hideMapLoading();
+                    amapInstance.off("complete", mapTilesDone);
+                    _tilesDone = true;
+                    // 即使瓦片未完全加载，仍然尝试校准标点
+                    setTimeout(function() { calibrateLandmarkCoords(AMap); }, 1000);
+                }
             }, 8000);
         }).catch((e) => {
             console.warn("AMap init failed, using canvas fallback:", e);
@@ -3962,61 +3969,104 @@ function addAllRouteOverlays(AMap) {
     // Route markers and lines removed — routes are viewed via the editor
 }
 
-function calibrateLandmarkCoords(AMap) {
-    var cacheKey = "nj_lm_cal_v1";
-    try {
-        var cached = JSON.parse(localStorage.getItem(cacheKey));
-        if (cached) {
-            applyCalibration(cached);
-            return;
-        }
-    } catch(e) {}
+// ═══ 标点坐标校准（嵌入地图初始化流程） ═══
+// 使用高德 PlaceSearch 对每个地标/建筑名称进行精确定位
+// 结果缓存于 localStorage，版本号递增可强制重新校准
+var LANDMARK_CAL_CACHE_KEY = "nj_lm_cal_v2";   // v2: 强制刷新校准缓存
+var LANDMARK_CAL_INTERVAL = 180;               // 每次搜索间隔 ms（避免 API 限频）
 
-    var ps = new AMap.PlaceSearch({ city: "南京", pageSize: 1 });
+// 清理旧版本校准缓存（v1 已废弃）
+try { localStorage.removeItem("nj_lm_cal_v1"); } catch(e) {}
+
+function calibrateLandmarkCoords(AMap) {
+    // ── 首先检查是否有缓存的有效校准数据 ──
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(LANDMARK_CAL_CACHE_KEY)); } catch(e) {}
+    if (cached && typeof cached === "object" && Object.keys(cached).length > 0) {
+        _applyCalibration(cached);
+        return;
+    }
+
+    // ── 收集所有需要校准的地标/建筑名称 ──
     var names = [];
-    // Collect all landmark/building names
+    var seen = {};
+    function addName(n) {
+        if (!n || seen[n]) return;
+        seen[n] = true;
+        names.push(n);
+    }
     if (window.NANJING_LANDMARKS) {
-        window.NANJING_LANDMARKS.forEach(function(l) { names.push(l.name); });
+        window.NANJING_LANDMARKS.forEach(function(l) { addName(l.name); });
     }
     if (window.CITYGO_BUILDING_POINTS) {
-        window.CITYGO_BUILDING_POINTS.forEach(function(b) {
-            if (names.indexOf(b.name) === -1) names.push(b.name);
-        });
+        window.CITYGO_BUILDING_POINTS.forEach(function(b) { addName(b.name); });
     }
     if (!names.length) return;
 
+    // ── 使用 PlaceSearch 逐个查询 ──
     var results = {};
-    function searchOne(i) {
+    var searched = 0;
+    var errors = 0;
+
+    function searchNext(i) {
         if (i >= names.length) {
-            try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) {}
-            applyCalibration(results);
+            // 全部搜索完成 → 缓存并应用
+            if (Object.keys(results).length > 0) {
+                try { localStorage.setItem(LANDMARK_CAL_CACHE_KEY, JSON.stringify(results)); } catch(e) {}
+            }
+            _applyCalibration(results);
             return;
         }
         var name = names[i];
-        ps.search(name, function(status, result) {
-            if (status === "complete" && result.poiList && result.poiList.pois.length) {
-                var p = result.poiList.pois[0];
-                results[name] = [p.location.lng, p.location.lat];
-            }
-            setTimeout(function() { searchOne(i + 1); }, 200);
-        });
+        try {
+            var ps = new AMap.PlaceSearch({ city: "南京", pageSize: 1 });
+            ps.search(name, function(status, result) {
+                searched++;
+                if (status === "complete" && result && result.poiList && result.poiList.pois && result.poiList.pois.length > 0) {
+                    var p = result.poiList.pois[0];
+                    if (p.location && typeof p.location.lng === "number" && typeof p.location.lat === "number") {
+                        results[name] = [p.location.lng, p.location.lat];
+                    }
+                } else {
+                    errors++;
+                }
+                setTimeout(function() { searchNext(i + 1); }, LANDMARK_CAL_INTERVAL);
+            });
+        } catch(e) {
+            errors++;
+            setTimeout(function() { searchNext(i + 1); }, LANDMARK_CAL_INTERVAL);
+        }
     }
-    searchOne(0);
+    searchNext(0);
 
-    function applyCalibration(map) {
+    // ── 内部：将校准结果应用到全局数据 ──
+    function _applyCalibration(map) {
+        var applied = 0;
         Object.keys(map).forEach(function(name) {
             var ll = map[name];
+            if (!ll || ll.length < 2) return;
             if (window.NANJING_LANDMARKS) {
                 window.NANJING_LANDMARKS.forEach(function(l) {
-                    if (l.name === name) { l.lng = ll[0]; l.lat = ll[1]; }
+                    if (l.name === name) { l.lng = ll[0]; l.lat = ll[1]; applied++; }
                 });
             }
             if (window.CITYGO_BUILDING_POINTS) {
                 window.CITYGO_BUILDING_POINTS.forEach(function(b) {
-                    if (b.name === name) { b.lng = ll[0]; b.lat = ll[1]; }
+                    if (b.name === name) { b.lng = ll[0]; b.lat = ll[1]; applied++; }
                 });
             }
         });
+        // 刷新地图 POI 标点（仅在纯地图模式下可见）
+        if (typeof window.citygoRefreshMapPOIs === "function") {
+            window.citygoRefreshMapPOIs();
+        }
+        // 如果没有任何校准结果 → 使用原始坐标直接渲染
+        if (applied === 0) {
+            _renderPOIsWithOriginalCoords();
+        }
+    }
+
+    function _renderPOIsWithOriginalCoords() {
         if (typeof window.citygoRefreshMapPOIs === "function") {
             window.citygoRefreshMapPOIs();
         }
