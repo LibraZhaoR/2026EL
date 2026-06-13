@@ -245,28 +245,41 @@ src/main/resources/static/app/
 ## 🚀 快速启动
 
 ### 前置要求
-- **JDK 17+**
+- **JDK 17+**（⚠️ Java 24+ 用户请参考下方版本说明）
 - **Maven 3.6+**
 - （可选）Python 3.8+ — 用于 dev server 和 route-database 微服务
 
 ### 方式一：Spring Boot 完整启动
 
+> ⚠️ **Java 版本说明**：`spring-boot:run` 在 Java 24+ 下存在兼容性问题，会报 `ClassNotFoundException`。请根据你的 Java 环境选择对应启动方式。
+
+**Java 17 ~ 23：**
+
 ```bash
-# 进入主应用目录
 cd 交互代码/主app代码/2026EL-main
 
-# 清理并构建启动（推荐使用 clean 避免构建缓存问题）
+# 直接启动（推荐加 clean 避免构建缓存）
 mvn clean spring-boot:run
+```
 
-# 或先清理打包再运行
+**Java 24+（如 Java 25）：**
+
+```bash
+cd 交互代码/主app代码/2026EL-main
+
+# spring-boot:run 不可用，改用打包后运行
 mvn clean package -DskipTests
 java -jar target/campus-nanjing-travel-0.0.1-SNAPSHOT.jar
 ```
+
+> 查看 Java 版本：`java -version`
 
 访问：
 - 主应用：`http://localhost:8080/app/index.html`
 - 路线编辑器：`http://localhost:8080/app/route-editor.html`
 - WorkAdventure 虚拟校园：`http://localhost:8080/app/assets/workadventure/standalone.html`
+
+> 💡 **终端提示**：启动后终端会停留在日志最后一行不退出，这是**正常现象**——Spring Boot 以前台进程运行，持续等待 HTTP 请求。日志中若出现 `NoResourceFoundException: favicon.ico` 只是浏览器自动请求网站图标（项目未放置），不影响功能。需要继续使用终端时，打开新终端窗口即可；停止服务按 `Ctrl+C`。
 
 ### 方式二：Python Dev Server（仅前端开发）
 
