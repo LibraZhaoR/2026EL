@@ -14,7 +14,7 @@ public class CustomRoute {
     private Long id;
 
     @Column(name = "user_id", nullable = false)
-    private Long userId = 1L;
+    private Long userId;
 
     @Column(name = "source_route_id")
     private Long sourceRouteId;

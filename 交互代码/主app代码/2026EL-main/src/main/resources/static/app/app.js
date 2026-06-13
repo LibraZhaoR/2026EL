@@ -1038,7 +1038,7 @@ function sendPet77ChatMessage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            userId: 1,
+            userId: getCurrentUserId() || 1,
             sessionId: pet77ChatSessionId,
             guideRole: "pet77",
             message: "你是南京城市漫游应用里的轻量桌宠 77。请用温柔、简短、陪伴感的中文回复，不超过两句话。用户说：" + text,
@@ -4572,7 +4572,7 @@ function showToast(msg) {
 // ── Route Copy ──
 async function handleCopyRoute(routeId) {
     try {
-        const resp = await fetch(`/api/user-routes/${routeId}/copy?userId=1`, { method: "POST" });
+        const resp = await fetch(`/api/user-routes/${routeId}/copy`, { method: "POST" });
         if (!resp.ok) throw new Error("复刻失败");
         const data = await resp.json();
         if (data.code === 200) {
@@ -4617,7 +4617,7 @@ async function submitInviteCard() {
     const meetDateTime = meetDate && meetTime ? `${meetDate}T${meetTime}:00` : null;
 
     const body = {
-        userId: 1,
+        userId: getCurrentUserId() || 1,
         routeId: routeId,
         meetPlace: meetPlace,
         expectedCost: cost,
@@ -6715,15 +6715,24 @@ function refreshPetStatusCard() {
 
 function getUserProfile() {
     const defaults = {
-        userId: 1,
-        name: "旅行者",
-        tagline: "南京城市探索中",
-        avatarUrl: "",
-        loggedIn: true,
-        lastLoginAt: new Date().toISOString(),
+        userId: getCurrentUserId() || 1,
+        name: getCurrentUserNickname(),
+        tagline: currentAuthUser?.bio || "南京城市探索中",
+        avatarUrl: currentAuthUser?.avatarUrl || "",
+        loggedIn: isLoggedIn(),
+        lastLoginAt: currentAuthUser?.lastLoginAt || new Date().toISOString(),
     };
     try {
-        return Object.assign(defaults, JSON.parse(localStorage.getItem(USER_PROFILE_STORAGE_KEY) || "{}"));
+        const stored = JSON.parse(localStorage.getItem(USER_PROFILE_STORAGE_KEY) || "{}");
+        const merged = Object.assign(defaults, stored);
+        // Always trust the live auth state, never stale localStorage
+        merged.loggedIn = isLoggedIn();
+        merged.userId = getCurrentUserId() || merged.userId || 1;
+        merged.name = getCurrentUserNickname();
+        merged.tagline = currentAuthUser?.bio || merged.tagline || "南京城市探索中";
+        merged.avatarUrl = currentAuthUser?.avatarUrl || merged.avatarUrl || "";
+        merged.lastLoginAt = currentAuthUser?.lastLoginAt || merged.lastLoginAt || new Date().toISOString();
+        return merged;
     } catch {
         return defaults;
     }
@@ -6810,44 +6819,98 @@ function showSettingsDetail(type) {
     const profile = getUserProfile();
 
     if (type === "account") {
+        if (!isLoggedIn()) {
+            detail.innerHTML = `
+                <div class="settings-detail-card">
+                    <h4>账户管理</h4>
+                    <p style="color:var(--soft);margin-bottom:16px;">登录后可管理账户信息、修改密码、查看设备</p>
+                    <button class="settings-primary" type="button" id="settings-go-login">登录 / 注册</button>
+                </div>
+            `;
+            detail.querySelector("#settings-go-login").addEventListener("click", () => {
+                showAuthModal("login", () => {
+                    showSettingsDetail("account");
+                });
+            });
+            return;
+        }
+
+        const authUser = currentAuthUser;
         detail.innerHTML = `
             <div class="settings-detail-card">
                 <h4>账户管理</h4>
-                <label class="settings-field">
+                <p><span class="settings-info-label">邮箱</span> ${escapeHtml(authUser.email || "未设置")}</p>
+                <p><span class="settings-info-label">用户编号</span> ${escapeHtml(authUser.publicUserCode || "-")}</p>
+                <p><span class="settings-info-label">状态</span> ${escapeHtml(authUser.status === "ACTIVE" ? "正常" : authUser.status)}</p>
+                <p><span class="settings-info-label">注册时间</span> ${authUser.createdAt ? new Date(authUser.createdAt).toLocaleDateString("zh-CN") : "-"}</p>
+                <label class="settings-field" style="margin-top:12px;">
                     <span>昵称</span>
                     <input id="settings-name-input" type="text" value="${escapeHtml(profile.name)}" maxlength="16" placeholder="请输入昵称">
                 </label>
-                <p><span class="settings-info-label">用户 ID</span> ${profile.userId} · ${profile.loggedIn ? "已登录" : "已退出"}</p>
                 <div class="settings-btn-row">
-                    <button class="settings-primary" type="button" id="settings-save-account">保存账户</button>
+                    <button class="settings-primary" type="button" id="settings-save-account">保存昵称</button>
                 </div>
                 <p class="settings-feedback" id="settings-account-feedback" style="display:none;"></p>
+                <hr style="margin:16px 0;border-color:var(--rule);">
+                <h4>密码</h4>
+                <div class="settings-field">
+                    <input id="settings-old-password" type="password" placeholder="当前密码" style="margin-bottom:8px;">
+                    <input id="settings-new-password" type="password" placeholder="新密码（至少6位）" minlength="6">
+                </div>
+                <button class="settings-primary" type="button" id="settings-change-password">修改密码</button>
+                <p class="settings-feedback" id="settings-password-feedback" style="display:none;"></p>
+                <hr style="margin:16px 0;border-color:var(--rule);">
+                <button class="settings-danger" type="button" id="settings-logout-btn">退出登录</button>
             </div>
         `;
-        detail.querySelector("#settings-save-account").addEventListener("click", () => {
+        detail.querySelector("#settings-save-account").addEventListener("click", async () => {
             const input = detail.querySelector("#settings-name-input");
             const name = input.value.trim();
             const fb = detail.querySelector("#settings-account-feedback");
-            if (!name) {
-                fb.style.display = "block";
-                fb.className = "settings-feedback error";
-                fb.textContent = "昵称不能为空";
-                input.focus();
-                return;
-            }
-            if (name.length < 1 || name.length > 16) {
+            if (!name || name.length > 16) {
                 fb.style.display = "block";
                 fb.className = "settings-feedback error";
                 fb.textContent = "昵称长度需在1-16个字符之间";
                 return;
             }
-            saveUserProfile({ name, loggedIn: true, lastLoginAt: new Date().toISOString() });
-            const profileTab = document.getElementById("tab-profile-inner");
-            if (profileTab) renderProfileTab(profileTab);
+            const result = await authApi.updateProfile({ nickname: name });
+            if (result.code === 200) {
+                currentAuthUser = result.data;
+                saveUserProfile({ name, loggedIn: true });
+                showToast("昵称已更新");
+            } else {
+                fb.style.display = "block";
+                fb.className = "settings-feedback error";
+                fb.textContent = result.msg || "更新失败";
+            }
+        });
+        detail.querySelector("#settings-change-password").addEventListener("click", async () => {
+            const oldPass = detail.querySelector("#settings-old-password").value;
+            const newPass = detail.querySelector("#settings-new-password").value;
+            const fb = detail.querySelector("#settings-password-feedback");
+            if (!oldPass || !newPass || newPass.length < 6) {
+                fb.style.display = "block";
+                fb.className = "settings-feedback error";
+                fb.textContent = "新密码至少6位";
+                return;
+            }
+            const result = await authApi.changePassword(oldPass, newPass);
             fb.style.display = "block";
-            fb.className = "settings-feedback success";
-            fb.textContent = "✓ 昵称修改成功";
-            showToast("账户信息已保存");
+            if (result.code === 200) {
+                fb.className = "settings-feedback success";
+                fb.textContent = "✓ 密码修改成功";
+                detail.querySelector("#settings-old-password").value = "";
+                detail.querySelector("#settings-new-password").value = "";
+            } else {
+                fb.className = "settings-feedback error";
+                fb.textContent = result.msg || "修改失败";
+            }
+        });
+        detail.querySelector("#settings-logout-btn").addEventListener("click", async () => {
+            await authApi.logout();
+            currentAuthUser = null;
+            showToast("已退出登录");
+            showSettingsDetail("account");
         });
         return;
     }
@@ -6998,8 +7061,10 @@ function showSettingsDetail(type) {
                     <button class="settings-outline" type="button" id="settings-logout-cancel">取消</button>
                 </div>
             `;
-            actions.querySelector("#settings-logout-final").addEventListener("click", () => {
-                saveUserProfile({ loggedIn: false, lastLogoutAt: new Date().toISOString() });
+            actions.querySelector("#settings-logout-final").addEventListener("click", async () => {
+                await authApi.logout();
+                currentAuthUser = null;
+                saveUserProfile({ loggedIn: false, userId: null, name: "我", lastLogoutAt: new Date().toISOString() });
                 const profileTab = document.getElementById("tab-profile-inner");
                 if (profileTab) renderProfileTab(profileTab);
                 showToast("已退出登录");
@@ -7317,7 +7382,7 @@ function showMyRoutes() {
 
     // Try to load from API first, fallback to local
     Promise.all([
-        fetch("/api/user-routes?userId=1").then(r => r.json()).then(d => d.data || []).catch(() => []),
+        fetch("/api/user-routes").then(r => r.json()).then(d => d.data || []).catch(() => []),
         Promise.resolve().then(() => { try { return JSON.parse(localStorage.getItem("nj_saved_routes") || "[]"); } catch(e) { return []; } })
     ]).then(([apiRoutes, localRoutes]) => {
         let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -7427,7 +7492,7 @@ function showCustomRouteDetail(detail) {
 async function deleteCustomRoute(userRouteId) {
     if (!confirm("确定要删除这条路线吗？此操作不可撤销。")) return;
     try {
-        const resp = await fetch(`/api/user-routes/${userRouteId}?userId=1`, { method: "DELETE" });
+        const resp = await fetch(`/api/user-routes/${userRouteId}`, { method: "DELETE" });
         const data = await resp.json();
         if (data.code === 200) {
             showToast("🗑️ 路线已删除");
@@ -7500,7 +7565,7 @@ function submitCreateRoute() {
     if (!title) { showToast("请填写路线名称"); return; }
 
     const body = {
-        userId: 1,
+        userId: getCurrentUserId() || 1,
         sourceRouteId: sourceRouteId,
         title: title,
         description: desc || "我的自定义路线",
@@ -7694,7 +7759,7 @@ function handleSaveRoute(routeKey) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            userId: 1,
+            userId: getCurrentUserId() || 1,
             sourceRouteId: routeId,
             title: r.title + "（已探索）",
             description: "我体验过的路线",
@@ -7727,6 +7792,9 @@ function handleSaveRoute(routeKey) {
 
 // ── Init ──
 async function init() {
+    // Restore auth session silently (don't show modal on failure)
+    initAuth().catch(() => {});
+
     resize();
     window.addEventListener("resize", () => { resize(); });
 
@@ -8463,7 +8531,7 @@ function sendAiMessage() {
     fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: 1, message: text, sessionId: "web-" + Date.now() }),
+        body: JSON.stringify({ userId: getCurrentUserId() || 1, message: text, sessionId: "web-" + Date.now() }),
     })
     .then(res => res.json())
     .then(data => {
@@ -9193,6 +9261,11 @@ function buildCommunityTags(typeInfo, routeName, rawTags) {
 }
 
 async function submitCommunityPost(container) {
+    if (!isLoggedIn()) {
+        showAuthModal("login", () => submitCommunityPost(container));
+        return;
+    }
+
     const typeId = container.querySelector("#community-post-type")?.value || "route";
     const typeInfo = getCommunityType(typeId);
     const titleInput = container.querySelector("#community-title");
@@ -9259,6 +9332,10 @@ function findCommunityPost(posts, postId) {
 function bindCommunityFeedEvents(container) {
     container.querySelectorAll("[data-community-like]").forEach(button => {
         button.addEventListener("click", () => {
+            if (!isLoggedIn()) {
+                showAuthModal("login");
+                return;
+            }
             const posts = loadCommunityPosts();
             const post = findCommunityPost(posts, button.dataset.communityLike);
             if (!post) return;
@@ -9271,6 +9348,10 @@ function bindCommunityFeedEvents(container) {
 
     container.querySelectorAll("[data-community-comment]").forEach(button => {
         button.addEventListener("click", () => {
+            if (!isLoggedIn()) {
+                showAuthModal("login");
+                return;
+            }
             const postId = button.dataset.communityComment;
             const input = container.querySelector(`[data-community-comment-input="${postId}"]`);
             const text = input?.value.trim();
@@ -9444,54 +9525,112 @@ function sendFriendMessage() {
 
 // Friend add modal
 function openFriendAddModal() {
-    let modal = document.getElementById("friend-add-overlay");
-    if (!modal) {
-        // Create modal dynamically
-        modal = document.createElement("div");
-        modal.id = "friend-add-overlay";
-        modal.className = "friend-add-overlay";
-        modal.innerHTML = `
-            <div class="friend-add-card">
-                <h3>添加好友</h3>
-                <input type="text" class="friend-add-input" id="friend-add-search" placeholder="搜索用户名或路线…" />
-                <div class="friend-add-suggestions" id="friend-add-suggestions">
-                    <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">推荐好友</p>
-                    ${MOCK_ADD_SUGGESTIONS.map(s => `
-                        <div class="friend-add-suggestion" data-id="${s.id}">
-                            <span class="friend-add-suggestion-avatar">${s.avatar}</span>
-                            <div>
-                                <div class="friend-add-suggestion-name">${escapeHtml(s.name)}</div>
-                                <div class="friend-add-suggestion-meta">${escapeHtml(s.meta)}</div>
-                            </div>
-                        </div>
-                    `).join("")}
-                </div>
-                <div class="friend-add-actions">
-                    <button class="friend-add-btn-cancel" id="friend-add-cancel">取消</button>
-                    <button class="friend-add-btn-primary" id="friend-add-confirm">添加</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        modal.addEventListener("click", function(e) {
-            if (e.target === modal) closeFriendAddModal();
-        });
-        document.getElementById("friend-add-cancel").addEventListener("click", closeFriendAddModal);
-        document.getElementById("friend-add-confirm").addEventListener("click", function() {
-            const search = document.getElementById("friend-add-search").value.trim();
-            if (search) {
-                showToast("好友请求已发送: " + search);
-            }
-            closeFriendAddModal();
-        });
-        document.querySelectorAll(".friend-add-suggestion").forEach(el => {
-            el.addEventListener("click", function() {
-                document.getElementById("friend-add-search").value = this.querySelector(".friend-add-suggestion-name").textContent;
-            });
-        });
+    if (!isLoggedIn()) {
+        showAuthModal("login", () => openFriendAddModal());
+        return;
     }
+
+    let modal = document.getElementById("friend-add-overlay");
+    // Always rebuild to clear stale state
+    if (modal) modal.remove();
+
+    modal = document.createElement("div");
+    modal.id = "friend-add-overlay";
+    modal.className = "friend-add-overlay";
+    modal.innerHTML = `
+        <div class="friend-add-card">
+            <h3>添加好友</h3>
+            <input type="text" class="friend-add-input" id="friend-add-search" placeholder="搜索用户编号(如NJW-xxx)或昵称…" />
+            <div class="friend-add-suggestions" id="friend-add-suggestions">
+                <p style="font-size:12px;color:var(--soft);margin-bottom:8px;">请输入关键词搜索真实用户</p>
+            </div>
+            <div class="friend-add-actions">
+                <button class="friend-add-btn-cancel" id="friend-add-cancel">取消</button>
+                <button class="friend-add-btn-primary" id="friend-add-confirm" disabled>发送申请</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    let selectedUserId = null;
+    let selectedUserName = null;
+
+    modal.addEventListener("click", function(e) {
+        if (e.target === modal) closeFriendAddModal();
+    });
+    modal.querySelector("#friend-add-cancel").addEventListener("click", closeFriendAddModal);
+
+    const confirmBtn = modal.querySelector("#friend-add-confirm");
+    const suggestionsDiv = modal.querySelector("#friend-add-suggestions");
+    const searchInput = modal.querySelector("#friend-add-search");
+
+    // Debounced search
+    let searchTimer = null;
+    searchInput.addEventListener("input", function() {
+        const q = this.value.trim();
+        clearTimeout(searchTimer);
+        selectedUserId = null;
+        selectedUserName = null;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "发送申请";
+
+        if (q.length < 1) {
+            suggestionsDiv.innerHTML = '<p style="font-size:12px;color:var(--soft);margin-bottom:8px;">请输入关键词搜索真实用户</p>';
+            return;
+        }
+
+        searchTimer = setTimeout(async () => {
+            suggestionsDiv.innerHTML = '<p style="font-size:12px;color:var(--soft);">搜索中…</p>';
+            const users = await friendApi.search(q);
+            if (users.length === 0) {
+                suggestionsDiv.innerHTML = '<p style="font-size:12px;color:var(--soft);">未找到匹配用户</p>';
+                return;
+            }
+            suggestionsDiv.innerHTML = users.map(u => `
+                <div class="friend-add-suggestion" data-id="${u.id}" data-name="${escapeHtml(u.nickname)}">
+                    <span class="friend-add-suggestion-avatar">${escapeHtml(u.nickname ? u.nickname.slice(0,1) : '?')}</span>
+                    <div>
+                        <div class="friend-add-suggestion-name">${escapeHtml(u.nickname)} <span style="font-size:10px;color:var(--faint);">${escapeHtml(u.publicUserCode)}</span></div>
+                        <div class="friend-add-suggestion-meta">${escapeHtml(u.bio || u.travelPersona || '')}</div>
+                    </div>
+                </div>
+            `).join("");
+
+            // Bind suggestion clicks
+            suggestionsDiv.querySelectorAll(".friend-add-suggestion").forEach(el => {
+                el.addEventListener("click", function() {
+                    selectedUserId = parseInt(this.dataset.id);
+                    selectedUserName = this.dataset.name;
+                    searchInput.value = this.dataset.name;
+                    suggestionsDiv.querySelectorAll(".friend-add-suggestion").forEach(e => e.style.background = "");
+                    this.style.background = "var(--surface-accent, #f0f0f0)";
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = `发送申请给 ${selectedUserName}`;
+                });
+            });
+        }, 400);
+    });
+
+    confirmBtn.addEventListener("click", async function() {
+        if (!selectedUserId) {
+            showToast("请先搜索并选择一个用户");
+            return;
+        }
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "发送中…";
+        const result = await friendApi.sendRequest(selectedUserId, "你好，一起探索南京！");
+        if (result.code === 200) {
+            showToast("好友申请已发送: " + selectedUserName);
+            closeFriendAddModal();
+        } else {
+            showToast(result.msg || "发送失败");
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = `发送申请给 ${selectedUserName}`;
+        }
+    });
+
     modal.classList.add("active");
+    setTimeout(() => searchInput.focus(), 300);
 }
 
 function closeFriendAddModal() {
@@ -9902,12 +10041,61 @@ renderCommunityPage = function(container) {
                     <button class="community-friend-entry" type="button" id="community-friend-entry">👥 好友</button>
                 </div>
             </section>
+            <section class="community-composer" id="community-composer">
+                <div class="community-composer-top" id="community-composer-toggle" role="button" tabindex="0" aria-expanded="false">
+                    <div>
+                        <strong>发一条新帖</strong>
+                        <span id="community-type-hint"></span>
+                    </div>
+                    <span class="community-composer-chevron" id="community-composer-chevron">›</span>
+                </div>
+                <div class="community-composer-body" id="community-composer-body" hidden>
+                    <select id="community-post-type" class="community-input">
+                        ${COMMUNITY_POST_TYPES.map(type => `<option value="${type.id}">${escapeHtml(type.label)}</option>`).join("")}
+                    </select>
+                    <input id="community-title" class="community-input" type="text" maxlength="42" placeholder="标题：比如 我的梧桐下午路线 / 南博排队体验">
+                    <textarea id="community-text" class="community-textarea" rows="4" maxlength="800" placeholder="写路线、评价、观点，或推荐一个值得加入的论坛。"></textarea>
+                    <div class="community-form-grid">
+                        <select id="community-route" class="community-input">
+                            <option value="">关联路线（可选）</option>
+                            ${getCommunityRouteOptions()}
+                        </select>
+                        <input id="community-place" class="community-input" type="text" maxlength="30" placeholder="关联地点（可选）">
+                        <select id="community-rating" class="community-input">
+                            <option value="">评分（可选）</option>
+                            <option value="5">5.0 很推荐</option>
+                            <option value="4.5">4.5 值得去</option>
+                            <option value="4">4.0 还不错</option>
+                            <option value="3">3.0 一般</option>
+                            <option value="2">2.0 不太推荐</option>
+                        </select>
+                        <input id="community-tags-input" class="community-input" type="text" maxlength="60" placeholder="标签，用空格分隔">
+                    </div>
+                    <div class="community-media-uploader">
+                        <label>
+                            <span>上传图片/视频</span>
+                            <input id="community-media-files" type="file" accept="image/*,video/*" multiple>
+                        </label>
+                        <div id="community-media-preview">可选：上传图片或短视频，也可以只发文字。</div>
+                    </div>
+                    <div class="community-link-grid">
+                        <input id="community-image-url" class="community-input" type="url" placeholder="图片链接（可选，多个可换行或逗号分隔）">
+                        <input id="community-video-url" class="community-input" type="url" placeholder="视频链接（可选）">
+                    </div>
+                    <div class="community-compose-actions">
+                        <button class="community-primary" type="button" id="community-submit">发布到社区</button>
+                        <button class="community-secondary" type="button" id="community-map-route">用地图发路线</button>
+                        <button class="community-ghost" type="button" id="community-clear">清空</button>
+                    </div>
+                </div>
+            </section>
             <nav class="community-feed-tabs" id="community-feed-tabs">
                 ${renderCommunityFeedTabs()}
             </nav>
             <div class="community-feed" id="community-feed"></div>
         </div>
     `;
+    bindCommunityComposer(container);
     renderCommunityFeed(container);
     bindCommunityFeedEvents(container);
     // Bind feed tab clicks
@@ -10448,6 +10636,9 @@ async function initAuth() {
     const result = await authApi.me();
     if (result.code === 200 && result.data) {
         currentAuthUser = result.data;
+        saveUserProfile({ loggedIn: true, userId: result.data.id, name: result.data.nickname, tagline: result.data.bio || "南京城市探索中", avatarUrl: result.data.avatarUrl || "", lastLoginAt: result.data.lastLoginAt || new Date().toISOString() });
+        // Also sync friends from backend
+        refreshFriendsFromBackend().catch(() => {});
         return true;
     }
     return false;
@@ -10553,6 +10744,7 @@ function showAuthModal(mode, callback) {
 
         if (result.code === 200 && result.data) {
             currentAuthUser = result.data;
+            saveUserProfile({ loggedIn: true, userId: result.data.id, name: result.data.nickname, tagline: result.data.bio || "南京城市探索中", avatarUrl: result.data.avatarUrl || "", lastLoginAt: result.data.lastLoginAt || new Date().toISOString() });
             showToast(isLogin ? "登录成功" : "注册成功！欢迎加入");
             overlay.remove();
             if (authModalCallback) { authModalCallback(); authModalCallback = null; }
@@ -10599,6 +10791,82 @@ getCommunityAvatar = function(author) {
 
 const FRIEND_STORAGE_KEY = "citygo_friends_v1";
 
+// Friend API (backend-driven)
+const friendApi = {
+    async search(q) {
+        try {
+            const res = await fetch(`/api/friend/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            return data.code === 200 ? data.data : [];
+        } catch (e) { return []; }
+    },
+    async sendRequest(toUserId, message) {
+        const res = await fetch("/api/friend/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ toUserId, message })
+        });
+        return res.json();
+    },
+    async acceptRequest(requestId) {
+        const res = await fetch(`/api/friend/accept/${requestId}`, { method: "PUT" });
+        return res.json();
+    },
+    async rejectRequest(requestId) {
+        const res = await fetch(`/api/friend/reject/${requestId}`, { method: "PUT" });
+        return res.json();
+    },
+    async getFriends() {
+        try {
+            const res = await fetch("/api/friend/list");
+            const data = await res.json();
+            return data.code === 200 ? data.data : [];
+        } catch (e) { return []; }
+    },
+    async getPendingRequests() {
+        try {
+            const res = await fetch("/api/friend/requests/pending");
+            const data = await res.json();
+            return data.code === 200 ? data.data : [];
+        } catch (e) { return []; }
+    },
+    async blockUser(userId) {
+        await fetch(`/api/friend/block/${userId}`, { method: "POST" });
+    },
+    async unblockUser(userId) {
+        await fetch(`/api/friend/block/${userId}`, { method: "DELETE" });
+    }
+};
+
+// Chat API (backend-driven)
+const chatApi = {
+    async send(receiverId, content) {
+        const res = await fetch("/api/chat/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ receiverId, content })
+        });
+        return res.json();
+    },
+    async getMessages(userId) {
+        try {
+            const res = await fetch(`/api/chat/messages/${userId}`);
+            const data = await res.json();
+            return data.code === 200 ? data.data : [];
+        } catch (e) { return []; }
+    },
+    async getConversations() {
+        try {
+            const res = await fetch("/api/chat/conversations");
+            const data = await res.json();
+            return data.code === 200 ? data.data : [];
+        } catch (e) { return []; }
+    },
+    async markRead(userId) {
+        await fetch(`/api/chat/read/${userId}`, { method: "PUT" });
+    }
+};
+
 const MOCK_FRIEND_USERS = [
     { id: "u-arch", nickname: "建筑光影", avatar: "建", bio: "用镜头记录南京民国建筑", tags: ["建筑", "摄影", "民国", "Citywalk"], travelStyle: "慢节奏深度游", area: "鼓楼/玄武", matchReason: "都喜欢建筑摄影与民国风情" },
     { id: "u-history", nickname: "金陵旧事", avatar: "陵", bio: "南京每块砖都有故事", tags: ["历史", "博物馆", "六朝", "城墙"], travelStyle: "文化沉浸式", area: "秦淮/老城南", matchReason: "共同关注南京历史与博物馆路线" },
@@ -10622,23 +10890,56 @@ function saveFriendData(data) {
     localStorage.setItem(FRIEND_STORAGE_KEY, JSON.stringify(data));
 }
 
+// Backend friend cache (synced on init and after friend actions)
+let _backendFriendsCache = [];
+let _backendRequestsCache = [];
+
+async function refreshFriendsFromBackend() {
+    try {
+        const [friends, requests] = await Promise.all([
+            friendApi.getFriends(),
+            friendApi.getPendingRequests()
+        ]);
+        _backendFriendsCache = friends || [];
+        _backendRequestsCache = requests || [];
+        // Also update localStorage cache
+        const data = loadFriendData();
+        data.friends = (friends || []).map(f => ({ userId: f.userId, remark: "", since: Date.now() }));
+        data.requests = (requests || []).map(r => ({
+            id: String(r.id),
+            fromId: String(r.fromUserId),
+            toId: String(r.toUserId),
+            fromName: r.fromUserNickname,
+            message: r.message,
+            status: r.status.toLowerCase(),
+            createdAt: r.createdAt ? new Date(r.createdAt).getTime() : Date.now()
+        }));
+        saveFriendData(data);
+    } catch (e) { /* silent */ }
+}
+
 function getMyFriendIds() {
     const data = loadFriendData();
     return data.friends.map(f => f.userId);
 }
 
 function isFriend(userId) {
-    return getMyFriendIds().includes(userId);
+    // Check both backend cache and localStorage
+    const data = loadFriendData();
+    const idStr = String(userId);
+    return data.friends.some(f => String(f.userId) === idStr);
 }
 
 function isBlocked(userId) {
     const data = loadFriendData();
-    return data.blocked.some(b => b.userId === userId);
+    const idStr = String(userId);
+    return data.blocked.some(b => String(b.userId) === idStr);
 }
 
 function hasPendingRequest(userId) {
     const data = loadFriendData();
-    return data.requests.some(r => (r.fromId === userId || r.toId === userId) && r.status === "pending");
+    const idStr = String(userId);
+    return data.requests.some(r => (r.fromId === idStr || r.toId === idStr) && r.status === "pending");
 }
 
 // ═══ Friend Page ═══
@@ -10754,39 +11055,35 @@ function bindFriendPageEvents(overlay) {
         });
     });
 
-    // Accept request
+    // Accept request (uses backend)
     overlay.querySelectorAll("[data-accept-request]").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const reqId = btn.dataset.acceptRequest;
-            const data = loadFriendData();
-            const req = data.requests.find(r => r.id === reqId);
-            if (!req) return;
-            req.status = "accepted";
-            req.handledAt = Date.now();
-            data.friends.push({
-                userId: req.fromId,
-                remark: "",
-                since: Date.now(),
-                lastInteractionAt: Date.now()
-            });
-            saveFriendData(data);
-            showToast("已接受好友申请");
-            renderFriendPage(overlay);
+        btn.addEventListener("click", async () => {
+            const reqId = parseInt(btn.dataset.acceptRequest);
+            if (!reqId) return;
+            const result = await friendApi.acceptRequest(reqId);
+            if (result.code === 200) {
+                showToast("已接受好友申请");
+                // Refresh friend list from backend
+                await refreshFriendsFromBackend();
+                renderFriendPage(overlay);
+            } else {
+                showToast(result.msg || "操作失败");
+            }
         });
     });
 
-    // Reject request
+    // Reject request (uses backend)
     overlay.querySelectorAll("[data-reject-request]").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const reqId = btn.dataset.rejectRequest;
-            const data = loadFriendData();
-            const req = data.requests.find(r => r.id === reqId);
-            if (!req) return;
-            req.status = "rejected";
-            req.handledAt = Date.now();
-            saveFriendData(data);
-            showToast("已拒绝");
-            renderFriendPage(overlay);
+        btn.addEventListener("click", async () => {
+            const reqId = parseInt(btn.dataset.rejectRequest);
+            if (!reqId) return;
+            const result = await friendApi.rejectRequest(reqId);
+            if (result.code === 200) {
+                showToast("已拒绝");
+                renderFriendPage(overlay);
+            } else {
+                showToast(result.msg || "操作失败");
+            }
         });
     });
 
@@ -10823,7 +11120,9 @@ function bindFriendPageEvents(overlay) {
         btn.addEventListener("click", () => {
             const userId = btn.dataset.chatFriend;
             const user = MOCK_FRIEND_USERS.find(u => u.id === userId);
-            if (user) openPrivateChat(userId, user.nickname, user.avatar);
+            const name = user ? user.nickname : ("好友" + userId);
+            const avatar = user ? user.avatar : (name ? name.slice(0, 1) : "?");
+            openPrivateChat(userId, name, avatar);
         });
     });
 
@@ -10834,7 +11133,9 @@ function bindFriendPageEvents(overlay) {
             const conv = loadChatData().conversations.find(c => c.id === convId);
             if (conv) {
                 const otherUser = MOCK_FRIEND_USERS.find(u => u.id === conv.withUserId);
-                if (otherUser) openPrivateChat(conv.withUserId, otherUser.nickname, otherUser.avatar);
+                const name = otherUser ? otherUser.nickname : ("用户" + conv.withUserId);
+                const avatar = otherUser ? otherUser.avatar : (name ? name.slice(0, 1) : "?");
+                openPrivateChat(conv.withUserId, name, avatar);
             }
         });
     });
@@ -10844,13 +11145,49 @@ function bindFriendPageEvents(overlay) {
 function renderFriendList() {
     const data = loadFriendData();
     const friendIds = getMyFriendIds();
-    const friends = MOCK_FRIEND_USERS.filter(u => friendIds.includes(u.id));
 
     const searchHTML = `<div class="friend-search-wrap">
         <input type="search" id="friend-search" class="friend-search-input" placeholder="搜索好友昵称或兴趣…">
     </div>`;
 
-    if (!friends.length) {
+    // Build friend list: merge real backend friends (from cached data) with mock friends
+    const allFriends = [];
+    const seenIds = new Set();
+
+    // Add real friends from backend cache (synced to localStorage)
+    data.friends.forEach(f => {
+        const idStr = String(f.userId);
+        if (seenIds.has(idStr)) return;
+        seenIds.add(idStr);
+        // Try to find in mock data for avatar/extra info, or use basic info
+        const mockUser = MOCK_FRIEND_USERS.find(u => u.id === idStr);
+        allFriends.push({
+            id: idStr,
+            nickname: mockUser ? mockUser.nickname : (f.remark || "好友" + idStr),
+            avatar: mockUser ? mockUser.avatar : (f.remark || "友").slice(0, 1),
+            bio: mockUser ? mockUser.bio : "",
+            tags: mockUser ? mockUser.tags : [],
+            matchReason: mockUser ? mockUser.matchReason : "已添加为好友"
+        });
+    });
+
+    // Add mock friends that haven't been synced yet
+    MOCK_FRIEND_USERS.forEach(u => {
+        if (seenIds.has(u.id)) return;
+        if (friendIds.includes(u.id)) {
+            seenIds.add(u.id);
+            allFriends.push({
+                id: u.id,
+                nickname: u.nickname,
+                avatar: u.avatar,
+                bio: u.bio,
+                tags: u.tags,
+                matchReason: u.matchReason
+            });
+        }
+    });
+
+    if (!allFriends.length) {
         return searchHTML + `<div class="friend-empty">
             <span class="friend-empty-icon">👋</span>
             <strong>还没有好友</strong>
@@ -10858,30 +11195,20 @@ function renderFriendList() {
         </div>`;
     }
 
-    const groupMap = {};
-    friends.forEach(f => {
-        f.tags.forEach(tag => {
-            if (!groupMap[tag]) groupMap[tag] = [];
-            groupMap[tag].push(f);
-        });
-    });
-
-    // Show friends grouped by primary interest
-    const cards = friends.map(f => {
-        const matchReasons = [];
-        const myTags = ["建筑", "咖啡", "历史", "美食", "摄影", "Citywalk", "校园", "夜游"];
+    // Show friends
+    const myTags = ["建筑", "咖啡", "历史", "美食", "摄影", "Citywalk", "校园", "夜游"];
+    const cards = allFriends.map(f => {
         const shared = f.tags.filter(t => myTags.includes(t));
-        if (shared.length >= 3) matchReasons.push(`共同喜欢 ${shared.length} 个主题`);
-        if (shared.length >= 1) matchReasons.push(`都对${shared[0]}感兴趣`);
-        matchReasons.push(f.matchReason);
+        let matchReason = f.matchReason || "";
+        if (!matchReason && shared.length >= 1) matchReason = `都对${shared[0]}感兴趣`;
 
         return `<div class="friend-card" data-name="${f.nickname}" data-tags="${f.tags.join(' ')}">
-            <div class="friend-card-avatar">${f.avatar}</div>
+            <div class="friend-card-avatar">${escapeHtml(f.avatar)}</div>
             <div class="friend-card-info">
                 <div class="friend-card-name">${escapeHtml(f.nickname)}</div>
                 <div class="friend-card-bio">${escapeHtml(f.bio)}</div>
                 <div class="friend-card-tags">${f.tags.map(t => `<span class="friend-tag">${escapeHtml(t)}</span>`).join("")}</div>
-                <div class="friend-card-match">🤝 ${matchReasons[0]}</div>
+                ${matchReason ? `<div class="friend-card-match">🤝 ${matchReason}</div>` : ''}
             </div>
             <div class="friend-card-actions">
                 <button class="friend-action-btn primary" type="button" data-chat-friend="${f.id}">💬 聊天</button>
@@ -10897,10 +11224,43 @@ function renderFriendList() {
 function renderFriendRequests() {
     const data = loadFriendData();
 
-    // Received requests (from others to me)
-    const received = data.requests.filter(r => r.toId === "me" && r.status === "pending");
+    function resolveUser(userIdStr) {
+        // Check mock data first
+        const mock = MOCK_FRIEND_USERS.find(u => u.id === userIdStr);
+        if (mock) return { nickname: mock.nickname, avatar: mock.avatar, tags: mock.tags };
+        // Backend user: use fromName or fallback
+        return { nickname: null, avatar: "?", tags: [] };
+    }
+
+    function resolveSenderName(r) {
+        if (r.fromName) return r.fromName;
+        const u = resolveUser(r.fromId);
+        return u.nickname || "用户" + r.fromId;
+    }
+
+    function resolveSenderAvatar(r) {
+        if (r.fromName) return r.fromName.slice(0, 1);
+        const u = resolveUser(r.fromId);
+        return u.avatar || "?";
+    }
+
+    function resolveToName(r) {
+        const u = resolveUser(r.toId);
+        return u.nickname || r.toId;
+    }
+
+    function resolveToAvatar(r) {
+        const u = resolveUser(r.toId);
+        return u.avatar || "?";
+    }
+
+    // Received requests (from others to me, status pending)
+    const received = data.requests.filter(r =>
+        (r.toId === "me" || r.status === "pending") &&
+        !(r.fromId === "me")
+    );
     // Sent requests (from me to others)
-    const sent = data.requests.filter(r => r.fromId === "me");
+    const sent = data.requests.filter(r => r.fromId === "me" || r.fromUserId !== undefined);
     // History (processed)
     const history = data.requests.filter(r => r.status !== "pending" && (r.toId === "me" || r.fromId === "me"));
 
@@ -10910,16 +11270,17 @@ function renderFriendRequests() {
     html += `<div class="friend-section-title">收到的申请${received.length ? ` (${received.length})` : ''}</div>`;
     if (received.length) {
         html += received.map(r => {
-            const user = MOCK_FRIEND_USERS.find(u => u.id === r.fromId);
-            if (!user) return "";
+            const name = resolveSenderName(r);
+            const avatar = resolveSenderAvatar(r);
+            const user = resolveUser(r.fromId);
             const timeStr = getTimeAgo(r.createdAt);
             const shared = user.tags.filter(t => ["建筑","咖啡","历史","美食","摄影","Citywalk","校园","夜游"].includes(t));
             return `<div class="friend-request-card">
-                <div class="friend-card-avatar">${user.avatar}</div>
+                <div class="friend-card-avatar">${escapeHtml(avatar)}</div>
                 <div class="friend-card-info">
-                    <div class="friend-card-name">${escapeHtml(user.nickname)}</div>
+                    <div class="friend-card-name">${escapeHtml(name)}</div>
                     <div class="friend-card-bio">${escapeHtml(r.message)}</div>
-                    <div class="friend-card-tags">${user.tags.map(t => `<span class="friend-tag">${escapeHtml(t)}</span>`).join("")}</div>
+                    ${user.tags.length ? `<div class="friend-card-tags">${user.tags.map(t => `<span class="friend-tag">${escapeHtml(t)}</span>`).join("")}</div>` : ''}
                     ${shared.length ? `<div class="friend-card-match">🤝 共同兴趣：${shared.join('、')}</div>` : ''}
                     <div class="friend-card-time">${timeStr}</div>
                 </div>
@@ -10937,13 +11298,14 @@ function renderFriendRequests() {
     html += `<div class="friend-section-title">我发出的申请</div>`;
     if (sent.length) {
         html += sent.map(r => {
-            const user = MOCK_FRIEND_USERS.find(u => u.id === r.toId);
-            if (!user) return "";
+            const toName = resolveToName(r);
+            const toAvatar = resolveToAvatar(r);
             const statusMap = { pending: "等待通过", accepted: "已接受", rejected: "已拒绝", canceled: "已撤回" };
+            const statusLabel = statusMap[r.status] || r.status;
             return `<div class="friend-request-card">
-                <div class="friend-card-avatar">${user ? user.avatar : '?'}</div>
+                <div class="friend-card-avatar">${escapeHtml(toAvatar)}</div>
                 <div class="friend-card-info">
-                    <div class="friend-card-name">${escapeHtml(user ? user.nickname : '未知用户')}</div>
+                    <div class="friend-card-name">${escapeHtml(toName)}</div>
                     <div class="friend-card-bio">${escapeHtml(r.message)}</div>
                     <span class="friend-request-status status-${r.status}">${statusMap[r.status] || r.status}</span>
                 </div>
@@ -11112,13 +11474,12 @@ function renderConversationList() {
 
     const items = conversations.map(conv => {
         const user = MOCK_FRIEND_USERS.find(u => u.id === conv.withUserId);
-        if (!user) return "";
         const msgs = freshData.messages[conv.id] || [];
         const unread = msgs.filter(m => m.senderId !== "me" && m.status !== "read").length;
         const lastTime = conv.lastMessageAt ? getTimeAgo(conv.lastMessageAt) : "";
         const summary = getLastMessageSummary(conv);
-        const avatar = user.avatar;
-        const name = user.nickname;
+        const avatar = user ? user.avatar : (conv.withUserId ? String(conv.withUserId).slice(0, 1) : "?");
+        const name = user ? user.nickname : ("用户" + conv.withUserId);
         const isPinned = conv.isPinned;
         const isMuted = conv.isMuted;
 
@@ -11536,6 +11897,9 @@ function sendChatMessage(convId, type, payload) {
     const data = loadChatData();
     if (!data.messages[convId]) data.messages[convId] = [];
 
+    const conv = data.conversations.find(c => c.id === convId);
+    const receiverId = conv ? conv.withUserId : null;
+
     const msg = {
         id: "msg-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
         type: type,
@@ -11549,7 +11913,6 @@ function sendChatMessage(convId, type, payload) {
     data.messages[convId].push(msg);
 
     // Update conversation
-    const conv = data.conversations.find(c => c.id === convId);
     if (conv) {
         conv.lastMessage = type === "text" ? (payload.text || "").substring(0, 30) : type;
         conv.lastMessageType = type;
@@ -11558,8 +11921,19 @@ function sendChatMessage(convId, type, payload) {
 
     saveChatData(data);
 
-    // Simulate reply after 1-3s for demo
-    if (type === "text" && payload.text) {
+    // Send via backend API if it's a real user ID (numeric)
+    if (type === "text" && payload.text && receiverId && /^\d+$/.test(String(receiverId))) {
+        chatApi.send(parseInt(receiverId), payload.text).then(result => {
+            if (result.code === 200) {
+                msg.status = "delivered";
+                msg.backendId = result.data.id;
+                saveChatData(loadChatData());
+            }
+        }).catch(() => {});
+    }
+
+    // Simulate reply after 1-3s for demo (only for mock friends)
+    if (type === "text" && payload.text && (!receiverId || !/^\d+$/.test(String(receiverId)))) {
         setTimeout(() => {
             const updatedData = loadChatData();
             if (!updatedData.messages[convId]) updatedData.messages[convId] = [];

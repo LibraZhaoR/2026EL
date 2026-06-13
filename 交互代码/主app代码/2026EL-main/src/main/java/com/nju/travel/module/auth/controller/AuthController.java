@@ -1,5 +1,6 @@
 package com.nju.travel.module.auth.controller;
 
+import com.nju.travel.common.AuthUtils;
 import com.nju.travel.common.result.ApiResult;
 import com.nju.travel.module.auth.dto.LoginRequest;
 import com.nju.travel.module.auth.dto.RegisterRequest;
@@ -24,20 +25,20 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResult<UserAccountVO> register(@Valid @RequestBody RegisterRequest request, HttpSession session) {
         UserAccountVO user = authService.register(request);
-        session.setAttribute("userId", user.id());
+        AuthUtils.login(session, user.id());
         return ApiResult.success(user);
     }
 
     @PostMapping("/login")
     public ApiResult<UserAccountVO> login(@Valid @RequestBody LoginRequest request, HttpSession session) {
         UserAccountVO user = authService.login(request.email(), request.password());
-        session.setAttribute("userId", user.id());
+        AuthUtils.login(session, user.id());
         return ApiResult.success(user);
     }
 
     @GetMapping("/me")
     public ApiResult<?> me(HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
+        Long userId = AuthUtils.getUserId(session);
         if (userId == null) {
             return ApiResult.fail(401, "未登录");
         }
@@ -46,14 +47,13 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ApiResult<Void> logout(HttpSession session) {
-        session.invalidate();
+        AuthUtils.logout(session);
         return ApiResult.success(null);
     }
 
     @PutMapping("/profile")
     public ApiResult<UserAccountVO> updateProfile(@RequestBody Map<String, String> body, HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
-        if (userId == null) return ApiResult.fail(401, "未登录");
+        Long userId = AuthUtils.requireUserId(session);
         UserAccountVO user = authService.updateProfile(userId,
                 body.get("nickname"),
                 body.get("bio"),
@@ -65,8 +65,7 @@ public class AuthController {
 
     @PostMapping("/change-password")
     public ApiResult<Void> changePassword(@RequestBody Map<String, String> body, HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
-        if (userId == null) return ApiResult.fail(401, "未登录");
+        Long userId = AuthUtils.requireUserId(session);
         authService.changePassword(userId, body.get("oldPassword"), body.get("newPassword"));
         return ApiResult.success(null);
     }

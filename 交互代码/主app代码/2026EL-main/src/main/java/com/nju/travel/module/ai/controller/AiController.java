@@ -1,11 +1,13 @@
 package com.nju.travel.module.ai.controller;
 
+import com.nju.travel.common.AuthUtils;
 import com.nju.travel.common.annotation.RateLimit;
 import com.nju.travel.common.result.ApiResult;
 import com.nju.travel.module.ai.dto.AiChatRequest;
 import com.nju.travel.module.ai.dto.AiRoutePlanRequest;
 import com.nju.travel.module.ai.service.AiService;
 import com.nju.travel.module.ai.vo.AiChatVO;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,12 +26,23 @@ public class AiController {
     }
 
     @PostMapping("/chat")
-    public ApiResult<AiChatVO> chat(@RequestBody AiChatRequest request) {
-        return ApiResult.success(aiService.chat(request));
+    public ApiResult<AiChatVO> chat(@RequestBody AiChatRequest request, HttpSession session) {
+        Long userId = AuthUtils.getUserId(session);
+        AiChatRequest resolved = new AiChatRequest(
+            userId != null ? userId : 1L,
+            request.sessionId(), request.message(), request.routeId(),
+            request.pointId(), request.guideRole(), request.imageUrls()
+        );
+        return ApiResult.success(aiService.chat(resolved));
     }
 
     @PostMapping("/route-plan")
-    public ApiResult<AiChatVO> routePlan(@RequestBody AiRoutePlanRequest request) {
-        return ApiResult.success(aiService.routePlan(request));
+    public ApiResult<AiChatVO> routePlan(@RequestBody AiRoutePlanRequest request, HttpSession session) {
+        Long userId = AuthUtils.getUserId(session);
+        AiRoutePlanRequest resolved = new AiRoutePlanRequest(
+            userId != null ? userId : 1L, request.durationMinutes(),
+            request.budgetMax(), request.userText()
+        );
+        return ApiResult.success(aiService.routePlan(resolved));
     }
 }

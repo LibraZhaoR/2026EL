@@ -123,6 +123,15 @@ public class RouteService {
         return toUserRouteVO(entity);
     }
 
+    public UserRouteVO createUserRoute(Long userId, UserRouteCreateRequest request) {
+        CustomRoute entity = new CustomRoute(
+                userId, request.sourceRouteId(),
+                request.title(), request.description(),
+                Boolean.TRUE.equals(request.isPublic()));
+        entity = routeRepo.save(entity);
+        return toUserRouteVO(entity);
+    }
+
     public UserRouteVO saveCustomRoute(Long userId, String title, String description, String coverUrl) {
         CustomRoute entity = new CustomRoute(userId, null, title, description, false);
         entity = routeRepo.save(entity);

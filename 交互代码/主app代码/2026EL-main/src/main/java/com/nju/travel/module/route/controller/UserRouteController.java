@@ -1,9 +1,11 @@
 package com.nju.travel.module.route.controller;
 
+import com.nju.travel.common.AuthUtils;
 import com.nju.travel.common.result.ApiResult;
 import com.nju.travel.module.route.dto.UserRouteCreateRequest;
 import com.nju.travel.module.route.service.RouteService;
 import com.nju.travel.module.route.vo.UserRouteVO;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,17 +22,21 @@ public class UserRouteController {
     }
 
     @PostMapping
-    public ApiResult<UserRouteVO> createUserRoute(@Valid @RequestBody UserRouteCreateRequest request) {
-        return ApiResult.success(routeService.createUserRoute(request));
+    public ApiResult<UserRouteVO> createUserRoute(@Valid @RequestBody UserRouteCreateRequest request,
+                                                   HttpSession session) {
+        Long userId = AuthUtils.requireUserId(session);
+        return ApiResult.success(routeService.createUserRoute(userId, request));
     }
 
     @PostMapping("/{routeId}/copy")
-    public ApiResult<UserRouteVO> copyRoute(@PathVariable Long routeId, @RequestParam Long userId) {
+    public ApiResult<UserRouteVO> copyRoute(@PathVariable Long routeId, HttpSession session) {
+        Long userId = AuthUtils.requireUserId(session);
         return ApiResult.success(routeService.copyRoute(routeId, userId));
     }
 
     @GetMapping
-    public ApiResult<List<UserRouteVO>> listUserRoutes(@RequestParam Long userId) {
+    public ApiResult<List<UserRouteVO>> listUserRoutes(HttpSession session) {
+        Long userId = AuthUtils.requireUserId(session);
         return ApiResult.success(routeService.listUserRoutes(userId));
     }
 
@@ -41,7 +47,8 @@ public class UserRouteController {
     }
 
     @DeleteMapping("/{userRouteId}")
-    public ApiResult<Void> deleteUserRoute(@PathVariable Long userRouteId, @RequestParam Long userId) {
+    public ApiResult<Void> deleteUserRoute(@PathVariable Long userRouteId, HttpSession session) {
+        Long userId = AuthUtils.requireUserId(session);
         routeService.deleteUserRoute(userRouteId, userId);
         return ApiResult.success(null);
     }
