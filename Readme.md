@@ -255,11 +255,11 @@ src/main/resources/static/app/
 # 进入主应用目录
 cd 交互代码/主app代码/2026EL-main
 
-# 构建并启动
-mvn spring-boot:run
+# 清理并构建启动（推荐使用 clean 避免构建缓存问题）
+mvn clean spring-boot:run
 
-# 或先打包再运行
-mvn package -DskipTests
+# 或先清理打包再运行
+mvn clean package -DskipTests
 java -jar target/campus-nanjing-travel-0.0.1-SNAPSHOT.jar
 ```
 
@@ -333,9 +333,9 @@ spring.datasource.url: jdbc:h2:file:./data/custom-routes;MODE=MySQL
 
 | 成员 | GitHub | 角色 |
 |------|--------|------|
-| **LibraZhaoR** | [@LibraZhaoR](https://github.com/LibraZhaoR) | 全栈开发 · 架构设计 |
-| **Li Xiangze** | — | 后端开发 · 数据库 |
-| **Du Xinyao** | — | 前端开发 · UI 设计 |
+| **LibraZhaoR** | [@LibraZhaoR](https://github.com/LibraZhaoR) | — |
+| **Li Xiangze** | — | — |
+| **Du Xinyao** | — | — |
 
 > 📌 项目仓库：[github.com/LibraZhaoR/2026EL](https://github.com/LibraZhaoR/2026EL)
 
