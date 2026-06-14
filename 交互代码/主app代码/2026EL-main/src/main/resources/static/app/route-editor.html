@@ -140,7 +140,7 @@
         <button class="btn-success" id="save-btn" onclick="handleSave()">💾 同步至灵动金陵</button>
     </div>
 </div>
-<div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;z-index:999;background:#1a1a2e;color:#0f0;font-family:monospace;font-size:11px;max-height:120px;overflow-y:auto;padding:6px 10px;display:block;"></div>
+<div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;z-index:999;background:#1a1a2e;color:#0f0;font-family:monospace;font-size:11px;max-height:120px;overflow-y:auto;padding:6px 10px;display:none;"></div>
 <div class="map-container">
     <div class="map-tip" id="mode-tip">📍 请点击地图设置【起点】</div>
     <div class="re-loading" id="re-loading">
@@ -155,31 +155,12 @@
 <script src="./all-route-pois.js"></script>
 <script src="https://webapi.amap.com/maps?v=2.0&key=5d1c179964cb1f9ac287778ca6fe9567&plugin=AMap.Walking,AMap.Driving,AMap.PlaceSearch"></script>
 <script>
-// 可见调试面板
-window._debugLines = [];
+// 调试日志（仅控制台，不显示面板）
 function debugLog(tag, msg) {
-    var line = '[' + tag + '] ' + (msg || '');
-    console.log(line);
-    window._debugLines.push(new Date().toLocaleTimeString() + ' ' + line);
-    if (window._debugLines.length > 30) window._debugLines.shift();
-    var panel = document.getElementById('debug-panel');
-    if (panel) {
-        panel.style.display = 'block';
-        panel.innerHTML = window._debugLines.join('<br>');
-    }
+    console.log('[' + tag + '] ' + (msg || ''));
 }
 function debugError(tag, msg) {
-    var line = '❌ [' + tag + '] ' + (msg || '');
-    console.error(line);
-    window._debugLines.push(new Date().toLocaleTimeString() + ' ' + line);
-    if (window._debugLines.length > 30) window._debugLines.shift();
-    var panel = document.getElementById('debug-panel');
-    if (panel) {
-        panel.style.display = 'block';
-        panel.innerHTML = window._debugLines.map(function(l) {
-            return l.indexOf('❌') === 0 ? '<span style="color:#f44">' + l + '</span>' : l;
-        }).join('<br>');
-    }
+    console.error('[' + tag + '] ' + (msg || ''));
 }
 
 const state = { map:null, editMode:'origin', points:[], polyline:null, lastResult:null, pathCoords:[], pathStops:[] };
