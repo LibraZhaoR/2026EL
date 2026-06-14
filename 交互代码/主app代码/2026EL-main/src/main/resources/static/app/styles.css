@@ -532,9 +532,20 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     line-height: 1.7;
     font-weight: 380;
     color: #2C2418;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     letter-spacing: 0.06em;
     text-shadow: 0 0 1px rgba(44,36,24,0.1);
+}
+
+.poem-desc {
+    font-family: "FangSong", "STFangsong", "KaiTi", "SimSun", serif !important;
+    font-size: 18px !important;
+    line-height: 2;
+    font-weight: 400;
+    color: #5A4E3C !important;
+    margin-bottom: 14px;
+    letter-spacing: 0.08em;
+    max-width: 24ch;
 }
 
 .enter {

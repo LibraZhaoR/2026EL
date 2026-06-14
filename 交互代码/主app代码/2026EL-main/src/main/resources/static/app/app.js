@@ -7996,6 +7996,19 @@ async function init() {
 
     paperTex = genPaperTexture();
 
+    // 用 routes 数据动态填充开屏诗词卡片的标题和描述
+    poems.forEach(function(el) {
+        var btn = el.querySelector(".enter");
+        if (!btn) return;
+        var routeKey = btn.getAttribute("data-route");
+        if (!routeKey || !routes[routeKey]) return;
+        var route = routes[routeKey];
+        var h2 = el.querySelector("h2");
+        var desc = el.querySelector(".poem-desc");
+        if (h2) h2.textContent = route.title ? route.title.split("：")[0].split(":")[0] : (h2.getAttribute("data-prefill") || "");
+        if (desc) desc.textContent = route.desc || "";
+    });
+
     dots[0].classList.add("lit");
     poems[0].style.opacity = "1";
     poems[0].style.transform = "translateY(0)";
