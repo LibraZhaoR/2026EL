@@ -1,35 +1,29 @@
 #!/usr/bin/env python3
-"""Static file server + Doubao AI proxy for Nanjing Travel app (Lingdong Jinling)."""
+"""Static file server + AI proxy for Nanjing Travel app (Lingdong Jinling)."""
 import http.server
 import json
 import os
 import sys
 
 import httpx
-from volcenginesdkarkruntime import Ark
 
 # Ensure UTF-8 output on Windows
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# Bypass system proxy for direct Ark API access
+# Bypass system proxy for direct API access
 os.environ["NO_PROXY"] = "*"
 os.environ["no_proxy"] = "*"
 
-ARK_API_KEY = os.getenv("ARK_API_KEY", "ark-4dde9478-fb60-4130-91e2-cc9706622a20-4d556")
-ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
-DOUBAO_MODEL = "doubao-seed-2-0-mini-260428"
+AI_API_KEY = os.getenv("AI_API_KEY", "sk-ws-H.REIRDIY.bLc7.MEUCIC4oDhHycxNA10zfUvJK7MxsztMItZt3b-bzm2GHhaylAiEA9z0y3PlV3hNmm0hz7fOrK_X7SYxEaMqP6EBbwa-Mzwg")
+AI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+AI_MODEL = "qwen-turbo"
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "src", "main", "resources", "static", "app")
 PORT = 8080
 
-ark_client = Ark(
-    base_url=ARK_BASE_URL,
-    api_key=ARK_API_KEY,
-    timeout=httpx.Timeout(8.0, connect=3.0),
-    max_retries=1,
-)
+http_client = httpx.Client(timeout=httpx.Timeout(15.0, connect=5.0))
 
 SYSTEM_PROMPT = """你是「灵动金陵」APP的内嵌AI旅游向导，一位从小在南京长大的本地朋友。
 
@@ -95,33 +89,29 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         user_msg = body.get("message", "")
 
         try:
-            response = ark_client.responses.create(
-                model=DOUBAO_MODEL,
-                max_output_tokens=512,
-                temperature=0.7,
-                input=[
-                    {
-                        "role": "system",
-                        "content": [{"type": "input_text", "text": SYSTEM_PROMPT}],
-                    },
-                    {
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": user_msg}],
-                    },
-                ],
+            resp = http_client.post(
+                AI_BASE_URL,
+                headers={
+                    "Authorization": f"Bearer {AI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": AI_MODEL,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_msg},
+                    ],
+                    "max_tokens": 512,
+                    "temperature": 0.7,
+                },
             )
-
-            reply = ""
-            for item in response.output:
-                if hasattr(item, "content"):
-                    for block in item.content:
-                        if hasattr(block, "text"):
-                            reply += block.text
-
+            data = resp.json()
+            reply = data["choices"][0]["message"]["content"].strip()
             if not reply:
                 reply = "让我想想..."
 
-            print(f"[AI] model={response.model} tokens_in={response.usage.input_tokens} tokens_out={response.usage.output_tokens}")
+            usage = data.get("usage", {})
+            print(f"[AI] model={data.get('model', AI_MODEL)} tokens_in={usage.get('prompt_tokens', 0)} tokens_out={usage.get('completion_tokens', 0)}")
 
         except Exception as e:
             print(f"[AI] Error: {e}")
@@ -130,11 +120,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         result = {
             "code": 200,
             "data": {
-                "sessionId": "ark-session",
+                "sessionId": "qwen-session",
                 "role": "南京本地向导",
                 "content": reply,
                 "reply": reply,
-                "provider": "doubao",
+                "provider": "qwen",
             },
         }
         self._send_json(result)
@@ -165,6 +155,6 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"Starting proxy server at http://localhost:{PORT}")
     print(f"Serving static files from: {STATIC_DIR}")
-    print(f"AI: Doubao ({DOUBAO_MODEL}) via Ark API (max_output=256, timeout=8s)")
+    print(f"AI: Qwen ({AI_MODEL}) via DashScope API (max_tokens=512, timeout=15s)")
     http.server.HTTPServer(("0.0.0.0", PORT), ProxyHandler).serve_forever()
 

@@ -25,10 +25,10 @@ travel:
   ai:
     # 可选: mock(离线关键词回复) | openai(兼容OpenAI接口,如DeepSeek) | doubao(火山引擎豆包)
     provider: openai
-    # DeepSeek API (兼容OpenAI格式), 换成其他兼容API只需改此地址
-    base-url: https://api.deepseek.com/chat/completions
-    api-key: sk-0c4f9bc4e734467e98d1996aa4811c95
-    model: deepseek-chat
+    # 阿里百炼 DashScope API (兼容OpenAI格式)
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    api-key: sk-ws-H.REIRDIY.bLc7.MEUCIC4oDhHycxNA10zfUvJK7MxsztMItZt3b-bzm2GHhaylAiEA9z0y3PlV3hNmm0hz7fOrK_X7SYxEaMqP6EBbwa-Mzwg
+    model: qwen-turbo
   meituan:
     enabled: false
     developer-id: ""
