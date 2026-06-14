@@ -142,6 +142,7 @@
                 <option value="driving">🚗 驾车模式</option>
             </select>
             <input type="text" id="route-name" placeholder="路线方案名称" style="margin-top:10px;" value="我的金陵探索路线">
+            <textarea id="route-desc" placeholder="路线简介（可选）&#10;描述这条路线的特色、适合人群、注意事项等" style="margin-top:8px;width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;font-family:inherit;resize:vertical;min-height:60px;box-sizing:border-box;"></textarea>
         </div>
         <div id="result-area"></div>
     </div>
@@ -770,8 +771,11 @@ async function handleSave() {
     const allStops = [origin, ...wps, dest].filter(Boolean).map(p => ({
         name: p.name, lnglat: p.lnglat
     }));
+    var descEl = document.getElementById('route-desc');
+    var routeDesc = descEl ? descEl.value.trim() : '';
     const payload={
         routeName:document.getElementById('route-name').value,
+        routeDesc: routeDesc,
         origin:origin.name+'|'+origin.lnglat,
         destination:dest.name+'|'+dest.lnglat,
         waypoints:wps.map(p=>p.name+'|'+p.lnglat).join(';'),
@@ -798,7 +802,7 @@ async function handleSave() {
                 description: '', stay_minutes: 30 };
         });
         const dbPayload = { title: document.getElementById('route-name').value,
-            description: state.lastResult ? (state.lastResult.distance/1000).toFixed(1)+'km - '+Math.ceil(state.lastResult.duration/60)+'min' : '',
+            description: routeDesc || (state.lastResult ? (state.lastResult.distance/1000).toFixed(1)+'km - '+Math.ceil(state.lastResult.duration/60)+'min' : ''),
             category: '自定义', duration_min: state.lastResult ? Math.ceil(state.lastResult.duration/60) : 0,
             budget_min: 0, budget_max: 0, crowd_tags: [], interest_tags: [],
             user_id: 'local-user', is_public: false, points: routeDbPoints };

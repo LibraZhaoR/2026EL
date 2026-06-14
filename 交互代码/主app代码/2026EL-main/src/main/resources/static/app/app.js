@@ -1991,7 +1991,7 @@ function saveCustomRouteFromEditor(d) {
     // Store route data
     routes[key] = {
         title: title,
-        desc: (d.transportMode === "walking" ? "🚶 步行" : "🚗 驾车") + " · " + distKm + "km · " + stopNames.length + "站",
+        desc: d.routeDesc || (d.transportMode === "walking" ? "🚶 步行" : "🚗 驾车") + " · " + distKm + "km · " + stopNames.length + "站",
         meta: [duration + " 分钟", distKm + "公里", stopNames.length + "个站点"],
         duration: duration,
         stops: stopNames.map((name, i) => ({ name, detail: "" })),
@@ -2004,7 +2004,7 @@ function saveCustomRouteFromEditor(d) {
     customRoutes[key] = {
         id: id,
         title: title,
-        desc: routes[key].desc,
+        desc: d.routeDesc || routes[key].desc,
         duration: duration,
         stops: stopNames.map((name, i) => ({ name, detail: "" })),
         isCustom: true,
@@ -4918,12 +4918,45 @@ function acceptInviteByCode() {
             }
             var card = data.data;
             var routeKey = card.routeKey;
+            var route = routes[routeKey];
             input.value = "";
-            // 如果有路线key，直接跳转路线页面
-            if (routeKey && routes[routeKey]) {
-                showToast("邀约已接受！正在打开路线…");
+            if (routeKey && route) {
+                // 存入我的路线
+                var customKey = "invite_" + Date.now();
+                var stopNames = route.stops.map(function(s) { return s.name; });
+                var mapData = ROUTE_MAP_DATA[routeKey];
+                var coords = mapData ? mapData.coords : [];
+                var savedRoute = {
+                    id: Date.now(),
+                    title: route.title,
+                    desc: route.desc || "",
+                    duration: route.duration || 120,
+                    stops: route.stops,
+                    isCustom: true,
+                    isInvited: true,
+                    fromInviteCode: code,
+                    budget: "自由预算",
+                    coords: coords,
+                    hasMapData: coords.length > 0
+                };
+                // 存入 customRoutes
+                customRoutes[customKey] = savedRoute;
+                // 存入 ROUTE_MAP_DATA
+                ROUTE_MAP_DATA[customKey] = { coords: coords, stops: stopNames };
+                // 存入 routes 用于显示
+                routes[customKey] = {
+                    title: route.title,
+                    desc: route.desc || "",
+                    meta: [(route.duration || 120) + " 分钟", "邀约路线", "自由预算"],
+                    duration: route.duration || 120,
+                    stops: route.stops,
+                    isCustom: true
+                };
+                ROUTE_ACCENT[customKey] = "#E07A5F";
+                saveCustomRoutesToStorage();
+                showToast("邀约已接受！已存入我的路线");
                 switchTab("home");
-                setTimeout(function() { openRoute(routeKey); }, 300);
+                setTimeout(function() { openRoute(customKey); }, 400);
             } else {
                 showToast("邀约已接受！路线：" + (card.routeName || ""));
             }
@@ -11137,7 +11170,10 @@ function showAuthModal(mode, callback) {
                 </div>
                 <div class="auth-field">
                     <label for="auth-password">密码</label>
-                    <input type="password" id="auth-password" placeholder="至少6位字符" minlength="6" required>
+                    <div class="auth-password-wrap">
+                        <input type="password" id="auth-password" placeholder="至少6位字符" minlength="6" required>
+                        <button type="button" class="auth-password-toggle" id="auth-password-toggle" tabindex="-1">👁️</button>
+                    </div>
                 </div>
                 <div class="auth-error" id="auth-error" style="display:none"></div>
                 <button class="auth-submit-btn" type="submit" id="auth-submit-btn">
@@ -11157,6 +11193,16 @@ function showAuthModal(mode, callback) {
     document.body.appendChild(overlay);
     overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
     overlay.querySelector(".auth-modal-close").addEventListener("click", () => overlay.remove());
+    // 密码可见性切换
+    var pwdToggle = overlay.querySelector("#auth-password-toggle");
+    var pwdInput = overlay.querySelector("#auth-password");
+    if (pwdToggle && pwdInput) {
+        pwdToggle.addEventListener("click", function() {
+            var isPass = pwdInput.type === "password";
+            pwdInput.type = isPass ? "text" : "password";
+            pwdToggle.textContent = isPass ? "🙈" : "👁️";
+        });
+    }
 
     // Switch mode
     overlay.querySelector("#auth-switch-btn").addEventListener("click", () => {

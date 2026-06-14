@@ -11923,6 +11923,29 @@ body.community-tab-active .ai-float-btn {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
+.auth-password-wrap {
+  position: relative;
+}
+.auth-password-wrap input {
+  padding-right: 44px;
+}
+.auth-password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px 8px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.auth-password-toggle:hover {
+  opacity: 1;
+}
 .auth-error {
   background: #FFF0F0;
   color: #D32F2F;
