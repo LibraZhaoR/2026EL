@@ -12347,3 +12347,17 @@ body.community-tab-active .ai-float-btn {
   color: rgba(142, 108, 255, 0.7);
   flex-shrink: 0;
 }
+
+/* ═══════════════════════════════════════
+   Performance hints · 性能优化提示
+   ═══════════════════════════════════════ */
+.snap-scroll { will-change: scroll-position; }
+.route-carousel { will-change: scroll-position; }
+.swiper-container { will-change: scroll-position; }
+.swiper-card { will-change: transform; }
+.main-map-container { will-change: transform; contain: layout style paint; }
+.route-float-card { will-change: transform; contain: layout style; }
+.ai-chat-panel { will-change: transform; contain: layout style; }
+.impressionist-map-stage { contain: layout style paint; }
+.wheel-nav { contain: layout style; }
+}

@@ -27,7 +27,6 @@ const swiperSwipeHint = document.querySelector(".swiper-swipe-hint");
 const mainPage = document.getElementById("main-page");
 const mainMapCanvas = document.getElementById("main-map-canvas");
 const mainMapCtx = mainMapCanvas ? mainMapCanvas.getContext("2d") : null;
-const mainScroll = document.getElementById("main-scroll");
 
 // ── State ──
 let W, H;
@@ -61,6 +60,130 @@ let amapFullscreen = false;
 
 // ── GSAP Init ──
 gsap.registerPlugin(ScrollTrigger);
+
+// ═══════════════════════════════════════════
+//  Performance Utilities · 性能优化工具
+// ═══════════════════════════════════════════
+
+// ── DOM Cache — 缓存重复查询的 DOM 节点 ──
+const $ = (() => {
+    const cache = new Map();
+    // WeakMap for cleanup tracking (node → key)
+    const nodeKeys = new WeakMap();
+    const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            m.removedNodes.forEach(n => {
+                if (n.nodeType === 1) {
+                    const key = nodeKeys.get(n);
+                    if (key) { cache.delete(key); nodeKeys.delete(n); }
+                    n.querySelectorAll("*").forEach(c => {
+                        const ck = nodeKeys.get(c);
+                        if (ck) { cache.delete(ck); nodeKeys.delete(c); }
+                    });
+                }
+            });
+        }
+    });
+    if (typeof document !== "undefined" && document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+    return (selector, parent = document) => {
+        const key = `${selector}::${parent === document ? "doc" : "el"}`;
+        if (cache.has(key)) {
+            const el = cache.get(key);
+            if (el && el.isConnected) return el;
+            cache.delete(key);
+        }
+        const el = parent.querySelector(selector);
+        if (el) {
+            cache.set(key, el);
+            nodeKeys.set(el, key);
+        }
+        return el;
+    };
+})();
+
+// ── DOM Batch — 批量读取/写入避免强制同步布局 ──
+function readDOM(fn) { return fn(); }
+function writeDOM(fn) { requestAnimationFrame(fn); }
+
+// ── Throttle (RAF-based) — 用于 scroll/resize 等高频事件 ──
+function throttleRAF(fn) {
+    let ticking = false;
+    return function (...args) {
+        if (!ticking) {
+            ticking = true;
+            requestAnimationFrame(() => {
+                fn.apply(this, args);
+                ticking = false;
+            });
+        }
+    };
+}
+
+// ── Throttle (time-based) — 限制最小调用间隔 ──
+function throttle(fn, delay = 100) {
+    let last = 0;
+    let timer = null;
+    return function (...args) {
+        const now = Date.now();
+        const remaining = delay - (now - last);
+        if (remaining <= 0) {
+            if (timer) { clearTimeout(timer); timer = null; }
+            last = now;
+            fn.apply(this, args);
+        } else if (!timer) {
+            timer = setTimeout(() => { timer = null; last = Date.now(); fn.apply(this, args); }, remaining);
+        }
+    };
+}
+
+// ── Debounce — 延迟执行，用于输入等 ──
+function debounce(fn, delay = 300) {
+    let timer = null;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+// ── localStorage Cache — 缓存读/写，减少同步 I/O ──
+const store = (() => {
+    const mem = new Map();
+    return {
+        get(key) {
+            if (mem.has(key)) return mem.get(key);
+            try {
+                const val = JSON.parse(localStorage.getItem(key));
+                mem.set(key, val);
+                return val;
+            } catch { return null; }
+        },
+        set(key, value) {
+            mem.set(key, value);
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* quota exceeded */ }
+        },
+        getRaw(key) {
+            try { return localStorage.getItem(key); } catch { return null; }
+        },
+        setRaw(key, value) {
+            try { localStorage.setItem(key, value); } catch { /* quota exceeded */ }
+        },
+        remove(key) {
+            mem.delete(key);
+            try { localStorage.removeItem(key); } catch { /* ignore */ }
+        },
+        invalidate(key) { mem.delete(key); },
+        flush() { mem.clear(); },
+    };
+})();
+
+// ── Batch DOM builder — DocumentFragment 批量插入 ──
+function buildFragment(html) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html;
+    return tpl.content;
+}
 
 // ── Persona Card Data (8 cards for vertical swipe) ──
 const personaCards = [
@@ -1087,7 +1210,7 @@ function initPet77Overlay() {
         showToast("已隐藏 77，可在宠物页重新召唤");
     });
     bindPet77Drag(overlay);
-    window.addEventListener("resize", () => placePet77Overlay(overlay));
+    window.addEventListener("resize", throttle(() => placePet77Overlay(overlay), 100));
     setPet77State("idle");
     pet77ResetIdleTimer();
     syncPet77Panels();
@@ -1769,7 +1892,7 @@ canvas.addEventListener("click", (e) => {
 canvas.style.cursor = "pointer";
 
 // ── Parallax ──
-canvas.addEventListener("mousemove", (e) => {
+const onMouseMoveParallax = throttleRAF((e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -1784,6 +1907,7 @@ canvas.addEventListener("mousemove", (e) => {
         canvas.style.cursor = "pointer";
     }
 });
+canvas.addEventListener("mousemove", onMouseMoveParallax);
 canvas.addEventListener("mouseleave", () => { mouseX = 0; mouseY = 0; });
 canvas.addEventListener("touchmove", (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -2470,7 +2594,7 @@ function showPersonaPage() {
     setupCardObserver();
 
     // Scroll listener for progress update
-    swiperContainer.addEventListener("scroll", onSwiperScroll, { passive: true });
+    swiperContainer.addEventListener("scroll", throttleRAF(onSwiperScroll), { passive: true });
 
     // ── Tutorial overlay: show on entry, dismiss on first scroll ──
     const tut = document.getElementById("swiper-tutorial");
@@ -3003,7 +3127,7 @@ function showMainPage() {
     mainPage.classList.remove("drawer-open");
     // Lazy-init map only when needed
     window._amapDeferredInit = true;
-    window.addEventListener("resize", onMainResize);
+    window.addEventListener("resize", throttle(onMainResize, 100));
 
     // ── Render new Swiss layout components ──
     const initialRouteKey = getHomeRecommendedRouteKey();
@@ -3015,10 +3139,7 @@ function showMainPage() {
     // ── Carousel scroll → update dots + feature section ──
     const carousel = document.getElementById("route-carousel");
     if (carousel) {
-        carousel.addEventListener("scroll", () => {
-            updateCarouselDots();
-            updateFeatureFromCarousel();
-        }, { passive: true });
+        carousel.addEventListener("scroll", throttleRAF(onCarouselScroll), { passive: true });
     }
 
     // ── Guide block button ──
@@ -3559,21 +3680,27 @@ function renderCarouselCards() {
     });
 }
 
-function updateCarouselDots() {
-    const carousel = document.getElementById("route-carousel");
-    const dots = document.querySelectorAll(".carousel-dot");
+function updateCarouselDots(carousel, dots, cardW) {
     if (!carousel || !dots.length) return;
-
-    const cardW = carousel.clientWidth * 0.38 + 12; // card width + gap
     const idx = Math.round(carousel.scrollLeft / cardW);
     dots.forEach((d, i) => d.classList.toggle("active", i === idx));
 }
 
-function updateFeatureFromCarousel() {
+function updateFeatureFromCarousel(carousel, cardW) {
+    if (!carousel) return;
+    const idx = Math.round(carousel.scrollLeft / cardW);
+    const routeKey = getHomeRouteOrder()[idx];
+    if (routeKey) renderFeatureSection(routeKey);
+}
+
+// Combined scroll handler for carousel — avoids duplicate DOM queries
+function onCarouselScroll() {
     const carousel = document.getElementById("route-carousel");
     if (!carousel) return;
     const cardW = carousel.clientWidth * 0.38 + 12;
     const idx = Math.round(carousel.scrollLeft / cardW);
+    const dots = document.querySelectorAll(".carousel-dot");
+    dots.forEach((d, i) => d.classList.toggle("active", i === idx));
     const routeKey = getHomeRouteOrder()[idx];
     if (routeKey) renderFeatureSection(routeKey);
 }
@@ -6336,12 +6463,12 @@ function showPoiDetailOverlayDianping(storeId) {
             const dots = overlay.querySelectorAll('.gdot');
             const counter = overlay.querySelector('.dp-gallery-count');
             if (!track) return;
-            track.addEventListener('scroll', () => {
+            track.addEventListener('scroll', throttleRAF(() => {
                 const idx = Math.round(track.scrollLeft / track.clientWidth);
                 dots.forEach(d => d.classList.remove('active'));
                 if (dots[idx]) dots[idx].classList.add('active');
                 if (counter) counter.textContent = (idx+1)+'/'+allPhotos.length;
-            }, {passive:true});
+            }), {passive:true});
         }, 100);
     }
     document.body.appendChild(overlay);
@@ -8092,7 +8219,7 @@ async function init() {
     initAuth().catch(() => {});
 
     resize();
-    window.addEventListener("resize", () => { resize(); });
+    window.addEventListener("resize", throttle(() => { resize(); }, 100));
 
     paperTex = genPaperTexture();
 
@@ -8535,6 +8662,13 @@ function animateRouteDraw(coordsArray) {
    路线显示增强 · Show Route on Map Enhance
    ═══════════════════════════════════════ */
 
+const GUIDE_ROUTE_MSGS = {
+    nju: "梧桐树下走走，一天就过去了。这条线藏着南大一百多年的故事。",
+    night: "秦淮灯影，金陵夜色。这条线路会带你走进一场旧梦。",
+    food: "不赶路，只把下午慢慢花掉。准备好你的胃了吗？",
+    expo: "安静地走进一座博物馆，和旧物说说话。记得提前预约哦。",
+};
+
 const _origShowRouteOnMap = showRouteOnMap;
 showRouteOnMap = function(routeKey) {
     _origShowRouteOnMap(routeKey);
@@ -8557,12 +8691,6 @@ showRouteOnMap = function(routeKey) {
     }
 
     // Show guide bubble with route-specific message
-    const GUIDE_ROUTE_MSGS = {
-        nju: "梧桐树下走走，一天就过去了。这条线藏着南大一百多年的故事。",
-        night: "秦淮灯影，金陵夜色。这条线路会带你走进一场旧梦。",
-        food: "不赶路，只把下午慢慢花掉。准备好你的胃了吗？",
-        expo: "安静地走进一座博物馆，和旧物说说话。记得提前预约哦。",
-    };
     showGuideBubble(GUIDE_ROUTE_MSGS[routeKey] || "这条路线看起来不错！");
 
 };
