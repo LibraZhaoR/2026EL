@@ -3125,6 +3125,7 @@ function showMainPage() {
                 renderMapPOIs();
             } else {
                 clearMapPOIs();
+                addAllRouteOverlays(window.AMap);
                 try { amapInstance.resize(); } catch(e) {}
             }
             setTimeout(() => amapInstance.resize(), 50);
@@ -3884,7 +3885,7 @@ function initAMap() {
         const personaStyle = getPersonaMapStyle(selectedPersonaId);
 
         AMapLoader.load({
-            key: "acbce3442afa6bf6251bc8014a1594b8",
+            key: "5d1c179964cb1f9ac287778ca6fe9567",
             version: "2.0",
             plugins: ["AMap.ToolBar", "AMap.Scale", "AMap.PlaceSearch"],
         }).then((AMap) => {
@@ -3967,7 +3968,170 @@ function initAMap() {
 }
 
 function addAllRouteOverlays(AMap) {
-    // Route markers and lines removed — routes are viewed via the editor
+    if (!amapInstance || !AMap) return;
+
+    // 清理旧的全路线POI标记
+    if (window._allRouteMarkers && window._allRouteMarkers.length) {
+        window._allRouteMarkers.forEach(function(m) {
+            try { amapInstance.remove(m); } catch(e) {}
+        });
+    }
+    window._allRouteMarkers = [];
+
+    // 从 ROUTE_MAP_DATA 构建去重POI目录
+    var poiMap = {}; // key: "lat,lng" -> { name, lng, lat, routeKeys[] }
+    Object.keys(ROUTE_MAP_DATA).forEach(function(routeKey) {
+        var data = ROUTE_MAP_DATA[routeKey];
+        if (!data || !data.coords || !data.coords.length) return;
+        var stops = data.stops || [];
+        data.coords.forEach(function(c, i) {
+            if (!c || c[0] == null || c[1] == null) return;
+            var lat = Number(c[0]), lng = Number(c[1]);
+            if (!isFinite(lat) || !isFinite(lng)) return;
+            // 南京及周边合理范围：lat 31~33, lng 118~120
+            if (lat < 31 || lat > 33 || lng < 118 || lng > 120) return;
+            // 坐标精确到小数点后4位（~11米），用于同一建筑/位置的去重
+            var coordKey = lat.toFixed(4) + "," + lng.toFixed(4);
+            var stopName = stops[i] || ("途经点" + (i + 1));
+            if (!poiMap[coordKey]) {
+                poiMap[coordKey] = {
+                    name: stopName,
+                    lng: lng,
+                    lat: lat,
+                    routeKeys: [routeKey]
+                };
+            } else {
+                if (poiMap[coordKey].routeKeys.indexOf(routeKey) === -1) {
+                    poiMap[coordKey].routeKeys.push(routeKey);
+                }
+            }
+        });
+    });
+
+    var pois = Object.values(poiMap);
+    var currentZoom = amapInstance.getZoom();
+
+    // 为每个唯一POI创建标记（最终位置校验防 NaN）
+    pois.forEach(function(poi) {
+        // 最终防线：拒绝任何无效坐标
+        if (!isFinite(poi.lng) || !isFinite(poi.lat)) return;
+        if (poi.lng < 118 || poi.lng > 120 || poi.lat < 31 || poi.lat > 33) return;
+
+        var accentColor = ROUTE_ACCENT[poi.routeKeys[0]] || "#E07A5F";
+        var el = document.createElement("div");
+        el.className = "route-poi-marker";
+        el.setAttribute("data-poi-name", poi.name);
+        el.setAttribute("data-route-keys", poi.routeKeys.join(","));
+        el.innerHTML = '<span class="route-poi-dot" style="background:' + accentColor + ';"></span>' +
+                       '<span class="route-poi-label">' + escapeHtml(poi.name) + '</span>';
+
+        var marker = new AMap.Marker({
+            position: [poi.lng, poi.lat],
+            content: el,
+            offset: new AMap.Pixel(-8, -8),
+            zIndex: 50
+        });
+
+        // 根据当前缩放级别设置显隐
+        if (currentZoom < 14) {
+            el.classList.add("route-poi-compact");
+        }
+        if (currentZoom < 11) {
+            el.style.display = "none";
+        }
+
+        marker.on("click", function() {
+            onRoutePoiClick(poi);
+        });
+
+        amapInstance.add(marker);
+        window._allRouteMarkers.push(marker);
+    });
+
+    // 缩放变化时控制标记显隐（只注册一次）
+    if (!window._routePoiZoomHandler) {
+        window._routePoiZoomHandler = function() {
+            var z = amapInstance.getZoom();
+            var markers = window._allRouteMarkers || [];
+            markers.forEach(function(m) {
+                try {
+                    var ce = m.getContent();
+                    if (!ce) return;
+                    if (z < 11) {
+                        ce.style.display = "none";
+                    } else {
+                        ce.style.display = "";
+                        if (z < 14) {
+                            ce.classList.add("route-poi-compact");
+                        } else {
+                            ce.classList.remove("route-poi-compact");
+                        }
+                    }
+                } catch(e) {}
+            });
+        };
+        amapInstance.on("zoomchange", window._routePoiZoomHandler);
+    }
+}
+
+// 路线POI标记点击处理
+function onRoutePoiClick(poi) {
+    if (!poi || !poi.name) return;
+    // 优先匹配建筑标点（带详细图文介绍）
+    var bp = findBuildingPointByName(poi.name);
+    if (bp && showBuildingPointDetail(bp, "路线途经点")) return;
+    // 只属于一条路线 → 直接打开
+    if (poi.routeKeys && poi.routeKeys.length === 1) {
+        openRoute(poi.routeKeys[0]);
+        return;
+    }
+    // 多条路线共享此POI → 弹出选择列表
+    showPoiRouteList(poi);
+}
+
+// 多路线共享POI的选择弹窗
+function showPoiRouteList(poi) {
+    var existing = document.querySelector(".poi-route-list-popup");
+    if (existing) existing.remove();
+
+    var popup = document.createElement("div");
+    popup.className = "poi-route-list-popup";
+    var listItems = (poi.routeKeys || []).map(function(rk) {
+        var r = routes[rk];
+        var title = r ? (r.title || rk) : rk;
+        var accent = ROUTE_ACCENT[rk] || "#E07A5F";
+        return '<button class="poi-route-list-item" data-route="' + rk +
+               '" style="border-left:3px solid ' + accent + '">' +
+               escapeHtml(title) + '</button>';
+    }).join("");
+    popup.innerHTML = '<div class="poi-route-list-header">' + escapeHtml(poi.name) +
+                      '<span class="poi-route-list-count">' + poi.routeKeys.length +
+                      ' 条路线</span></div>' + listItems;
+
+    popup.style.cssText = "position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:300;" +
+        "background:rgba(252,252,251,0.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);" +
+        "border-radius:12px;padding:12px;box-shadow:0 8px 32px rgba(31,35,32,0.15);" +
+        "max-width:320px;width:calc(100vw - 48px);";
+    document.body.appendChild(popup);
+
+    popup.querySelectorAll(".poi-route-list-item").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            var rk = btn.getAttribute("data-route");
+            popup.remove();
+            if (rk) openRoute(rk);
+        });
+    });
+
+    // 点击外部关闭
+    setTimeout(function() {
+        var dismiss = function(e) {
+            if (!popup.contains(e.target)) {
+                popup.remove();
+                document.removeEventListener("click", dismiss);
+            }
+        };
+        document.addEventListener("click", dismiss);
+    }, 100);
 }
 
 // ═══ 标点坐标校准（嵌入地图初始化流程） ═══
@@ -4928,6 +5092,13 @@ function clearRouteOverlays() {
         try { amapInstance.remove(amapRouteLines); } catch(e) {}
         amapRouteLines = [];
     }
+    // 同时清理全部路线POI标记
+    if (window._allRouteMarkers && window._allRouteMarkers.length) {
+        window._allRouteMarkers.forEach(function(m) {
+            try { amapInstance.remove(m); } catch(e) {}
+        });
+        window._allRouteMarkers = [];
+    }
 }
 
 function setRouteOverlaysVisible(visible) {
@@ -4959,8 +5130,16 @@ function drawRouteOnMap(routeKey) {
 
     // Use planned path if available, else direct stop-to-stop
     var linePoints = (data.plannedPath && data.plannedPath.length >= 2) ? data.plannedPath : data.coords;
-    // Convert [lat, lng] → [lng, lat] for AMap
-    var lnglats = linePoints.map(function(c) { return [c[1], c[0]]; });
+    // Convert [lat, lng] → [lng, lat] for AMap，同时过滤无效坐标
+    var lnglats = [];
+    linePoints.forEach(function(c) {
+        if (!c || c[0] == null || c[1] == null) return;
+        var lng = Number(c[1]), lat = Number(c[0]);
+        if (isFinite(lng) && isFinite(lat)) {
+            lnglats.push([lng, lat]);
+        }
+    });
+    if (lnglats.length < 2) return;
 
     // Simple solid polyline (same approach as addAllRouteOverlays which works)
     var polyline = new AMap.Polyline({
@@ -4976,12 +5155,15 @@ function drawRouteOnMap(routeKey) {
 
     // Stop markers using data.coords
     data.coords.forEach(function(c, i) {
+        if (!c || c[0] == null || c[1] == null) return;
+        var lng = Number(c[1]), lat = Number(c[0]);
+        if (!isFinite(lng) || !isFinite(lat)) return;
         var label = data.stops[i] || "途经点";
         var el = document.createElement("div");
         el.className = "route-marker";
         el.innerHTML = '<span class="dot"></span><span>' + label + '</span>';
         var marker = new AMap.Marker({
-            position: [c[1], c[0]],
+            position: [lng, lat],
             content: el,
             offset: new AMap.Pixel(-30, -10),
             zIndex: 60,
@@ -5219,7 +5401,10 @@ function switchTab(tab) {
         if (tab === "home") {
             const mapStage = document.getElementById("map-stage");
             if (mapStage) mapStage.style.display = "";
-            if (amapInstance) amapInstance.resize();
+            if (amapInstance) {
+                addAllRouteOverlays(window.AMap);
+                amapInstance.resize();
+            }
         }
         return;
     }
@@ -5271,7 +5456,7 @@ function switchTab(tab) {
             snapScroll.style.display = "";
             snapScroll.scrollTop = 0;
         }
-        if (amapInstance) setTimeout(() => amapInstance.resize(), 50);
+        if (amapInstance) { try { addAllRouteOverlays(window.AMap); } catch(e) {} setTimeout(() => amapInstance.resize(), 50); }
     } else {
         // routes / nearby / pet / profile — hide map stage and all other tabs
         hideAllTabContent();
@@ -5391,10 +5576,16 @@ function showMapRouteEditor(routeKey) {
         var r = routes[routeKey];
         var mapData = ROUTE_MAP_DATA[routeKey];
         if (mapData && mapData.stops && mapData.stops.length) {
+            // 优先使用 ALL_ROUTE_POIS 中的验证坐标，兜底用 ROUTE_MAP_DATA 原始坐标
+            var verifiedPois = window.ALL_ROUTE_POIS && window.ALL_ROUTE_POIS[routeKey];
+            var verifiedCoords = null;
+            if (verifiedPois && verifiedPois.pois) {
+                verifiedCoords = verifiedPois.pois.map(function(p) { return [p.lat, p.lng]; });
+            }
             var prefill = {
                 routeName: r.title || "",
                 stops: mapData.stops,
-                coords: mapData.coords || null,
+                coords: verifiedCoords || mapData.coords || null,
                 plannedPath: mapData.plannedPath || null,
                 plannedDist: mapData.plannedDist || 0,
                 plannedDur: mapData.plannedDur || 0,
@@ -5440,7 +5631,12 @@ function closeMapEditor() {
     if (overlay && overlay._msgHandler) {
         window.removeEventListener("message", overlay._msgHandler);
     }
-    try { overlay.remove(); } catch(e) {}
+    // 强制移除 iframe overlay（确保不遮挡导航栏）
+    try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(e) {}
+    // 清理所有残留的 map-editor-iframe-overlay
+    document.querySelectorAll(".map-editor-iframe-overlay").forEach(function(el) {
+        try { el.remove(); } catch(e) {}
+    });
 
     // Aggressively clear any leftover route markers/lines
     if (amapInstance) {
