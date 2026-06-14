@@ -12301,3 +12301,49 @@ body.community-tab-active .ai-float-btn {
   font-family: inherit;
   color: var(--ink);
 }
+
+/* ═══ 校园互动游戏入口横幅 ═══ */
+.route-game-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 4px 0 16px;
+  background: linear-gradient(135deg, rgba(142, 108, 255, 0.12), rgba(125, 211, 252, 0.12));
+  border: 1.5px solid rgba(142, 108, 255, 0.35);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: inherit;
+}
+.route-game-banner:hover {
+  background: linear-gradient(135deg, rgba(142, 108, 255, 0.2), rgba(125, 211, 252, 0.2));
+  border-color: rgba(142, 108, 255, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(142, 108, 255, 0.15);
+}
+.route-game-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.route-game-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.route-game-info strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--primary, #3D405B);
+}
+.route-game-info small {
+  font-size: 13px;
+  color: var(--ink-secondary, #6b7280);
+}
+.route-game-arrow {
+  font-size: 18px;
+  color: rgba(142, 108, 255, 0.7);
+  flex-shrink: 0;
+}

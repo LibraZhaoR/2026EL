@@ -2113,6 +2113,15 @@ function openRoute(key) {
                 <span class="stop-story-icon">故事</span>
             </div>`
         ).join("")}</div>` +
+        // Game entry for NJU route
+        (key === 'nju' ? `<div class="route-game-banner" onclick="launchNjuGame()">
+            <span class="route-game-icon">🎮</span>
+            <div class="route-game-info">
+                <strong>南小鲸·金陵鲸梦</strong>
+                <small>点击开始校园互动剧情游戏</small>
+            </div>
+            <span class="route-game-arrow">▶</span>
+        </div>` : '') +
         // Action buttons
         `<div class="route-actions">
             <button class="route-action-btn" onclick="handleCopyRoute(${routeId})">
@@ -2159,6 +2168,11 @@ function closeSheet() {
     sheetBody.classList.remove("no-scroll");
     currentRouteKey = null;
     if (hadRoute) setPetState("happy");
+}
+
+// ── Launch NJU Campus Visual Novel Game ──
+function launchNjuGame() {
+    window.open('0520-game/index.html', '_blank');
 }
 
 // ── Story Node System ──

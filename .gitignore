@@ -22,6 +22,7 @@ Thumbs.db
 node_modules/
 .npm/
 dist/
+package-lock.json
 
 # Python
 __pycache__/
@@ -43,6 +44,13 @@ logs/
 *.tmp
 *.temp
 *.bak
+*.7z
+*.zip
+citygo-*.png
+codex-smoke*.png
+*-debug.png
+screenshot*.js
+auth-test-debug.png
 
 # Large dependency dirs (keep only source code)
 blender-mcp-main/
@@ -57,6 +65,15 @@ three.js-dev/
 # Route database (SQLite runtime data)
 route-database/data/
 *.db
+data/
+*.mv.db
+*.trace.db
+
+# Local-only installers, backups, and extracted source packs
+finalshell/
+services/
+像素游戏/
+建筑点/
 
 # IDE
 .claude/

@@ -19,6 +19,8 @@
 
 <!-- 视觉小说舞台 -->
 <div id="vn-stage">
+  <!-- 退出按钮 -->
+  <button id="vn-exit-btn" title="返回主应用">✕</button>
   <!-- 背景图层 -->
   <div id="vn-background"></div>
 
@@ -48,6 +50,11 @@
 document.getElementById('vn-start-screen').addEventListener('click', function() {
   this.classList.add('hidden');
   VNEngine.start('start');
+});
+
+// 退出按钮 → 关闭当前页签，回到主应用
+document.getElementById('vn-exit-btn').addEventListener('click', function() {
+  window.close();
 });
 </script>
 
