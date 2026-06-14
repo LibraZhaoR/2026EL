@@ -2121,10 +2121,10 @@ function openRoute(key) {
             <button class="route-action-btn" onclick="showRouteOnMap('${key}')">
                 <span class="label">在地图查看</span>
             </button>
-            <button class="route-action-btn primary-action" onclick="showInviteForm(${routeId})">
+            <button class="route-action-btn primary-action" onclick="showInviteForm('${key}')">
                 <span class="label">邀请朋友一起走</span>
             </button>
-            <button class="route-action-btn" onclick="handleGenerateCard(${routeId})">
+            <button class="route-action-btn" onclick="handleGenerateCard('${key}')">
                 <span class="icon">🎴</span>
                 <span class="label">路线邀请卡</span>
             </button>
@@ -3615,8 +3615,7 @@ function renderFeatureSection(routeKey) {
     });
     section.querySelector(".feature-btn-secondary").addEventListener("click", (e) => {
         const key = e.target.dataset.route;
-        const routeId = ROUTE_KEY_TO_ID[key] || 1;
-        showInviteForm(routeId);
+        showInviteForm(key || "nju");
     });
     section.querySelectorAll("[data-home-place-index]").forEach(button => {
         button.addEventListener("click", () => {
@@ -4755,9 +4754,9 @@ async function handleCopyRoute(routeId) {
 }
 
 // ── Invite Card ──
-function showInviteForm(routeId) {
+function showInviteForm(routeKey) {
     closeSheet();
-    document.getElementById("invite-route-id").value = routeId;
+    document.getElementById("invite-route-id").value = routeKey;
     // Set default date to tomorrow
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -4771,18 +4770,21 @@ function closeInviteForm() {
 }
 
 async function submitInviteCard() {
-    const routeId = parseInt(document.getElementById("invite-route-id").value);
-    const meetPlace = document.getElementById("invite-place").value.trim() || "未指定";
-    const meetDate = document.getElementById("invite-date").value;
-    const meetTime = document.getElementById("invite-time").value;
-    const cost = parseInt(document.getElementById("invite-cost").value) || 0;
-    const people = parseInt(document.getElementById("invite-people").value) || 1;
+    var routeKey = document.getElementById("invite-route-id").value;
+    var route = routes[routeKey];
+    var routeName = route ? route.title : routeKey;
+    var meetPlace = document.getElementById("invite-place").value.trim() || "未指定";
+    var meetDate = document.getElementById("invite-date").value;
+    var meetTime = document.getElementById("invite-time").value;
+    var cost = parseInt(document.getElementById("invite-cost").value) || 0;
+    var people = parseInt(document.getElementById("invite-people").value) || 1;
 
-    const meetDateTime = meetDate && meetTime ? `${meetDate}T${meetTime}:00` : null;
+    var meetDateTime = meetDate && meetTime ? meetDate + "T" + meetTime + ":00" : null;
 
-    const body = {
+    var body = {
         userId: getCurrentUserId() || 1,
-        routeId: routeId,
+        routeKey: routeKey,
+        routeName: routeName,
         meetPlace: meetPlace,
         expectedCost: cost,
         peopleLimit: people
@@ -4790,27 +4792,25 @@ async function submitInviteCard() {
     if (meetDateTime) body.meetTime = meetDateTime;
 
     try {
-        const resp = await fetch("/api/invites/cards", {
+        var resp = await fetch("/api/invites/cards", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         });
-        const data = await resp.json();
+        var data = await resp.json();
         if (data.code === 200) {
             closeInviteForm();
-            showInviteResult(data.data);
+            showInviteResult(data.data, routeKey);
             unlockAchievement("invite");
         } else {
-            showToast("❌ 生成失败：" + (data.msg || ""));
+            showToast("生成失败：" + (data.msg || ""));
         }
     } catch (e) {
-        // Offline: generate a local invite card
         closeInviteForm();
         showInviteResult({
             inviteId: Date.now(),
-            inviteCode: "local_" + Date.now().toString(36),
-            routeId: routeId,
-            meetPlace: meetPlace,
+            inviteCode: "NJ" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+            routeKey: routeKey,
             meetTime: meetDateTime,
             expectedCost: cost,
             peopleLimit: people,
@@ -4820,9 +4820,9 @@ async function submitInviteCard() {
     }
 }
 
-function showInviteResult(card) {
-    const routeKey = ROUTE_KEY_BY_ID[card.routeId] || "nju";
-    const route = routes[routeKey];
+function showInviteResult(card, routeKey) {
+    routeKey = routeKey || card.routeKey || ROUTE_KEY_BY_ID[card.routeId] || "nju";
+    var route = routes[routeKey];
     if (!route) return;
 
     const cardDate = card.meetTime ? new Date(card.meetTime) : null;
@@ -4836,12 +4836,10 @@ function showInviteResult(card) {
     const persona = personaCards.find(p => p.routeKey === routeKey);
     const avatarEmoji = persona ? persona.elements[0].emoji : "🗺️";
 
+    const inviteCode = card.inviteCode || card.invite_code || "";
     const shareLink = card.shareUrl || window.location.href;
 
     const body = document.getElementById("invite-result-body");
-
-    // Determine the route's detail page URL or use share link
-    const qrUrl = shareLink;
 
     body.innerHTML = `
         <div class="invite-card" id="invite-card-display">
@@ -4860,13 +4858,15 @@ function showInviteResult(card) {
                 <div class="invite-card-info-item"><span>花费</span><span class="val">${costStr}</span></div>
                 <div class="invite-card-info-item"><span>人数</span><span class="val">${peopleStr}</span></div>
             </div>
-            <div class="invite-card-qr">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrUrl)}" alt="QR Code" />
+            <div class="invite-card-code-section">
+                <span class="invite-card-code-label">邀约码</span>
+                <div class="invite-card-code">${inviteCode}</div>
+                <span class="invite-card-code-hint">好友输入此码即可接受邀约</span>
             </div>
             <div class="invite-card-share-actions">
-                <button class="btn-copy" onclick="copyInviteLink('${shareLink}')">📋 复制链接</button>
+                <button class="btn-copy" onclick="copyInviteCode('${inviteCode}')">📋 复制邀约码</button>
                 <button class="btn-save" onclick="saveInviteImage()">💾 保存图片</button>
-                <button class="btn-share" onclick="shareInvite('${shareLink}')">📤 分享</button>
+                <button class="btn-share" onclick="shareInviteCode('${inviteCode}')">📤 分享</button>
             </div>
         </div>
         <button class="close-overlay-btn" onclick="closeInviteResult()">关闭</button>
@@ -4877,6 +4877,55 @@ function showInviteResult(card) {
 
 function closeInviteResult() {
     document.getElementById("invite-result-overlay").classList.remove("open");
+}
+
+function copyInviteCode(code) {
+    if (!code) return showToast("邀约码生成失败");
+    navigator.clipboard.writeText(code).then(() => {
+        showToast("邀约码已复制！发送给好友即可");
+    }).catch(() => {
+        var ta = document.createElement("textarea");
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast("邀约码已复制！");
+    });
+}
+
+function shareInviteCode(code) {
+    if (!code) return;
+    if (navigator.share) {
+        navigator.share({ title: "南京漫游邀约", text: "和我一起探索南京！我的邀约码：" + code });
+    } else {
+        copyInviteCode(code);
+    }
+}
+
+// 接受邀约
+function acceptInviteByCode() {
+    var input = document.getElementById("invite-accept-input");
+    if (!input) return;
+    var code = input.value.trim().toUpperCase();
+    if (!code) return showToast("请输入邀约码");
+    fetch("/api/invites/" + encodeURIComponent(code))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.code !== 200) {
+                showToast("邀约码无效或已失效");
+                return;
+            }
+            var card = data.data;
+            showToast("邀约已接受！路线：" + (card.routeName || card.routeTitle || ""));
+            input.value = "";
+            // 关闭接受面板
+            var panel = document.getElementById("invite-accept-panel");
+            if (panel) panel.style.display = "none";
+        })
+        .catch(function() {
+            showToast("网络错误，请重试");
+        });
 }
 
 function copyInviteLink(link) {
@@ -5226,8 +5275,7 @@ function showFloatCard(routeKey) {
         openRoute(routeKey);
     };
     document.getElementById("float-card-invite").onclick = () => {
-        const rid = ROUTE_KEY_TO_ID[routeKey] || 1;
-        showInviteForm(rid);
+        showInviteForm(routeKey);
     };
     document.getElementById("float-card-close").onclick = hideFloatCard;
 
@@ -10402,6 +10450,13 @@ renderCommunityPage = function(container) {
                     <span><b>${postCount}</b> 动态</span>
                     ${userPosts ? `<span><b>${userPosts}</b> 我的</span>` : ""}
                     <button class="community-friend-entry" type="button" id="community-friend-entry">👥 好友</button>
+                </div>
+            </section>
+            <section class="community-invite-accept-section" id="invite-accept-panel">
+                <div class="community-invite-accept-header">🎫 接受路线邀约</div>
+                <div class="community-invite-accept-row">
+                    <input type="text" id="invite-accept-input" placeholder="输入邀请码" style="flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:10px;font-size:13px;font-family:inherit;">
+                    <button type="button" onclick="acceptInviteByCode()" style="padding:8px 18px;background:var(--primary,#E07A5F);color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer;white-space:nowrap;font-family:inherit;">接受邀约</button>
                 </div>
             </section>
             <section class="community-friends-section" id="community-friends-section">

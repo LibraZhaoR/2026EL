@@ -1755,16 +1755,35 @@ button { font: inherit; cursor: pointer; border: 0; background: none; }
     color: var(--accent);
     letter-spacing: 0.03em;
 }
-.invite-card-qr {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 12px;
+.invite-card-code-section {
+    text-align: center;
+    margin: 16px 0 12px;
 }
-.invite-card-qr img {
-    width: 100px;
-    height: 100px;
-    border-radius: 8px;
-    border: 1px solid var(--rule);
+.invite-card-code-label {
+    font-size: 11px;
+    color: var(--faint, #A0A0A0);
+    display: block;
+    margin-bottom: 6px;
+}
+.invite-card-code {
+    display: inline-block;
+    font-family: "Courier New", "SF Mono", monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--primary, #E07A5F);
+    background: #FFF8F5;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2px dashed var(--primary, #E07A5F);
+    user-select: all;
+    cursor: pointer;
+}
+.invite-card-code-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--faint, #A0A0A0);
+    margin-top: 6px;
 }
 
 .invite-card-share-actions {
@@ -12051,6 +12070,28 @@ body.community-tab-active .ai-float-btn {
 }
 .poi-route-list-item:last-child {
   margin-bottom: 0;
+}
+
+/* ═══════════════════════════════════════
+   Community Invite Accept · 社区接受邀约
+   ═══════════════════════════════════════ */
+
+.community-invite-accept-section {
+  margin: 12px 0;
+  padding: 14px 16px;
+  background: #FFF8F5;
+  border-radius: 12px;
+  border: 1px dashed var(--primary, #E07A5F);
+}
+.community-invite-accept-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary, #E07A5F);
+  margin-bottom: 8px;
+}
+.community-invite-accept-row {
+  display: flex;
+  gap: 8px;
 }
 
 /* ═══════════════════════════════════════

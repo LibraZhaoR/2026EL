@@ -6,7 +6,8 @@ import java.time.LocalDateTime;
 
 public record InviteCardCreateRequest(
         @NotNull Long userId,
-        @NotNull Long routeId,
+        String routeKey,
+        String routeName,
         LocalDateTime meetTime,
         String meetPlace,
         Integer expectedCost,

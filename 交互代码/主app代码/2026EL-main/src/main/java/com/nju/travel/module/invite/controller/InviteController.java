@@ -29,7 +29,7 @@ public class InviteController {
                                                       HttpSession session) {
         Long userId = AuthUtils.requireUserId(session);
         InviteCardCreateRequest resolved = new InviteCardCreateRequest(
-            userId, request.routeId(), request.meetTime(),
+            userId, request.routeKey(), request.routeName(), request.meetTime(),
             request.meetPlace(), request.expectedCost(), request.peopleLimit()
         );
         return ApiResult.success(inviteService.createInviteCard(resolved));
