@@ -2,14 +2,14 @@
 
 > **2026 EL 智能应用开发与创新大赛参赛作品**
 >
-> 一款融合手绘水墨美学、高德地图深度交互、AI 智慧伴游的南京城市探索应用。以"新艺术运动"设计语言重塑城市漫游体验，为 Gen-Z 探索者和在宁大学生打造一本活的数字旅行手账。
+> 一款融合手绘水墨美学、高德地图深度交互、AI 智慧伴游的南京城市探索应用。以「折衷新艺术运动」设计语言重塑城市漫游体验，为 Gen-Z 探索者和在宁大学生打造一本活的数字旅行手账。
 
 <p align="center">
   <img src="https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?logo=springboot" alt="Spring Boot">
   <img src="https://img.shields.io/badge/Java-17-orange?logo=java" alt="Java 17">
   <img src="https://img.shields.io/badge/前端-纯_Vanilla_JS-F7DF1E?logo=javascript" alt="Vanilla JS">
   <img src="https://img.shields.io/badge/地图-高德_JS_API_2.0-0099FF" alt="AMap">
-  <img src="https://img.shields.io/badge/AI-DeepSeek_|_豆包-6C4AB6" alt="AI">
+  <img src="https://img.shields.io/badge/AI-阿里百炼_Qwen--Turbo-FF6A00" alt="AI">
   <img src="https://img.shields.io/badge/动画-GSAP_|_Three.js-88CE02?logo=threedotjs" alt="Animation">
   <img src="https://img.shields.io/badge/数据库-H2-blue" alt="H2">
 </p>
@@ -18,15 +18,15 @@
 
 ## ✨ 项目简介
 
-**灵动金陵**不止是一款地图导航应用——它是一款有"人格"的城市探索伴侣。从打开 App 那一刻的水墨卷轴动画，到选择你今日的"探索人格"，再到 AI 向导「南小鲸」为你量身推荐路线——每一步都像翻开一本手绘旅行手账。
+**灵动金陵**不止是一款地图导航应用——它是一款有「人格」的城市探索伴侣。从打开 App 那一刻的水墨卷轴动画，到选择你今日的「探索人格」，再到 AI 向导「南小鲸」为你量身推荐路线——每一步都像翻开一本手绘旅行手账。
 
-我们在地图之上叠加了**故事剧情**、**成就收集**、**社区分享**、**宠物陪伴**和**虚拟校园**，让"探索城市"这件事变得像玩一场沉浸式剧本杀。
+我们在地图之上叠加了**故事剧情**、**成就收集**、**社区分享**、**好友私聊**、**宠物陪伴**和**虚拟校园**，让「探索城市」这件事变得像玩一场沉浸式剧本杀。
 
 ---
 
 ## 🎨 设计理念
 
-本项目遵循自建的 **[灵动金陵设计系统 (DESIGN.md)](./DESIGN.md)**——一套完整的"折衷新艺术运动 (Eclectic Art Nouveau)" 设计语言：
+本项目遵循自建的 **[灵动金陵设计系统 (DESIGN.md)](./DESIGN.md)**——一套完整的「折衷新艺术运动 (Eclectic Art Nouveau)」设计语言：
 
 | 维度 | 描述 |
 |------|------|
@@ -42,15 +42,15 @@
 
 ### 🎬 一、沉浸式开屏体验
 - **五幕水墨卷轴动画**：基于 Three.js + GSAP 的视差交互开屏
-- 金陵地标手绘场景逐幕展开：秦淮河 → 明城墙 → 梧桐大道 → 夫子庙 → 紫峰大厦
+- 金陵地标手绘场景逐幕展开，每幕对应一条推荐路线，可在开屏直接进入
 - 支持跳过 / 回看，动画时长可配置
 
 ### 🧑‍🎨 二、8 种探索人格系统
-首次进入选择你的"今日人格"，每种人格对应不同的地图视觉风格和路线推荐：
+首次进入选择你的「今日人格」，每种人格对应不同的地图视觉风格和路线推荐：
 
 | 人格 | 推荐路线倾向 | 地图主题 | 适用场景 |
 |------|-------------|----------|----------|
-| 🍜 **美食家** | 午后餐茶 / 秦淮夜游 | 暖色系，美食 POI 突出 | 想吃遍南京的你 |
+| 🍜 **美食家** | 食光漫步 / 秦淮夜游 | 暖色系，美食 POI 突出 | 想吃遍南京的你 |
 | 📚 **文学爱好者** | 南大校史 / 午后餐茶 | 清新柔和，书店标注 | 爱逛书店咖啡馆 |
 | 🌙 **夜游玩家** | 秦淮夜游 | 暗色模式，夜景突出 | 享受南京夜生活 |
 | 🎓 **校园情怀派** | 南大校史 | 学院风，建筑标注 | NJUer 和校园控 |
@@ -59,46 +59,53 @@
 | 🌿 **自然探索者** | 午后餐茶 | 绿色系，公园标注 | 钟山玄武湖选手 |
 | 📸 **摄影达人** | 秦淮夜游 / 博物馆 | 高对比，打卡点标注 | 出片第一优先级 |
 
-> 人格可随时切换，地图主题和推荐内容实时更新。
+> 人格可随时切换，首页推荐和「特别的你」礼包内容实时更新。
 
-### 🗺️ 三、35 条主题路线 × 74 个精准地标
+### 🗺️ 三、34 条主题路线 × 87 个精准 POI
 
-**路线分类**（数据文件：[routes-data.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/routes-data.js)）：
+**路线分类**（核心数据文件：[routes-data.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/routes-data.js)）：
 
 | 分类 | 数量 | 代表路线 |
 |------|------|----------|
-| 🏯 文化历史 | 12 条 | 秦淮文脉线、老城南漫步、明城墙巡礼、民国建筑线… |
-| 🍜 美食探店 | 7 条 | 科巷小吃线、南大后街、老门东美食巷… |
+| 🏯 文化历史 | 12 条 | 秦淮文脉线、老城南漫步、明城墙巡礼、民国风华线、六朝遗梦线… |
+| 🍜 美食探店 | 5+ 条 | 食光漫步线、老门东美食巷、南大后街… |
 | 📸 摄影出片 | 5 条 | 颐和路梧桐光影、玄武湖日落线、紫峰天际线… |
-| 🎓 南大专线 | 4 条 | 鼓楼校史线、仙林探索线、浦口记忆… |
-| 🌃 夜景路线 | 4 条 | 秦淮夜游、眼桥夜色、新街口霓虹… |
-| 🎯 更多主题 | 3+ 条 | 亲子研学、艺术看展、佛系禅意… |
+| 🎓 南大专线 | 4 条 | 鼓楼校史线、仙林书香线、浦口寻根… |
+| 🌃 夜景路线 | 3+ 条 | 秦淮夜游、河西新城霓虹、滨江风光… |
+| 🎯 更多主题 | 5+ 条 | 亲子研学、情侣浪漫、艺术漫步、佛寺禅修… |
 
 每条路线包含：**站点详情** + **剧情故事文本** + **时长/费用/难度** + **封面图** + **关联人格标签**。
 
-**地标数据**：74 个南京地标 POI，全部通过高德 API 坐标校准（[landmarks-data.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/landmarks-data.js) + [verified-map-points.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/verified-map-points.js)）。
+**POI 数据库**：[all-route-pois.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/all-route-pois.js) — 87 个唯一 POI（去重后），全部经高德 API 坐标交叉验证。
+
+**建筑级定位**：[building-points.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/building-points.js) — 22 个重点建筑附带详细图文介绍与精确坐标。
+
+**地标数据**：74 个南京地标 POI（[landmarks-data.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/landmarks-data.js) + [verified-map-points.js](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/verified-map-points.js)），高德 POI ID 校准。
 
 ### 🗣️ 四、AI 向导「南小鲸」
-- **多模型支持**：DeepSeek Chat / 豆包 (Volcengine Ark) / OpenAI 兼容接口，通过配置文件灵活切换
+- **当前默认**：阿里百炼 DashScope（Qwen-Turbo），兼容 OpenAI 接口格式
+- **多模型可切换**：DeepSeek Chat / 豆包 (Volcengine Ark) / 本地 Mock 模式，通过 `application.yml` 一行切换
 - **对话式路线推荐**：理解你的偏好，推荐最匹配的路线
 - **南京知识问答**：吃喝玩乐、历史文化、实时资讯
 - **上下文感知**：结合当前选中的人格和路线给出个性化建议
-- **后端模块**：`module/ai/` — 完整的 AI 对话 + 路线规划 API
+- 后端模块：`module/ai/` — 完整的 AI 对话 + 路线规划 API
 
 ### ✍️ 五、路线编辑器
-- **自由创建路线**：在地图上点击添加途经点，拖拽调整顺序
-- **自动路径规划**：调用高德路径规划 API，自动生成步行/驾车路线
 - **全屏地图模式**：沉浸式地图查看，路线一目了然
+- **自动路径规划**：调用高德路径规划 API，自动生成步行/驾车路线
+- **自由创建路线**：在地图上点击添加途经点，拖拽调整顺序
+- **路线描述字段**：为自定义路线添加名称和描述
 - **预填充模板**：基于现有路线快速修改
-- **保存为自定义路线**：本地存储，出现在"我的路线"列表中
+- **保存为自定义路线**：本地存储，出现在「我的路线」列表中
 - 独立页面：[route-editor.html](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/route-editor.html)
 
-### 👥 六、社区发现系统
+### 👥 六、社区与好友系统
 - **微博式信息流**：图文 + 视频帖子，按路线/美食/摄影/展览等主题分类
+- **好友系统**：搜索用户 → 添加好友 → 通过 JPA 持久化好友关系
+- **私聊功能**：好友间 1v1 实时聊天，消息存储到 H2 数据库
 - **路线评价**：用户对路线的评分与点评
 - **搜索 + 筛选**：按分类、关键词筛选社区内容
-- **种草互动**：点赞、收藏、分享
-- 后端模块：`module/route/` · 数据存储：H2 Database
+- 后端模块：`module/friend/`（好友关系）+ `module/chat/`（聊天消息）
 
 ### 🦆 七、桌面宠物 · 金陵鸭鸭 / Pet77 V2
 - **陪伴精灵**：可爱像素风桌面宠物，在页面角落活动
@@ -129,7 +136,9 @@
 
 ### 🎫 十、邀约卡系统
 - **生成精美邀约卡**：选择路线 → 设置时间地点 → 生成手绘风格邀约卡片
-- **一键分享**：复制链接 / 生成图片分享给好友
+- **随机邀请码**：每张邀约卡附带唯一随机码，好友通过输入邀请码获取邀约
+- **智能路线匹配**：routeKey 支持 — 接收方自动识别路线并导航到对应路线详情
+- **一键接收**：好友接收后自动保存到「我的路线」
 - **邀约管理**：查看已发送和已收到的邀约
 - 后端模块：`module/invite/`
 
@@ -147,20 +156,28 @@
 - **独立虚拟校园引擎**：基于 WorkAdventure 开源项目二次开发
 - **南大软院虚拟地图**：像素风虚拟校园，支持多人实时互动
 - **音视频通话**：进入同一房间自动连接
-- 代码路径：[assets/workadventure/](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/assets/workadventure/)
+- 入口：[standalone.html](./交互代码/主app代码/2026EL-main/src/main/resources/static/app/assets/workadventure/standalone.html)
 
 ### 🏪 十四、美团 POI 集成
 - **实时商家搜索**：周边餐饮/咖啡/便利店 POI 搜索
 - **商家详情**：评分、人均、营业时间、地址
 - **优惠券展示**：美团优惠券信息
 - 后端模块：`module/meituan/` + `integration/meituan/`
+- 当前状态：默认关闭（`travel.meituan.enabled: false`），需要有效的美团开发者账号
 
 ### 👤 十五、用户系统
-- **注册/登录**：JWT-free 简化认证
+- **注册/登录**：JWT-free 简化认证，密码可见性切换
 - **个人主页**：头像（可自定义）、昵称、个性签名
 - **我的路线**：自定义路线 + 复刻路线管理
 - **成就墙**：已解锁成就以插画卡片形式展示
 - 后端模块：`module/auth/` + `module/user/`
+
+### ⚡ 十六、性能优化（2026-06-14）
+- **DOM 缓存层**：`$()` 选择器缓存 + MutationObserver 自动失效，避免重复查询
+- **高频事件节流**：Scroll / Resize / Mousemove 等高频事件全面接入 RAF-based throttle
+- **localStorage 缓存**：内存级读写缓存 (`store` wrapper)，减少同步 I/O
+- **批量 DOM 操作**：`readDOM()` / `writeDOM()` 分离读写、`DocumentFragment` 批量插入
+- **CSS containment**：关键渲染路径优化，暗示浏览器跳过子树重绘
 
 ---
 
@@ -170,17 +187,18 @@
 ┌──────────────────────────────────────────────────────┐
 │                    前端 (SPA)                          │
 │  Vanilla JS · GSAP · Three.js · 高德 JS API 2.0      │
-│  12K+ 行核心 JS · 12K+ 行 CSS · 整体式设计系统         │
+│  12.8K 行核心 JS · 12.4K 行 CSS · 整体式设计系统       │
 ├──────────────────────────────────────────────────────┤
 │                  Spring Boot 3.3.5                     │
 │                    Java 17 · Maven                     │
 ├──────────┬──────────┬──────────┬─────────────────────┤
 │   AI     │  地图/路线 │  社区/社交 │   展览/提醒         │
-│ DeepSeek │ 高德API   │  H2 DB   │  Cron Schedule     │
-│ 豆包Ark  │ 美团API   │  REST    │  @Scheduled        │
+│ 阿里百炼  │ 高德API   │  H2 DB   │  Cron Schedule     │
+│ DeepSeek │ 美团API   │  REST    │  @Scheduled        │
+│ 豆包Ark  │          │  私聊API  │                    │
 ├──────────┴──────────┴──────────┴─────────────────────┤
 │               H2 File Database (MySQL-mode)            │
-│       用户 · 路线 · 邀约 · 展览 · 成就 · 故事          │
+│    用户 · 路线 · 好友关系 · 聊天消息 · 邀约 · 展览      │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -189,30 +207,34 @@
 | 层面 | 技术 | 选择理由 |
 |------|------|----------|
 | **前端框架** | 无框架，纯 Vanilla JS | 零依赖、极致轻量；比赛场景看重原生能力展示 |
-| **动画** | GSAP + Three.js | GSAP 实现卷轴视差；Three.js 驱动水墨开屏和 0520 游戏 |
+| **动画** | GSAP + Three.js | GSAP 实现卷轴视差；Three.js 驱动水墨开屏 |
 | **地图** | 高德 JS API 2.0 | 国内最稳定地图服务、3D 视图、路径规划 API 完善 |
 | **后端** | Spring Boot 3.3.5 | 成熟生态、JPA 自动建表、`@EnableScheduling` 开箱即用 |
 | **数据库** | H2 File (MySQL 兼容模式) | 零配置部署、数据持久化到文件、适合比赛演示 |
-| **AI** | 可切换 Provider 模式 | `mock` 本地演示 / `openai` 兼容 (DeepSeek) / `doubao` (火山引擎) |
-| **CSS** | 整体式 CSS 设计系统 | 12K 行单一样式表、CSS 自定义属性驱动、无预处理器 |
+| **AI** | 阿里百炼 DashScope（默认） | Qwen-Turbo · 兼容 OpenAI 格式 · 可无痛切换 DeepSeek/豆包 |
+| **CSS** | 整体式 CSS 设计系统 | 12.4K 行单一样式表、CSS 自定义属性驱动、无预处理器 |
+| **性能** | RAF throttle + DOM cache + localStorage wrapper | 全链路优化高频事件与 I/O，见上方性能优化章节 |
 
 ### 后端模块结构
 
 ```
 src/main/java/com/nju/travel/
 ├── TravelApplication.java          # 启动类 + @EnableScheduling
-├── common/                          # 注解 · 异常 · API 响应包装
-├── config/                          # Security (全放行) · WebConfig (CORS)
+├── common/                          # 注解 (RateLimit) · 异常 · API 响应包装
+├── config/                          # Security (全放行) · WebConfig (CORS) · AI/美团配置
 ├── integration/
 │   ├── ai/                          # AI Provider (mock | openai | doubao)
-│   ├── meituan/                     # 美团 POI API 客户端
+│   ├── meituan/                     # 美团 POI API 客户端（含签名工具）
 │   └── schedule/                    # Cron 定时任务 (展览提醒)
+├── mycode/                           # 路径规划 API (高德路径规划代理)
 └── module/
     ├── achievement/                 # 成就系统
     ├── ai/                          # AI 对话 / 路线规划 API
     ├── auth/                        # 用户注册登录
+    ├── chat/                        # 🆕 好友私聊消息
     ├── exhibition/                  # 展览信息 + 预约提醒
-    ├── homepage/                    # 首页 + 人格推荐
+    ├── friend/                      # 🆕 好友关系管理
+    ├── homepage/                    # 首页 + 人格推荐 + 社区热评
     ├── invite/                      # 邀约卡生成
     ├── meituan/                     # 美团搜索代理
     ├── nju/                         # 南大校史数据
@@ -227,17 +249,23 @@ src/main/java/com/nju/travel/
 src/main/resources/static/app/
 ├── index.html                      # 主 SPA 页面（含所有内联模板）
 ├── route-editor.html               # 独立路线编辑器页面
-├── app.js                          # 核心应用逻辑 (~12K 行)
-├── styles.css                      # 全局样式表 (~12K 行)
+├── app.js                          # 核心应用逻辑 (~12.8K 行)
+├── styles.css                      # 全局样式表 (~12.4K 行)
 ├── opening.js                      # Three.js 水墨开屏动画
-├── routes-data.js                  # 35 条主题路线数据
+├── routes-data.js                  # 34 条主题路线数据
+├── all-route-pois.js               # 87 个唯一 POI 坐标数据库
 ├── landmarks-data.js               # 74 个南京地标 POI
 ├── verified-map-points.js          # 高德验证 POI 坐标
-├── building-points.js              # 建筑级定位数据
+├── building-points.js              # 22 个重点建筑图文介绍
 ├── supply-data.js                  # 商户/美食模拟数据
 ├── persona-map-styles.js           # 8 种人格地图样式映射
-├── assets/pets/                    # 宠物精灵资源
-└── assets/workadventure/           # 虚拟校园引擎
+├── apple-refresh.css               # Apple 风格主题覆盖
+├── gsap.min.js / ScrollTrigger.min.js  # GSAP 动画库
+└── assets/
+    ├── building-points/            # 建筑照片资源 (60+ 张)
+    ├── landmarks/                  # 地标照片资源 (60+ 张)
+    ├── pets/                       # 宠物精灵资源
+    └── workadventure/              # 虚拟校园引擎
 ```
 
 ---
@@ -279,16 +307,16 @@ java -jar target/campus-nanjing-travel-0.0.1-SNAPSHOT.jar
 - 路线编辑器：`http://localhost:8080/app/route-editor.html`
 - WorkAdventure 虚拟校园：`http://localhost:8080/app/assets/workadventure/standalone.html`
 
-> 💡 **终端提示**：启动后终端会停留在日志最后一行不退出，这是**正常现象**——Spring Boot 以前台进程运行，持续等待 HTTP 请求。日志中若出现 `NoResourceFoundException: favicon.ico` 只是浏览器自动请求网站图标（项目未放置），不影响功能。需要继续使用终端时，打开新终端窗口即可；停止服务按 `Ctrl+C`。
+> 💡 **终端提示**：启动后终端会停留在日志最后一行不退出，这是**正常现象**——Spring Boot 以前台进程运行，持续等待 HTTP 请求。日志中若出现 `NoResourceFoundException: favicon.ico` 只是浏览器自动请求网站图标（项目未放置），不影响功能。停止服务按 `Ctrl+C`。
 
-### 方式二：Python Dev Server（仅前端开发）
+### 方式二：Python Dev Server（仅前端开发，绕过 Spring Boot）
 
 ```bash
 cd 交互代码/主app代码/2026EL-main
 python proxy-server.py
 ```
 
-直接提供静态文件，并代理 `/api/ai/chat` 到豆包 API。适合纯前端调试，无需重启 Java。
+直接提供静态文件，并代理 `/api/ai/chat` 到 DashScope API。适合纯前端调试，无需重启 Java。
 
 ### 方式三：Route Database 微服务（可选）
 
@@ -315,18 +343,23 @@ powershell -Command "Get-Process java -ErrorAction SilentlyContinue | Stop-Proce
 核心配置文件：[application.yml](./交互代码/主app代码/2026EL-main/src/main/resources/application.yml)
 
 ```yaml
-# AI Provider 切换
-travel.ai.provider: openai    # mock | openai | doubao
+# AI Provider 切换（当前默认使用阿里百炼 DashScope）
+travel.ai:
+  provider: openai    # mock | openai | doubao
+  # 当前配置为阿里百炼 DashScope (兼容 OpenAI 格式)
+  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+  api-key: ${AI_API_KEY}
+  model: qwen-turbo
 
-# openai 模式下使用 DeepSeek
-travel.ai.openai:
-  api-key: ${DEEPSEEK_API_KEY}
-  model: deepseek-chat
+# openai 模式下可改为 DeepSeek
+# travel.ai.openai:
+#   api-key: ${DEEPSEEK_API_KEY}
+#   model: deepseek-chat
 
 # doubao 模式下使用火山引擎
-travel.ai.doubao:
-  api-key: ${DOUBAO_API_KEY}
-  model: doubao-pro-32k
+# travel.ai.doubao:
+#   api-key: ${DOUBAO_API_KEY}
+#   model: doubao-pro-32k
 
 # H2 数据库文件路径
 spring.datasource.url: jdbc:h2:file:./data/custom-routes;MODE=MySQL
@@ -335,7 +368,7 @@ spring.datasource.url: jdbc:h2:file:./data/custom-routes;MODE=MySQL
 ### 高德地图 Key 配置
 
 高德 JS API Key 配置于前端 HTML 中：
-- `index.html` → 主应用地图
+- `index.html` → 主应用地图（`securityJsCode: "88159a564a85b87cdaf80de5d0604b82"`）
 - `route-editor.html` → 路线编辑器地图
 
 使用前请替换为自己的高德 Key（需开启 Web服务 API + JS API 权限）。
@@ -346,7 +379,7 @@ spring.datasource.url: jdbc:h2:file:./data/custom-routes;MODE=MySQL
 
 | 成员 | GitHub | 角色 |
 |------|--------|------|
-| **LibraZhaoR** | [@LibraZhaoR](https://github.com/LibraZhaoR) | — |
+| **LibraZhaoR** | [@LibraZhaoR](https://github.com/LibraZhaoR) | 全栈开发 |
 | **Li Xiangze** | — | — |
 | **Du Xinyao** | — | — |
 
@@ -358,9 +391,9 @@ spring.datasource.url: jdbc:h2:file:./data/custom-routes;MODE=MySQL
 
 | 文档 | 路径 | 内容 |
 |------|------|------|
-| 🎨 设计系统 | [DESIGN.md](./DESIGN.md) | 完整设计规范：色彩 · 排版 · 组件 · 动效 |
+| 🎨 设计系统 | [DESIGN.md](./DESIGN.md) | 完整设计规范：色彩 · 排版 · 组件 · 动效 · 形状 |
 | 📋 CLAUDE.md | [CLAUDE.md](./CLAUDE.md) | AI 协作开发指引（Claude Code 专用） |
-| 📖 前端设计规范 | [前端设计规范.md](./交互代码/主app代码/2026EL-main/前端设计规范.md) | 前端实现设计细节 |
+| 📖 子目录说明 | [交互代码/README.md](./交互代码/README.md) | 前端/后端代码目录说明 |
 
 ---
 
