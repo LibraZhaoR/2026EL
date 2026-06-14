@@ -9538,6 +9538,161 @@ function findCommunityPost(posts, postId) {
     return posts.find(post => String(post.id) === String(postId));
 }
 
+// ═══ 社区好友区段 ═══
+function renderCommunityFriendsSection(container) {
+    var listEl = container.querySelector("#community-friends-list");
+    var reqEl = container.querySelector("#community-friends-requests");
+    if (!listEl) return;
+
+    // 检查登录状态
+    if (!isLoggedIn()) {
+        listEl.innerHTML = '<span class="community-friends-loading" style="cursor:pointer;color:var(--primary);" onclick="showAuthModal(\'login\')">登录后查看好友</span>';
+        return;
+    }
+
+    // 加载好友数据
+    var friends = [];
+    var requests = [];
+    try {
+        var stored = localStorage.getItem("citygo_friends_v1");
+        if (stored) {
+            var data = JSON.parse(stored);
+            friends = data.friends || [];
+            requests = (data.requests || []).filter(function(r) { return r.status === "PENDING"; });
+        }
+    } catch(e) {}
+
+    // 异步从后端刷新
+    if (typeof friendApi !== "undefined" && typeof friendApi.getFriends === "function") {
+        friendApi.getFriends().then(function(res) {
+            if (res && res.code === 200 && res.data) {
+                friends = res.data;
+                saveFriendData(friends, requests, []);
+            }
+            renderFriendsList(listEl, friends, container);
+        }).catch(function() {
+            renderFriendsList(listEl, friends, container);
+        });
+    } else {
+        renderFriendsList(listEl, friends, container);
+    }
+
+    // 显示待处理请求
+    if (reqEl && requests.length > 0) {
+        reqEl.style.display = "block";
+        reqEl.innerHTML = '<span class="community-friends-request-badge" onclick="requireAuth(function(){ openFriendPage(); })">' +
+            requests.length + ' 条好友请求待处理 →</span>';
+    }
+}
+
+function renderFriendsList(listEl, friends, container) {
+    if (!friends || !friends.length) {
+        listEl.innerHTML = '<span class="community-friends-empty">还没有好友，点击上方按钮添加</span>';
+        return;
+    }
+    var html = '';
+    friends.forEach(function(f) {
+        var avatar = f.avatarUrl || f.avatar || '👤';
+        var name = f.nickname || f.name || '用户';
+        var bio = f.bio || f.travelPersona || '';
+        var fid = f.userId || f.id;
+        html += '<div class="community-friend-card" data-friend-id="' + fid + '" ' +
+            'onclick="requireAuth(function(){ if(typeof openFriendChat===\'function\')openFriendChat(\'' + fid + '\'); })">' +
+            '<span class="community-friend-avatar">' + avatar + '</span>' +
+            '<div class="community-friend-info">' +
+            '<span class="community-friend-name">' + escapeHtml(name) + '</span>' +
+            (bio ? '<span class="community-friend-bio">' + escapeHtml(bio) + '</span>' : '') +
+            '</div>' +
+            '</div>';
+    });
+    listEl.innerHTML = html;
+}
+
+function openCommunityAddFriend(container) {
+    // 移除已有弹窗
+    var existing = document.querySelector(".community-friend-search-modal");
+    if (existing) existing.remove();
+
+    var modal = document.createElement("div");
+    modal.className = "community-friend-search-modal";
+    modal.innerHTML = '<div class="community-friend-search-backdrop"></div>' +
+        '<div class="community-friend-search-dialog">' +
+        '<h3>添加好友</h3>' +
+        '<input type="text" id="community-friend-search-input" placeholder="输入用户昵称或 NJW- 编号搜索">' +
+        '<div class="community-friend-search-results" id="community-friend-search-results">' +
+        '<span class="community-friends-loading" style="display:none;">搜索中…</span></div>' +
+        '<button class="community-friend-search-close" type="button">关闭</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+
+    var closeBtn = modal.querySelector(".community-friend-search-close");
+    var backdrop = modal.querySelector(".community-friend-search-backdrop");
+    var close = function() { modal.remove(); };
+    closeBtn.addEventListener("click", close);
+    backdrop.addEventListener("click", close);
+
+    var input = modal.querySelector("#community-friend-search-input");
+    var results = modal.querySelector("#community-friend-search-results");
+    var timer;
+    input.addEventListener("input", function() {
+        clearTimeout(timer);
+        var q = input.value.trim();
+        if (!q) { results.innerHTML = ""; return; }
+        results.querySelector(".community-friends-loading").style.display = "block";
+        timer = setTimeout(function() {
+            if (typeof friendApi !== "undefined" && typeof friendApi.search === "function") {
+                friendApi.search(q).then(function(res) {
+                    var users = (res && res.data) || [];
+                    renderFriendSearchResults(results, users);
+                }).catch(function() {
+                    results.innerHTML = '<span style="color:#999;">搜索失败，请重试</span>';
+                });
+            }
+        }, 400);
+    });
+    input.focus();
+}
+
+function renderFriendSearchResults(results, users) {
+    if (!users || !users.length) {
+        results.innerHTML = '<span style="color:#999;">未找到用户</span>';
+        return;
+    }
+    var html = '';
+    users.forEach(function(u) {
+        var name = u.nickname || u.name || '用户';
+        var code = u.publicUserCode || '';
+        html += '<div class="community-friend-search-item">' +
+            '<div class="community-friend-search-user">' +
+            '<span class="community-friend-avatar">' + (u.avatarUrl || '👤') + '</span>' +
+            '<div><strong>' + escapeHtml(name) + '</strong>' +
+            (code ? '<br><small style="color:#999;">' + escapeHtml(code) + '</small>' : '') +
+            '</div></div>' +
+            '<button class="community-friend-search-add" data-user-id="' + u.userId + '">+ 添加</button>' +
+            '</div>';
+    });
+    results.innerHTML = html;
+    results.querySelectorAll(".community-friend-search-add").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            var userId = btn.getAttribute("data-user-id");
+            btn.disabled = true;
+            btn.textContent = "发送中…";
+            friendApi.sendRequest(userId, "你好，一起探索南京！").then(function(res) {
+                if (res && res.code === 200) {
+                    btn.textContent = "已发送 ✓";
+                    btn.style.background = "#2E8B57";
+                } else {
+                    btn.textContent = "失败，重试";
+                    btn.disabled = false;
+                }
+            }).catch(function() {
+                btn.textContent = "失败，重试";
+                btn.disabled = false;
+            });
+        });
+    });
+}
+
 function bindCommunityFeedEvents(container) {
     container.querySelectorAll("[data-community-like]").forEach(button => {
         button.addEventListener("click", () => {
@@ -10250,6 +10405,16 @@ renderCommunityPage = function(container) {
                     <button class="community-friend-entry" type="button" id="community-friend-entry">👥 好友</button>
                 </div>
             </section>
+            <section class="community-friends-section" id="community-friends-section">
+                <div class="community-friends-header">
+                    <span>👥 我的好友</span>
+                    <button class="community-friends-add" type="button" id="community-add-friend">+ 添加好友</button>
+                </div>
+                <div class="community-friends-list" id="community-friends-list">
+                    <span class="community-friends-loading">加载中…</span>
+                </div>
+                <div class="community-friends-requests" id="community-friends-requests" style="display:none;"></div>
+            </section>
             <section class="community-composer" id="community-composer">
                 <div class="community-composer-top" id="community-composer-toggle" role="button" tabindex="0" aria-expanded="false">
                     <div>
@@ -10321,6 +10486,15 @@ renderCommunityPage = function(container) {
     if (friendEntry) {
         friendEntry.addEventListener("click", () => {
             requireAuth(() => { if (typeof openFriendPage === "function") openFriendPage(); });
+        });
+    }
+    // 渲染好友列表区段
+    renderCommunityFriendsSection(container);
+    // 绑定添加好友按钮
+    const addFriendBtn = container.querySelector("#community-add-friend");
+    if (addFriendBtn) {
+        addFriendBtn.addEventListener("click", () => {
+            requireAuth(() => openCommunityAddFriend(container));
         });
     }
 };

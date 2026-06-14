@@ -12052,3 +12052,188 @@ body.community-tab-active .ai-float-btn {
 .poi-route-list-item:last-child {
   margin-bottom: 0;
 }
+
+/* ═══════════════════════════════════════
+   Community Friends Section · 社区好友区段
+   ═══════════════════════════════════════ */
+
+.community-friends-section {
+  margin: 12px 0;
+  padding: 14px 16px;
+  background: var(--stone, #F4F1DE);
+  border-radius: 12px;
+  border: 1px solid rgba(139,115,85,0.12);
+}
+.community-friends-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink, #3D405B);
+}
+.community-friends-add {
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--primary, #E07A5F);
+  background: transparent;
+  color: var(--primary, #E07A5F);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.community-friends-add:hover {
+  background: var(--primary, #E07A5F);
+  color: #fff;
+}
+.community-friends-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.community-friend-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+.community-friend-card:hover {
+  background: rgba(255,255,255,0.95);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.community-friend-avatar {
+  font-size: 28px;
+  flex-shrink: 0;
+  width: 36px;
+  text-align: center;
+}
+.community-friend-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.community-friend-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink, #3D405B);
+}
+.community-friend-bio {
+  font-size: 11px;
+  color: var(--faint, #A0A0A0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.community-friends-loading,
+.community-friends-empty {
+  font-size: 12px;
+  color: var(--faint, #A0A0A0);
+}
+.community-friends-requests {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+.community-friends-request-badge {
+  font-size: 12px;
+  color: var(--primary, #E07A5F);
+  cursor: pointer;
+  font-weight: 500;
+}
+.community-friends-request-badge:hover {
+  text-decoration: underline;
+}
+
+/* 添加好友搜索弹窗 */
+.community-friend-search-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+}
+.community-friend-search-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+}
+.community-friend-search-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100vw - 48px);
+  max-width: 380px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+}
+.community-friend-search-dialog h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink, #3D405B);
+}
+.community-friend-search-dialog input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.community-friend-search-results {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 10px 0;
+}
+.community-friend-search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.community-friend-search-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.community-friend-search-add {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--primary, #E07A5F);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.community-friend-search-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.community-friend-search-close {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+}

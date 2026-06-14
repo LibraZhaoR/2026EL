@@ -52,27 +52,35 @@
         ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-thumb { background:#D1D1D6; border-radius:10px; }
         @media (max-width: 720px) {
             body { flex-direction:column; background:#F5F5F7; }
-            .sidebar {
-                width:100%;
-                height:58dvh;
-                min-height:430px;
-                border-right:0;
-                border-bottom:1px solid #EBEBEB;
-                box-shadow:0 1px 0 rgba(0,0,0,0.05);
-            }
-            .sidebar-header { padding:16px 20px; gap:8px; }
-            .sidebar-header h1 { font-size:18px; }
-            .btn-back { border-radius:999px; padding:7px 14px; }
-            .sidebar-content { padding:14px 20px; }
-            .input-card { border-radius:16px; background:#FFFFFF; border:1px solid #EBEBEB; }
-            .input-card.active { border-color:rgba(0,102,204,0.34); box-shadow:0 0 0 3px rgba(0,102,204,0.10); }
-            .btn-group { padding:12px 20px 16px; gap:8px; }
-            button { border-radius:999px; }
+            /* 地图在上方占主要区域 */
             .map-container {
                 flex:1;
-                min-height:260px;
+                min-height:50vh;
                 width:100%;
+                order:1;
             }
+            /* 路线信息面板在下方 */
+            .sidebar {
+                width:100%;
+                height:auto;
+                max-height:45vh;
+                min-height:auto;
+                border-right:0;
+                border-top:1px solid #EBEBEB;
+                border-bottom:0;
+                box-shadow:0 -2px 12px rgba(0,0,0,0.08);
+                order:2;
+                border-radius:16px 16px 0 0;
+                overflow-y:auto;
+            }
+            .sidebar-header { padding:14px 20px 10px; gap:8px; flex-shrink:0; }
+            .sidebar-header h1 { font-size:18px; }
+            .btn-back { border-radius:999px; padding:7px 14px; }
+            .sidebar-content { padding:8px 20px 12px; overflow-y:auto; }
+            .input-card { border-radius:12px; background:#FFFFFF; border:1px solid #EBEBEB; padding:10px 14px; }
+            .input-card.active { border-color:rgba(0,102,204,0.34); box-shadow:0 0 0 3px rgba(0,102,204,0.10); }
+            .btn-group { padding:10px 20px 16px; gap:8px; flex-shrink:0; }
+            button { border-radius:999px; }
             .map-tip {
                 left:16px;
                 right:16px;
@@ -84,6 +92,10 @@
                 line-height:1.35;
                 border:1px solid #EBEBEB;
             }
+            /* 下方面板收起输入卡片 */
+            .sidebar-content.planned .input-card { display:none; }
+            .sidebar-content.planned .route-planned-summary { display:flex; }
+            .route-planned-summary { margin-bottom:6px; }
         }
         .re-loading { position:absolute; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#F5F5F7; gap:12px; }
         .re-loading.hide { display:none; }
