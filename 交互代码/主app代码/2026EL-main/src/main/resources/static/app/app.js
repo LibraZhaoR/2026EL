@@ -9564,9 +9564,9 @@ function renderCommunityFriendsSection(container) {
 
     // 异步从后端刷新
     if (typeof friendApi !== "undefined" && typeof friendApi.getFriends === "function") {
-        friendApi.getFriends().then(function(res) {
-            if (res && res.code === 200 && res.data) {
-                friends = res.data;
+        friendApi.getFriends().then(function(list) {
+            if (list && list.length) {
+                friends = list;
                 saveFriendData(friends, requests, []);
             }
             renderFriendsList(listEl, friends, container);
@@ -9641,9 +9641,8 @@ function openCommunityAddFriend(container) {
         results.querySelector(".community-friends-loading").style.display = "block";
         timer = setTimeout(function() {
             if (typeof friendApi !== "undefined" && typeof friendApi.search === "function") {
-                friendApi.search(q).then(function(res) {
-                    var users = (res && res.data) || [];
-                    renderFriendSearchResults(results, users);
+                friendApi.search(q).then(function(users) {
+                    renderFriendSearchResults(results, users || []);
                 }).catch(function() {
                     results.innerHTML = '<span style="color:#999;">搜索失败，请重试</span>';
                 });
@@ -9668,7 +9667,7 @@ function renderFriendSearchResults(results, users) {
             '<div><strong>' + escapeHtml(name) + '</strong>' +
             (code ? '<br><small style="color:#999;">' + escapeHtml(code) + '</small>' : '') +
             '</div></div>' +
-            '<button class="community-friend-search-add" data-user-id="' + u.userId + '">+ 添加</button>' +
+            '<button class="community-friend-search-add" data-user-id="' + (u.id || u.userId) + '">+ 添加</button>' +
             '</div>';
     });
     results.innerHTML = html;
