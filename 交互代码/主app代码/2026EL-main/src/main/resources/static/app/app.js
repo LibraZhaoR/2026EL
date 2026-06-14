@@ -4912,16 +4912,21 @@ function acceptInviteByCode() {
     fetch("/api/invites/" + encodeURIComponent(code))
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.code !== 200) {
+            if (data.code !== 200 || !data.data) {
                 showToast("邀约码无效或已失效");
                 return;
             }
             var card = data.data;
-            showToast("邀约已接受！路线：" + (card.routeName || card.routeTitle || ""));
+            var routeKey = card.routeKey;
             input.value = "";
-            // 关闭接受面板
-            var panel = document.getElementById("invite-accept-panel");
-            if (panel) panel.style.display = "none";
+            // 如果有路线key，直接跳转路线页面
+            if (routeKey && routes[routeKey]) {
+                showToast("邀约已接受！正在打开路线…");
+                switchTab("home");
+                setTimeout(function() { openRoute(routeKey); }, 300);
+            } else {
+                showToast("邀约已接受！路线：" + (card.routeName || ""));
+            }
         })
         .catch(function() {
             showToast("网络错误，请重试");

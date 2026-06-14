@@ -31,6 +31,7 @@ public class InviteService {
         String inviteCode = sb.toString();
         String shareUrl = shareBaseUrl + inviteCode;
         String routeName = request.routeName() != null ? request.routeName() : "";
+        String routeKey = request.routeKey() != null ? request.routeKey() : "";
         InviteCardVO card = new InviteCardVO(
                 inviteIdGenerator.incrementAndGet(),
                 request.userId(),
@@ -42,7 +43,8 @@ public class InviteService {
                 request.peopleLimit(),
                 shareUrl,
                 shareUrl,
-                routeName
+                routeName,
+                routeKey
         );
         inviteCards.put(inviteCode, card);
         return card;

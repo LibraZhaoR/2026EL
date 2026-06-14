@@ -13,6 +13,7 @@ public record InviteCardVO(
         Integer peopleLimit,
         String shareUrl,
         String qrCodeText,
-        String routeName
+        String routeName,
+        String routeKey
 ) {
 }
