@@ -4,7 +4,7 @@
 >
 > 一款融合手绘水墨美学、高德地图深度交互、AI 智慧伴游的南京城市探索应用。以「折衷新艺术运动」设计语言重塑城市漫游体验，为 Gen-Z 探索者和在宁大学生打造一本活的数字旅行手账。
 
-🌐 **在线访问**：[**njuel.xin**](//njuel.xin) — 无需部署，即刻体验灵动金陵！
+🌐 **在线访问**：[**njuel.xin**](//njuel.xin) — 无需部署，即刻体验灵动金陵！//注：手动删除http前缀，只保留njuel.xin
 
 <p align="center">
   <img src="https://img.shields.io/badge/Spring_Boot-3.3.5-6DB33F?logo=springboot" alt="Spring Boot">
